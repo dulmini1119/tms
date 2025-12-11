@@ -10,6 +10,9 @@ export class BusinessUnitController {
   getAll = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await this.service.getAll(req.query);
+      if (!result) {
+      return ApiResponse.success(res, { businessUnits: [], total: 0, page: 1, limit: 10, totalPages: 0 });
+    }
       ApiResponse.success(res, result);
     } catch (error) {
       next(error);
