@@ -2,19 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+
+  // PROXY ALL API CALLS TO YOUR EXPRESS BACKEND (port 3001)
   async rewrites() {
     return [
-      // --- Departments ---
-      {
-        source: "/departments/:path*",
-        destination: "http://localhost:3001/departments/:path*",
-      },
-      {
-        source: "/departments/:path*",
-        destination: "http://localhost:3001/departments/:path*",
-      },
-
-      // --- Business Units ---
+      // ── BUSINESS UNITS ─────────────────────────────────────
       {
         source: "/business-units",
         destination: "http://localhost:3001/business-units",
@@ -24,7 +16,17 @@ const nextConfig: NextConfig = {
         destination: "http://localhost:3001/business-units/:path*",
       },
 
-      // --- Users ---
+      // ── DEPARTMENTS ───────────────────────────────────────
+      {
+        source: "/departments",
+        destination: "http://localhost:3001/departments",
+      },
+      {
+        source: "/departments/:path*",
+        destination: "http://localhost:3001/departments/:path*",
+      },
+
+      // ── USERS ─────────────────────────────────────────────
       {
         source: "/users",
         destination: "http://localhost:3001/users",
@@ -34,7 +36,7 @@ const nextConfig: NextConfig = {
         destination: "http://localhost:3001/users/:path*",
       },
 
-      // --- Auth ---
+      // ── AUTH ──────────────────────────────────────────────
       {
         source: "/auth",
         destination: "http://localhost:3001/auth",
@@ -44,7 +46,7 @@ const nextConfig: NextConfig = {
         destination: "http://localhost:3001/auth/:path*",
       },
 
-      // --- Roles ---
+      // ── ROLES & PERMISSIONS ───────────────────────────────
       {
         source: "/roles",
         destination: "http://localhost:3001/roles",
@@ -53,8 +55,6 @@ const nextConfig: NextConfig = {
         source: "/roles/:path*",
         destination: "http://localhost:3001/roles/:path*",
       },
-
-      // --- Permissions ---
       {
         source: "/permissions",
         destination: "http://localhost:3001/permissions",
@@ -64,19 +64,30 @@ const nextConfig: NextConfig = {
         destination: "http://localhost:3001/permissions/:path*",
       },
 
-      // Add more backend modules here using the same pattern
+      // ── FALLBACK: ANY OTHER /api/* routes (optional safety) ──
+      {
+        source: "/api/:path*",
+        destination: "http://localhost:3001/api/:path*",
+      },
     ];
   },
 
-  // Optional: allow images from backend
+  // Allow images from backend (avatars, uploads, etc.)
   images: {
     remotePatterns: [
       {
         protocol: "http",
         hostname: "localhost",
         port: "3001",
+        pathname: "/**",
       },
     ],
+  },
+
+  // This is crucial for query params like ?page=1&limit=10&search=tech
+  // Without it Next.js strips or messes up the query string on some rewrites
+  experimental: {
+    proxyTimeout: 60_000, // 60 seconds (prevents timeout on large responses)
   },
 };
 

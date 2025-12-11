@@ -1,14 +1,14 @@
 "use client";
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Plus,
   Search,
   MoreHorizontal,
   Edit,
   Trash2,
-  Users,
   Building,
-  Briefcase,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,663 +37,364 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { toast } from "sonner";
 
-interface BusinessUnits {
-  id: number;
+interface BusinessUnit {
+  id: string;
   name: string;
   code: string;
-  manager: string;
-  managerEmail: string;
-  department: string;
-  employeeCount: number;
-  budget: number;
-  established: string;
+  created_at: string;
+  updated_at: string;
+  users_business_units_head_idTousers?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  } | null;
+  departments?: { name: string }[] | null;
+  _count?: {
+    users_users_business_unit_idTobusiness_units: number;
+  };
 }
 
-const initialBusinessUnits: BusinessUnits[] = [
-  {
-    id: 1,
-    name: "Technology",
-    code: "TECH",
-    manager: "John Smith",
-    managerEmail: "john.smith@company.com",
-    department: "Information Technology",
-    employeeCount: 78,
-    budget: 5500000,
-    established: "2020-01-01",
-  },
-  {
-    id: 2,
-    name: "Sales & Marketing",
-    code: "SM",
-    manager: "Sarah Johnson",
-    managerEmail: "sarah.johnson@company.com",
-    department: "Marketing",
-    employeeCount: 56,
-    budget: 3200000,
-    established: "2020-01-01",
-  },
-  {
-    id: 3,
-    name: "Administration",
-    code: "ADMIN",
-    manager: "Mike Wilson",
-    managerEmail: "mike.wilson@company.com",
-    department: "Human Resources",
-    employeeCount: 42,
-    budget: 2100000,
-    established: "2020-01-01",
-  },
-  {
-    id: 4,
-    name: "Finance",
-    code: "FIN",
-    manager: "Emily Davis",
-    managerEmail: "emily.davis@company.com",
-    department: "Finance",
-    employeeCount: 35,
-    budget: 1800000,
-    established: "2020-01-01",
-  },
-  {
-    id: 5,
-    name: "Operations",
-    code: "OPS",
-    manager: "David Brown",
-    managerEmail: "david.brown@company.com",
-    department: "Operations",
-    employeeCount: 89,
-    budget: 4200000,
-    established: "2020-01-01",
-  },
-];
-
-const availableManagers = [
-  "John Smith",
-  "Sarah Johnson",
-  "Mike Wilson",
-  "Emily Davis",
-  "David Brown",
-  "Lisa Anderson",
-  "Tom Garcia",
-  "Maria Rodriguez",
-];
-
-const availableDepartments = [
-  "Information Technology",
-  "Marketing",
-  "Sales",
-  "Human Resources",
-  "Legal",
-  "Facilities",
-  "Finance",
-  "Accounting",
-  "Treasury",
-  "Operations",
-  "Supply Chain",
-  "Quality",
-];
-
-export default function BusinessUnits() {
+export default function BusinessUnitsPage() {
+  const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingBU, setEditingBU] = useState<BusinessUnits | null>(null);
-  const [businessUnits, setBusinessUnits] =
-    useState<BusinessUnits[]>(initialBusinessUnits);
-  const [formData, setFormData] = useState<Partial<BusinessUnits>>({
-    id: 0,
-    name: "",
-    code: "",
-    manager: "",
-    managerEmail: "",
-    department: "",
-    budget: 0,
-    established: new Date().toISOString().split("T")[0],
-  });
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize] = useState(10);
 
-  // Simulate fetching employeeCount from a backend
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingUnit, setEditingUnit] = useState<BusinessUnit | null>(null);
+  const [formData, setFormData] = useState({ name: "", code: "" });
+
   useEffect(() => {
-    // Replace this with an actual API call to fetch employee counts
-    const fetchEmployeeCounts = async () => {
-      // Mock API response: { businessUnitId: number, employeeCount: number }[]
-      const mockResponse = [
-        { businessUnitId: 1, employeeCount: 78 },
-        { businessUnitId: 2, employeeCount: 56 },
-        { businessUnitId: 3, employeeCount: 42 },
-        { businessUnitId: 4, employeeCount: 35 },
-        { businessUnitId: 5, employeeCount: 89 },
-      ];
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-      setBusinessUnits((prev) =>
-        prev.map((bu) => {
-          const count =
-            mockResponse.find((r) => r.businessUnitId === bu.id)
-              ?.employeeCount || bu.employeeCount;
-          return { ...bu, employeeCount: count };
-        })
-      );
+  useEffect(() => setCurrentPage(1), [debouncedSearch]);
+
+  const getAuthHeaders = (): HeadersInit => {
+    const token = localStorage.getItem("authToken");
+    return {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
     };
-
-    fetchEmployeeCounts();
-  }, []);
-
-  const filteredBusinessUnits = businessUnits.filter(
-    (bu) =>
-      bu.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bu.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bu.manager.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bu.department.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleEditBU = (bu: BusinessUnits) => {
-    setEditingBU(bu);
-    setFormData({
-      id: bu.id,
-      name: bu.name,
-      code: bu.code,
-      manager: bu.manager,
-      managerEmail: bu.managerEmail,
-      department: bu.department,
-      budget: bu.budget,
-      established: bu.established,
-    });
-    setIsDialogOpen(true);
   };
 
-  const handleCreateBU = () => {
-    setEditingBU(null);
-    setFormData({
-      id: 0,
-      name: "",
-      code: "",
-      manager: "",
-      managerEmail: "",
-      department: "",
-      budget: 0,
-      established: new Date().toISOString().split("T")[0],
+const fetchBusinessUnits = useCallback(async () => {
+  try {
+    setLoading(true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+    const params = new URLSearchParams();
+    params.set("page", String(currentPage));
+    params.set("limit", String(pageSize));
+    if (debouncedSearch) params.set("search", debouncedSearch);
+
+    const res = await fetch(`/business-units?${params.toString()}`, {
+      headers: getAuthHeaders(),
+      signal: controller.signal,
     });
-    setIsDialogOpen(true);
-  };
+    clearTimeout(timeoutId);
 
-  const handleChange = (field: keyof BusinessUnits, value: string | number) => {
-    setFormData((prev) => {
-      const newManagerEmail =
-        field === "manager" &&
-        typeof value === "string" &&
-        value.trim() &&
-        value.includes(" ")
-          ? `${value.trim().toLowerCase().replace(/\s+/g, ".")}@company.com`
-          : prev.managerEmail;
-
-      return {
-        ...prev,
-        [field]: value,
-        managerEmail: newManagerEmail,
-      };
-    });
-  };
-
-  const handleSubmit = () => {
-    if (
-      !formData.name ||
-      !formData.code ||
-      !formData.manager ||
-      !formData.department
-    ) {
-      alert("Please fill in all required fields.");
+    // Try to parse JSON, but also capture plain text if JSON fails
+    const text = await res.text();
+    let data;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (parseErr) {
+      console.warn("Failed to parse JSON from /business-units response:", parseErr);
+      console.log("Response text:", text);
+      toast.error("Server returned malformed response (see console).");
       return;
     }
 
-    if (editingBU) {
-      setBusinessUnits((prev) =>
-        prev.map((bu) =>
-          bu.id === editingBU.id
-            ? { ...bu, ...formData, id: bu.id, employeeCount: bu.employeeCount }
-            : bu
-        )
-      );
-    } else {
-      setBusinessUnits((prev) => [
-        ...prev,
-        {
-          ...formData,
-          id: prev.length + 1,
-          employeeCount: 0, // Default to 0; will be updated by system
-          established:
-            formData.established || new Date().toISOString().split("T")[0],
-        } as BusinessUnits,
-      ]);
+    if (!res.ok) {
+      // Show everything helpful in console
+      console.error("BUSINESS UNITS ERROR:", {
+        status: res.status,
+        statusText: res.statusText,
+        body: data,
+        rawText: text,
+      });
+
+      // Try to show a friendly toast message from server
+      const serverMsg = data.error?.message || data.message || data?.errors?.[0]?.message;
+      toast.error(serverMsg || `Failed to load (status ${res.status})`);
+      return;
     }
-    setIsDialogOpen(false);
-    setFormData({
-      id: 0,
-      name: "",
-      code: "",
-      manager: "",
-      managerEmail: "",
-      department: "",
-      budget: 0,
-      established: new Date().toISOString().split("T")[0],
-    });
+
+    // success
+    setBusinessUnits(data.data?.businessUnits || []);
+    setTotalItems(data.data?.total ?? 0);
+    setTotalPages(data.data?.totalPages ?? 1);
+  } catch (err) {
+     if (err instanceof Error) {
+      toast.error("Request timed out. Please try again.");
+    } else if (err instanceof TypeError && err.message.includes('fetch')) {
+      toast.error("Network error. Please check your connection.");
+    } else {
+      toast.error("Failed to load business units");
+    }
+    console.error("Error fetching business units:", err);
+  } finally {
+    setLoading(false);
+  }
+}, [currentPage, debouncedSearch, pageSize]);
+
+
+  useEffect(() => {
+    fetchBusinessUnits();
+  }, [fetchBusinessUnits]);
+
+  const handleCreate = () => {
+    setEditingUnit(null);
+    setFormData({ name: "", code: "" });
+    setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: number) => {
-    setBusinessUnits((prev) => prev.filter((bu) => bu.id !== id));
+  const handleEdit = (unit: BusinessUnit) => {
+    setEditingUnit(unit);
+    setFormData({ name: unit.name, code: unit.code });
+    setIsDialogOpen(true);
   };
 
-  const formatCurrency = (amount: number) => {
-    return `Rs. ${new Intl.NumberFormat("en-LK", {
-      maximumFractionDigits: 0,
-    }).format(amount)}`;
+  const handleSubmit = async () => {
+    if (!formData.name.trim()) return toast.error("Name is required");
+
+    const url = editingUnit ? `/business-units/${editingUnit.id}` : "/business-units";
+    const method = editingUnit ? "PUT" : "POST";
+    const actionType = editingUnit ? "updating" : "creating";
+
+    try {
+      setActionLoading(actionType);
+      const res = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ name: formData.name.trim(), code: formData.code.trim() || undefined }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        return toast.error(data.message || "Operation failed");
+      }
+
+      toast.success(editingUnit ? "Updated successfully" : "Created successfully");
+      fetchBusinessUnits();
+      setIsDialogOpen(false);
+    } catch (err) {
+      toast.error("Something went wrong");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const totalPages =
-    pageSize > 0 ? Math.ceil(filteredBusinessUnits.length / pageSize) : 1;
-  const paginatedDocuments = filteredBusinessUnits.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this business unit permanently?")) return;
+
+    try {
+      const res = await fetch(`/business-units/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+
+      if (!res.ok) return toast.error(data.message || "Delete failed");
+
+      toast.success("Deleted successfully");
+      fetchBusinessUnits();
+    } catch (err) {
+      toast.error("Delete failed");
+      console.error(err);
+    }
+  };
+
+
+
+  if (loading && businessUnits.length === 0)
+    return <div className="flex justify-center py-10">Loading...</div>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="p-3">
-          <h1 className="text-2xl">BUSINESS UNITS</h1>
-          <p className="text-muted-foreground text-xs">
-            Manage business units and their departmental structure
+        <div>
+          <h1 className="text-2xl font-bold">BUSINESS UNITS</h1>
+          <p className="text-muted-foreground text-sm">
+            Manage organizational business units
           </p>
         </div>
-        <Button onClick={handleCreateBU}>
-          <Plus className="h-4 w-4" />
-          Add Business Unit
+        <Button onClick={handleCreate}>
+          <Plus className="mr-2 h-4 w-4" /> Add Business Unit
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Business Units</CardTitle>
+          <CardTitle>Business Units List</CardTitle>
           <CardDescription>
-            Overview of all business units in your organization
+            All business units in the organization
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center space-x-4 mb-6">
+          <div className="flex items-center mb-6">
             <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search business units..."
+                placeholder="Search by name or code..."
+                className="pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
               />
             </div>
           </div>
 
-          {/* Desktop Table View */}
-          <div className="hidden md:block">
-            <div className="w-full overflow-x-auto">
-              <Table>
-                <TableHeader>
+          <div className="rounded-md border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Manager</TableHead>
+                  <TableHead>Employees</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {businessUnits.length === 0 ? (
                   <TableRow>
-                    <TableHead>Business Unit</TableHead>
-                    <TableHead>Manager</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Employees</TableHead>
-                    <TableHead>Budget</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      No business units found
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedDocuments.map((bu) => (
+                ) : (
+                  businessUnits.map((bu) => (
                     <TableRow key={bu.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4" />
+                          {bu.name}
+                        </div>
+                      </TableCell>
                       <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Building className="h-4 w-4 text-muted-foreground" />
+                        <Badge variant="outline">{bu.code}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {bu.users_business_units_head_idTousers ? (
                           <div>
-                            <div className="font-medium">{bu.name}</div>
+                            <div className="font-medium">
+                              {bu.users_business_units_head_idTousers.first_name}{" "}
+                              {bu.users_business_units_head_idTousers.last_name}
+                            </div>
                             <div className="text-sm text-muted-foreground">
-                              {bu.code}
+                              {bu.users_business_units_head_idTousers.email}
                             </div>
                           </div>
-                        </div>
+                        ) : (
+                          <span className="text-muted-foreground italic">No manager</span>
+                        )}
                       </TableCell>
-
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{bu.manager}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {bu.managerEmail}
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <Badge variant="secondary" className="text-xs">
-                          <Briefcase className="h-3 w-3 mr-1" />
-                          {bu.department}
-                        </Badge>
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center gap-2">
                           <Users className="h-4 w-4 text-muted-foreground" />
-                          <span>{bu.employeeCount}</span>
+                          {bu._count?.users_users_business_unit_idTobusiness_units || 0}
                         </div>
                       </TableCell>
-
-                      <TableCell>
-                        <span className="font-medium">
-                          {formatCurrency(bu.budget)}
-                        </span>
-                      </TableCell>
-
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
+                            <Button variant="ghost" size="icon">
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEditBU(bu)}>
-                              <Edit className="h-4 w-4 mr-2" /> Edit
+                            <DropdownMenuItem onClick={() => handleEdit(bu)}>
+                              <Edit className="mr-2 h-4 w-4" /> Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => handleDelete(bu.id)}
                               className="text-destructive"
+                              onClick={() => handleDelete(bu.id)}
                             >
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="block md:hidden space-y-3">
-            {paginatedDocuments.map((bu) => (
-              <div
-                key={bu.id}
-                className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Building className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <div className="font-semibold">{bu.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {bu.code}
-                      </div>
-                    </div>
-                  </div>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleEditBU(bu)}>
-                        <Edit className="h-4 w-4 mr-2" /> Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleDelete(bu.id)}
-                        className="text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <p className="font-medium text-muted-foreground">
-                      Manager:
-                    </p>
-                    <p>{bu.manager}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-muted-foreground">Email:</p>
-                    <p className="truncate">{bu.managerEmail}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-muted-foreground">
-                      Department:
-                    </p>
-                    <p>{bu.department}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-muted-foreground">
-                      Employees:
-                    </p>
-                    <p>{bu.employeeCount}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-muted-foreground">Budget:</p>
-                    <p>{formatCurrency(bu.budget)}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
 
           {/* Pagination */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Show</span>
-              <Select
-                value={pageSize.toString()}
-                onValueChange={(v) => {
-                  setPageSize(Number(v));
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="w-16">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[10, 25, 50, 100].map((s) => (
-                    <SelectItem key={s} value={s.toString()}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-muted-foreground">
-                of {filteredBusinessUnits.length} documents
-              </span>
+          <div className="flex items-center justify-between mt-6">
+            <div className="text-sm text-muted-foreground">
+              Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalItems)} of {totalItems}
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages}
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                >
-                  First
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Prev
-                </Button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let num;
-                  if (totalPages <= 5) num = i + 1;
-                  else if (currentPage <= 3) num = i + 1;
-                  else if (currentPage >= totalPages - 2)
-                    num = totalPages - 4 + i;
-                  else num = currentPage - 2 + i;
-                  return num;
-                }).map((num) => (
-                  <Button
-                    key={num}
-                    variant={currentPage === num ? "default" : "outline"}
-                    size="icon"
-                    onClick={() => setCurrentPage(num)}
-                    className="w-9 h-9"
-                  >
-                    {num}
-                  </Button>
-                ))}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                >
-                  Last
-                </Button>
-              </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => p - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => p + 1)}
+              >
+                Next
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[525px]">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingBU ? "Edit Business Unit" : "Create New Business Unit"}
+              {editingUnit ? "Edit Business Unit" : "Create Business Unit"}
             </DialogTitle>
-            <DialogDescription>
-              {editingBU
-                ? "Update business unit information and settings"
-                : "Add a new business unit to the organization"}
-            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name
-              </Label>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Name *</Label>
               <Input
-                id="name"
-                value={formData.name || ""}
-                onChange={(e) => handleChange("name", e.target.value)}
-                className="col-span-3"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Technology Division"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="code" className="text-right">
-                Code
-              </Label>
+            <div className="space-y-2">
+              <Label>Code (optional)</Label>
               <Input
-                id="code"
-                value={formData.code || ""}
-                onChange={(e) => handleChange("code", e.target.value)}
-                className="col-span-3"
-                placeholder="e.g., TECH, SM, ADMIN"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="manager" className="text-right">
-                Manager
-              </Label>
-              <Select
-                value={formData.manager || ""}
-                onValueChange={(value) => handleChange("manager", value)}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select manager" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableManagers.map((manager) => (
-                    <SelectItem key={manager} value={manager}>
-                      {manager}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="department" className="text-right">
-                Department
-              </Label>
-              <Select
-                value={formData.department || ""}
-                onValueChange={(value) => handleChange("department", value)}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableDepartments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="budget" className="text-right">
-                Budget (Rs.)
-              </Label>
-              <Input
-                id="budget"
-                type="number"
-                value={formData.budget || ""}
-                onChange={(e) => handleChange("budget", Number(e.target.value))}
-                className="col-span-3"
-                placeholder="Annual budget"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="established" className="text-right">
-                Established
-              </Label>
-              <Input
-                id="established"
-                type="date"
-                value={formData.established || ""}
-                onChange={(e) => handleChange("established", e.target.value)}
-                className="col-span-3"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                placeholder="e.g., TECH"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" onClick={handleSubmit}>
-              {editingBU ? "Update Business Unit" : "Create Business Unit"}
+            <Button onClick={handleSubmit} disabled={!!actionLoading}>
+              {actionLoading === 'updating' || actionLoading === 'creating'
+              ? "Processing..."
+            : editingUnit ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
