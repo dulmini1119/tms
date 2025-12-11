@@ -1,0 +1,1176 @@
+generator client {
+  provider = "prisma-client-js"
+ engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+
+}
+
+model agreement_rate_cards {
+  id                       String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agreement_id             String         @db.Uuid
+  vehicle_type             String         @db.VarChar(50)
+  base_rate                Decimal?       @db.Decimal(10, 2)
+  per_km_rate              Decimal?       @db.Decimal(10, 2)
+  per_hour_rate            Decimal?       @db.Decimal(10, 2)
+  night_charges            Decimal?       @db.Decimal(10, 2)
+  holiday_charges          Decimal?       @db.Decimal(10, 2)
+  waiting_charges_per_hour Decimal?       @db.Decimal(10, 2)
+  minimum_charge           Decimal?       @db.Decimal(10, 2)
+  cancellation_charge      Decimal?       @db.Decimal(10, 2)
+  currency                 String?        @db.VarChar(10)
+  effective_from           DateTime?      @db.Date
+  effective_to             DateTime?      @db.Date
+  created_at               DateTime?      @default(now()) @db.Timestamp(6)
+  created_by               String?        @db.Uuid
+  cab_agreements           cab_agreements @relation(fields: [agreement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users                    users?         @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model audit_logs {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String?   @db.Uuid
+  user_name      String?   @db.VarChar(255)
+  user_email     String?   @db.VarChar(255)
+  user_role      String?   @db.VarChar(100)
+  action         String    @db.VarChar(100)
+  module         String    @db.VarChar(100)
+  entity_type    String?   @db.VarChar(100)
+  entity_id      String?   @db.Uuid
+  entity_name    String?   @db.VarChar(255)
+  old_value      Json?
+  new_value      Json?
+  changes        Json?
+  ip_address     String?   @db.VarChar(50)
+  user_agent     String?
+  request_method String?   @db.VarChar(10)
+  request_url    String?   @db.VarChar(500)
+  status         String?   @db.VarChar(50)
+  error_message  String?
+  session_id     String?   @db.VarChar(255)
+  request_id     String?   @db.VarChar(255)
+  description    String?
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  users          users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([action], map: "idx_audit_logs_action")
+  @@index([created_at], map: "idx_audit_logs_created")
+  @@index([module], map: "idx_audit_logs_module")
+  @@index([user_id], map: "idx_audit_logs_user")
+}
+
+model business_units {
+  id                                           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                         String        @db.VarChar(200)
+  code                                         String        @unique @db.VarChar(50)
+  description                                  String?
+  head_id                                      String?       @db.Uuid
+  status                                       String?       @default("Active") @db.VarChar(20)
+  created_at                                   DateTime?     @default(now()) @db.Timestamp(6)
+  created_by                                   String?       @db.Uuid
+  updated_at                                   DateTime?     @default(now()) @db.Timestamp(6)
+  updated_by                                   String?       @db.Uuid
+  deleted_at                                   DateTime?     @db.Timestamp(6)
+  users_business_units_created_byTousers       users?        @relation("business_units_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_business_units_created_by")
+  users_business_units_head_idTousers          users?        @relation("business_units_head_idTousers", fields: [head_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_business_units_head")
+  users_business_units_updated_byTousers       users?        @relation("business_units_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_business_units_updated_by")
+  departments                                  departments[]
+  users_users_business_unit_idTobusiness_units users[]       @relation("users_business_unit_idTobusiness_units")
+}
+
+model cab_agreements {
+  id                                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cab_service_id                         String                 @db.Uuid
+  agreement_number                       String                 @unique @db.VarChar(100)
+  title                                  String                 @db.VarChar(255)
+  type                                   String?                @db.VarChar(100)
+  status                                 String?                @default("Draft") @db.VarChar(50)
+  priority                               String?                @db.VarChar(20)
+  client_company_name                    String?                @db.VarChar(255)
+  client_contact_person                  String?                @db.VarChar(255)
+  client_email                           String?                @db.VarChar(255)
+  client_phone                           String?                @db.VarChar(20)
+  start_date                             DateTime               @db.Date
+  end_date                               DateTime               @db.Date
+  auto_renewal                           Boolean?               @default(false)
+  renewal_period                         String?                @db.VarChar(50)
+  notice_period_days                     Int?
+  contract_value                         Decimal?               @db.Decimal(15, 2)
+  currency                               String?                @db.VarChar(10)
+  payment_terms                          String?
+  payment_schedule                       String?                @db.VarChar(50)
+  security_deposit                       Decimal?               @db.Decimal(15, 2)
+  insurance_required                     Boolean?               @default(false)
+  insurance_amount                       Decimal?               @db.Decimal(15, 2)
+  insurance_provider                     String?                @db.VarChar(255)
+  insurance_policy_number                String?                @db.VarChar(100)
+  insurance_expiry_date                  DateTime?              @db.Date
+  sla_response_time                      Int?
+  sla_availability_percentage            Decimal?               @db.Decimal(5, 2)
+  sla_on_time_performance                Decimal?               @db.Decimal(5, 2)
+  termination_clause                     String?
+  penalty_clause                         String?
+  created_at                             DateTime?              @default(now()) @db.Timestamp(6)
+  created_by                             String?                @db.Uuid
+  updated_at                             DateTime?              @default(now()) @db.Timestamp(6)
+  updated_by                             String?                @db.Uuid
+  deleted_at                             DateTime?              @db.Timestamp(6)
+  agreement_rate_cards                   agreement_rate_cards[]
+  cab_services                           cab_services           @relation(fields: [cab_service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_cab_agreements_created_byTousers users?                 @relation("cab_agreements_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_cab_agreements_updated_byTousers users?                 @relation("cab_agreements_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model cab_services {
+  id                                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                 String           @db.VarChar(255)
+  code                                 String           @unique @db.VarChar(50)
+  type                                 String?          @db.VarChar(50)
+  status                               String?          @default("Active") @db.VarChar(20)
+  description                          String?
+  registration_number                  String?          @db.VarChar(100)
+  tax_id                               String?          @db.VarChar(100)
+  primary_contact_name                 String?          @db.VarChar(255)
+  primary_contact_position             String?          @db.VarChar(100)
+  primary_contact_email                String?          @db.VarChar(255)
+  primary_contact_phone                String?          @db.VarChar(20)
+  address_street                       String?          @db.VarChar(255)
+  address_city                         String?          @db.VarChar(100)
+  website                              String?          @db.VarChar(255)
+  service_areas                        String[]
+  is_24x7                              Boolean?         @default(false)
+  operating_hours_weekdays             String?          @db.VarChar(100)
+  operating_hours_weekends             String?          @db.VarChar(100)
+  operating_hours_holidays             String?          @db.VarChar(100)
+  completed_trips                      Int?             @default(0)
+  cancelled_trips                      Int?             @default(0)
+  created_at                           DateTime?        @default(now()) @db.Timestamp(6)
+  created_by                           String?          @db.Uuid
+  updated_at                           DateTime?        @default(now()) @db.Timestamp(6)
+  updated_by                           String?          @db.Uuid
+  deleted_at                           DateTime?        @db.Timestamp(6)
+  cab_agreements                       cab_agreements[]
+  users_cab_services_created_byTousers users?           @relation("cab_services_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_cab_services_updated_byTousers users?           @relation("cab_services_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  vehicles                             vehicles[]
+}
+
+model departments {
+  id                                     String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_unit_id                       String?         @db.Uuid
+  name                                   String          @db.VarChar(200)
+  code                                   String          @unique @db.VarChar(50)
+  description                            String?
+  type                                   String?         @db.VarChar(100)
+  status                                 String?         @default("Active") @db.VarChar(20)
+  head_id                                String?         @db.Uuid
+  budget_allocated                       Decimal?        @db.Decimal(15, 2)
+  budget_utilized                        Decimal?        @db.Decimal(15, 2)
+  budget_currency                        String?         @db.VarChar(10)
+  fiscal_year                            String?         @db.VarChar(20)
+  created_at                             DateTime?       @default(now()) @db.Timestamp(6)
+  created_by                             String?         @db.Uuid
+  updated_at                             DateTime?       @default(now()) @db.Timestamp(6)
+  updated_by                             String?         @db.Uuid
+  deleted_at                             DateTime?       @db.Timestamp(6)
+  business_units                         business_units? @relation(fields: [business_unit_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_departments_created_byTousers    users?          @relation("departments_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_departments_created_by")
+  users_departments_head_idTousers       users?          @relation("departments_head_idTousers", fields: [head_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_departments_head")
+  users_departments_updated_byTousers    users?          @relation("departments_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_departments_updated_by")
+  trip_requests                          trip_requests[]
+  users_users_department_idTodepartments users[]         @relation("users_department_idTodepartments")
+  vehicles                               vehicles[]
+  expenses                               department_expenses[]
+}                      
+
+model department_expenses {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  department_id String    @db.Uuid
+  amount        Decimal   @db.Decimal(15, 2)
+  description   String
+  expense_date  DateTime  @default(now()) @db.Timestamptz(6)
+  status        String    @default("Approved") @db.VarChar(20)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  created_by    String    @db.Uuid
+  approved_by   String?   @db.Uuid
+
+  // CORRECT RELATIONS WITH NAMED PAIRS
+  department    departments @relation(fields: [department_id], references: [id], onDelete: Cascade)
+  creator       users      @relation("expense_created_by", fields: [created_by], references: [id])
+  approver      users?     @relation("expense_approved_by", fields: [approved_by], references: [id])
+
+  @@index([department_id])
+  @@index([expense_date])
+}
+
+model documents {
+  id                                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entity_type                        String               @db.VarChar(50)
+  entity_id                          String               @db.Uuid
+  document_type                      String               @db.VarChar(100)
+  document_number                    String?              @db.VarChar(100)
+  file_name                          String               @db.VarChar(255)
+  file_path                          String
+  file_size                          BigInt?
+  mime_type                          String?              @db.VarChar(100)
+  issue_date                         DateTime?            @db.Date
+  expiry_date                        DateTime?            @db.Date
+  issuing_authority                  String?              @db.VarChar(255)
+  status                             String?              @default("Valid") @db.VarChar(50)
+  verification_status                String?              @db.VarChar(50)
+  verified_by                        String?              @db.Uuid
+  verified_at                        DateTime?            @db.Timestamp(6)
+  version                            String?              @default("1.0") @db.VarChar(20)
+  is_current                         Boolean?             @default(true)
+  replaces_document_id               String?              @db.Uuid
+  notes                              String?
+  created_at                         DateTime?            @default(now()) @db.Timestamp(6)
+  created_by                         String?              @db.Uuid
+  updated_at                         DateTime?            @default(now()) @db.Timestamp(6)
+  updated_by                         String?              @db.Uuid
+  deleted_at                         DateTime?            @db.Timestamp(6)
+  users_documents_created_byTousers  users?               @relation("documents_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  documents                          documents?           @relation("documentsTodocuments", fields: [replaces_document_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_documents                    documents[]          @relation("documentsTodocuments")
+  users_documents_updated_byTousers  users?               @relation("documents_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_documents_verified_byTousers users?               @relation("documents_verified_byTousers", fields: [verified_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  expiry_alerts                      expiry_alerts[]
+  insurance_policies                 insurance_policies[]
+
+  @@index([entity_type, entity_id], map: "idx_documents_entity")
+  @@index([expiry_date], map: "idx_documents_expiry")
+  @@index([status], map: "idx_documents_status")
+  @@index([document_type], map: "idx_documents_type")
+}
+
+model drivers {
+  id                                            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                                       String             @unique @db.Uuid
+  license_number                                String             @unique @db.VarChar(100)
+  license_type                                  String?            @db.VarChar(50)
+  license_issue_date                            DateTime?          @db.Date
+  license_expiry_date                           DateTime?          @db.Date
+  license_issuing_authority                     String?            @db.VarChar(255)
+  license_state                                 String?            @db.VarChar(100)
+  medical_certificate_number                    String?            @db.VarChar(100)
+  medical_certificate_expiry                    DateTime?          @db.Date
+  background_check_status                       String?            @db.VarChar(50)
+  background_check_date                         DateTime?          @db.Date
+  background_check_valid_until                  DateTime?          @db.Date
+  driver_status                                 String?            @default("Available") @db.VarChar(50)
+  years_of_experience                           Int?
+  previous_employer                             String?            @db.VarChar(255)
+  training_completed                            Boolean?           @default(false)
+  training_completion_date                      DateTime?          @db.Date
+  training_expiry_date                          DateTime?          @db.Date
+  total_trips_completed                         Int?               @default(0)
+  total_distance_driven                         Decimal?           @default(0) @db.Decimal(12, 2)
+  violations_count                              Int?               @default(0)
+  accidents_count                               Int?               @default(0)
+  current_vehicle_id                            String?            @db.Uuid
+  assigned_to_vehicle_date                      DateTime?          @db.Timestamp(6)
+  created_at                                    DateTime?          @default(now()) @db.Timestamp(6)
+  created_by                                    String?            @db.Uuid
+  updated_at                                    DateTime?          @default(now()) @db.Timestamp(6)
+  updated_by                                    String?            @db.Uuid
+  deleted_at                                    DateTime?          @db.Timestamp(6)
+  users_drivers_created_byTousers               users?             @relation("drivers_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_drivers_updated_byTousers               users?             @relation("drivers_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_drivers_user_idTousers                  users              @relation("drivers_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vehicles_drivers_current_vehicle_idTovehicles vehicles?          @relation("drivers_current_vehicle_idTovehicles", fields: [current_vehicle_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_drivers_vehicle")
+  gps_logs                                      gps_logs[]
+  trip_assignments                              trip_assignments[]
+  vehicles_vehicles_current_driver_idTodrivers  vehicles[]         @relation("vehicles_current_driver_idTodrivers")
+}
+
+model email_templates {
+  id                                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_code                           String    @unique @db.VarChar(100)
+  template_name                           String    @db.VarChar(255)
+  subject                                 String    @db.VarChar(500)
+  body_html                               String
+  body_text                               String?
+  category                                String?   @db.VarChar(100)
+  variables                               Json?
+  status                                  String?   @default("Active") @db.VarChar(20)
+  created_at                              DateTime? @default(now()) @db.Timestamp(6)
+  created_by                              String?   @db.Uuid
+  updated_at                              DateTime? @default(now()) @db.Timestamp(6)
+  updated_by                              String?   @db.Uuid
+  users_email_templates_created_byTousers users?    @relation("email_templates_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_email_templates_updated_byTousers users?    @relation("email_templates_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([template_code], map: "idx_email_templates_code")
+}
+
+model emergency_contacts {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String    @db.Uuid
+  name         String    @db.VarChar(200)
+  relationship String?   @db.VarChar(100)
+  phone        String    @db.VarChar(20)
+  email        String?   @db.VarChar(255)
+  is_primary   Boolean?  @default(false)
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+  updated_at   DateTime? @default(now()) @db.Timestamp(6)
+  users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model expiry_alerts {
+  id                                     String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alert_type                             String     @db.VarChar(100)
+  entity_type                            String     @db.VarChar(50)
+  entity_id                              String     @db.Uuid
+  entity_name                            String?    @db.VarChar(255)
+  document_id                            String?    @db.Uuid
+  document_name                          String?    @db.VarChar(255)
+  document_number                        String?    @db.VarChar(100)
+  issue_date                             DateTime?  @db.Date
+  expiry_date                            DateTime   @db.Date
+  days_to_expiry                         Int?
+  status                                 String?    @default("Active") @db.VarChar(50)
+  priority                               String?    @db.VarChar(20)
+  department                             String?    @db.VarChar(255)
+  assigned_to                            String?    @db.Uuid
+  reminders_sent                         Int?       @default(0)
+  last_reminder_date                     DateTime?  @db.Timestamp(6)
+  renewal_process_started                Boolean?   @default(false)
+  renewal_documents_submitted            Boolean?   @default(false)
+  renewal_payment_made                   Boolean?   @default(false)
+  new_expiry_date                        DateTime?  @db.Date
+  renewal_reference                      String?    @db.VarChar(100)
+  renewal_cost                           Decimal?   @db.Decimal(15, 2)
+  renewal_vendor                         String?    @db.VarChar(255)
+  notes                                  String?
+  resolved_at                            DateTime?  @db.Timestamp(6)
+  resolved_by                            String?    @db.Uuid
+  created_at                             DateTime?  @default(now()) @db.Timestamp(6)
+  updated_at                             DateTime?  @default(now()) @db.Timestamp(6)
+  users_expiry_alerts_assigned_toTousers users?     @relation("expiry_alerts_assigned_toTousers", fields: [assigned_to], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  documents                              documents? @relation(fields: [document_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_expiry_alerts_resolved_byTousers users?     @relation("expiry_alerts_resolved_byTousers", fields: [resolved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([entity_type, entity_id], map: "idx_expiry_alerts_entity")
+  @@index([expiry_date], map: "idx_expiry_alerts_expiry")
+  @@index([status], map: "idx_expiry_alerts_status")
+}
+
+model geofences {
+  id                                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                              String    @db.VarChar(255)
+  description                       String?
+  type                              String?   @db.VarChar(50)
+  center_latitude                   Decimal?  @db.Decimal(10, 8)
+  center_longitude                  Decimal?  @db.Decimal(11, 8)
+  radius_meters                     Decimal?  @db.Decimal(10, 2)
+  polygon_coordinates               Json?
+  status                            String?   @default("Active") @db.VarChar(20)
+  alert_on_entry                    Boolean?  @default(false)
+  alert_on_exit                     Boolean?  @default(true)
+  alert_recipients                  String[]
+  created_at                        DateTime? @default(now()) @db.Timestamp(6)
+  created_by                        String?   @db.Uuid
+  updated_at                        DateTime? @default(now()) @db.Timestamp(6)
+  updated_by                        String?   @db.Uuid
+  users_geofences_created_byTousers users?    @relation("geofences_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_geofences_updated_byTousers users?    @relation("geofences_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status], map: "idx_geofences_status")
+}
+
+model gps_devices {
+  id                                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  device_id                           String    @unique @db.VarChar(100)
+  imei                                String    @unique @db.VarChar(50)
+  vehicle_id                          String?   @db.Uuid
+  device_model                        String?   @db.VarChar(100)
+  manufacturer                        String?   @db.VarChar(100)
+  firmware_version                    String?   @db.VarChar(50)
+  installation_date                   DateTime? @db.Date
+  last_maintenance_date               DateTime? @db.Date
+  next_maintenance_date               DateTime? @db.Date
+  status                              String?   @default("Active") @db.VarChar(50)
+  battery_backup_hours                Int?
+  sim_number                          String?   @db.VarChar(50)
+  network_provider                    String?   @db.VarChar(100)
+  created_at                          DateTime? @default(now()) @db.Timestamp(6)
+  created_by                          String?   @db.Uuid
+  updated_at                          DateTime? @default(now()) @db.Timestamp(6)
+  updated_by                          String?   @db.Uuid
+  users_gps_devices_created_byTousers users?    @relation("gps_devices_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_gps_devices_updated_byTousers users?    @relation("gps_devices_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  vehicles                            vehicles? @relation(fields: [vehicle_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([device_id], map: "idx_gps_devices_device_id")
+  @@index([imei], map: "idx_gps_devices_imei")
+  @@index([vehicle_id], map: "idx_gps_devices_vehicle")
+}
+
+model gps_logs {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vehicle_id         String            @db.Uuid
+  driver_id          String?           @db.Uuid
+  trip_assignment_id String?           @db.Uuid
+  device_id          String?           @db.VarChar(100)
+  latitude           Decimal           @db.Decimal(10, 8)
+  longitude          Decimal           @db.Decimal(11, 8)
+  altitude           Decimal?          @db.Decimal(8, 2)
+  accuracy           Decimal?          @db.Decimal(8, 2)
+  address            String?           @db.VarChar(500)
+  speed              Decimal?          @db.Decimal(6, 2)
+  heading            Decimal?          @db.Decimal(5, 2)
+  ignition_status    String?           @db.VarChar(10)
+  mileage            Decimal?          @db.Decimal(10, 2)
+  battery_level      Decimal?          @db.Decimal(5, 2)
+  signal_strength    Decimal?          @db.Decimal(5, 2)
+  network_provider   String?           @db.VarChar(100)
+  geofence_status    String?           @db.VarChar(50)
+  speed_limit        Decimal?          @db.Decimal(6, 2)
+  is_speed_violation Boolean?          @default(false)
+  violation_count    Int?              @default(0)
+  panic_button       Boolean?          @default(false)
+  device_timestamp   DateTime          @db.Timestamp(6)
+  server_timestamp   DateTime?         @default(now()) @db.Timestamp(6)
+  created_at         DateTime?         @default(now()) @db.Timestamp(6)
+  drivers            drivers?          @relation(fields: [driver_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  trip_assignments   trip_assignments? @relation(fields: [trip_assignment_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  vehicles           vehicles          @relation(fields: [vehicle_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([latitude, longitude], map: "idx_gps_logs_location")
+  @@index([device_timestamp], map: "idx_gps_logs_timestamp")
+  @@index([trip_assignment_id], map: "idx_gps_logs_trip")
+  @@index([vehicle_id], map: "idx_gps_logs_vehicle")
+}
+
+model holidays {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  holiday_date   DateTime  @db.Date
+  holiday_name   String    @db.VarChar(255)
+  holiday_type   String?   @db.VarChar(50)
+  is_working_day Boolean?  @default(false)
+  region         String?   @db.VarChar(100)
+  country        String?   @db.VarChar(100)
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  created_by     String?   @db.Uuid
+  users          users?    @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([holiday_date], map: "idx_holidays_date")
+}
+
+model insurance_policies {
+  id                                         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vehicle_id                                 String     @db.Uuid
+  provider                                   String     @db.VarChar(255)
+  policy_number                              String     @unique @db.VarChar(100)
+  policy_type                                String?    @db.VarChar(100)
+  coverage                                   String?    @db.VarChar(500)
+  premium_amount                             Decimal?   @db.Decimal(15, 2)
+  currency                                   String?    @db.VarChar(10)
+  payment_frequency                          String?    @db.VarChar(50)
+  start_date                                 DateTime   @db.Date
+  expiry_date                                DateTime   @db.Date
+  status                                     String?    @default("Active") @db.VarChar(50)
+  idv_amount                                 Decimal?   @db.Decimal(15, 2)
+  deductible                                 Decimal?   @db.Decimal(15, 2)
+  agent_name                                 String?    @db.VarChar(255)
+  agent_contact                              String?    @db.VarChar(255)
+  claims_filed                               Int?       @default(0)
+  ncb_percentage                             Decimal?   @db.Decimal(5, 2)
+  document_id                                String?    @db.Uuid
+  created_at                                 DateTime?  @default(now()) @db.Timestamp(6)
+  created_by                                 String?    @db.Uuid
+  updated_at                                 DateTime?  @default(now()) @db.Timestamp(6)
+  updated_by                                 String?    @db.Uuid
+  users_insurance_policies_created_byTousers users?     @relation("insurance_policies_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  documents                                  documents? @relation(fields: [document_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_insurance_policies_updated_byTousers users?     @relation("insurance_policies_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  vehicles                                   vehicles   @relation(fields: [vehicle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([policy_number], map: "idx_insurance_policies_policy")
+  @@index([vehicle_id], map: "idx_insurance_policies_vehicle")
+}
+
+model login_history {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id              String    @db.Uuid
+  login_timestamp      DateTime  @db.Timestamp(6)
+  logout_timestamp     DateTime? @db.Timestamp(6)
+  ip_address           String?   @db.VarChar(50)
+  user_agent           String?
+  device               String?   @db.VarChar(255)
+  browser              String?   @db.VarChar(100)
+  operating_system     String?   @db.VarChar(100)
+  location_city        String?   @db.VarChar(100)
+  location_country     String?   @db.VarChar(100)
+  location_coordinates String?   @db.VarChar(100)
+  login_status         String?   @db.VarChar(50)
+  failure_reason       String?   @db.VarChar(255)
+  two_factor_used      Boolean?  @default(false)
+  session_id           String?   @db.VarChar(255)
+  session_duration     Int?
+  created_at           DateTime? @default(now()) @db.Timestamp(6)
+  users                users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([login_timestamp], map: "idx_login_history_timestamp")
+  @@index([user_id], map: "idx_login_history_user")
+}
+
+model maintenance_logs {
+  id                                       String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vehicle_id                               String              @db.Uuid
+  maintenance_type                         String              @db.VarChar(100)
+  category                                 String?             @db.VarChar(100)
+  priority                                 String?             @db.VarChar(20)
+  description                              String
+  symptoms                                 String?
+  root_cause                               String?
+  scheduled_date                           DateTime?           @db.Date
+  actual_date                              DateTime            @db.Date
+  duration_hours                           Decimal?            @db.Decimal(6, 2)
+  based_on                                 String?             @db.VarChar(50)
+  mileage_at_maintenance                   Decimal?            @db.Decimal(10, 2)
+  service_provider_type                    String?             @db.VarChar(50)
+  service_provider_name                    String?             @db.VarChar(255)
+  service_location                         String?             @db.VarChar(500)
+  service_advisor                          String?             @db.VarChar(255)
+  labor_cost                               Decimal?            @default(0) @db.Decimal(15, 2)
+  parts_cost                               Decimal?            @default(0) @db.Decimal(15, 2)
+  other_charges                            Decimal?            @default(0) @db.Decimal(15, 2)
+  tax_amount                               Decimal?            @default(0) @db.Decimal(15, 2)
+  discount                                 Decimal?            @default(0) @db.Decimal(15, 2)
+  total_cost                               Decimal?            @db.Decimal(15, 2)
+  currency                                 String?             @db.VarChar(10)
+  payment_status                           String?             @db.VarChar(50)
+  payment_method                           String?             @db.VarChar(50)
+  invoice_number                           String?             @db.VarChar(100)
+  invoice_date                             DateTime?           @db.Date
+  status                                   String?             @default("Scheduled") @db.VarChar(50)
+  completion_date                          DateTime?           @db.Date
+  quality_rating                           Decimal?            @db.Decimal(3, 2)
+  next_maintenance_date                    DateTime?           @db.Date
+  next_maintenance_mileage                 Decimal?            @db.Decimal(10, 2)
+  next_maintenance_type                    String?             @db.VarChar(100)
+  notes                                    String?
+  created_at                               DateTime?           @default(now()) @db.Timestamp(6)
+  created_by                               String?             @db.Uuid
+  updated_at                               DateTime?           @default(now()) @db.Timestamp(6)
+  updated_by                               String?             @db.Uuid
+  users_maintenance_logs_created_byTousers users?              @relation("maintenance_logs_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_maintenance_logs_updated_byTousers users?              @relation("maintenance_logs_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  vehicles                                 vehicles            @relation(fields: [vehicle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  maintenance_parts                        maintenance_parts[]
+
+  @@index([status], map: "idx_maintenance_logs_status")
+  @@index([maintenance_type], map: "idx_maintenance_logs_type")
+  @@index([vehicle_id], map: "idx_maintenance_logs_vehicle")
+}
+
+model maintenance_parts {
+  id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  maintenance_log_id   String           @db.Uuid
+  part_number          String?          @db.VarChar(100)
+  part_name            String           @db.VarChar(255)
+  brand                String?          @db.VarChar(100)
+  quantity             Int
+  unit_cost            Decimal?         @db.Decimal(15, 2)
+  total_cost           Decimal?         @db.Decimal(15, 2)
+  currency             String?          @db.VarChar(10)
+  warranty_duration    Int?
+  warranty_unit        String?          @db.VarChar(20)
+  warranty_expiry_date DateTime?        @db.Date
+  supplier             String?          @db.VarChar(255)
+  created_at           DateTime?        @default(now()) @db.Timestamp(6)
+  maintenance_logs     maintenance_logs @relation(fields: [maintenance_log_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([maintenance_log_id], map: "idx_maintenance_parts_log")
+}
+
+model notifications {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title             String    @db.VarChar(255)
+  message           String
+  type              String?   @db.VarChar(50)
+  category          String?   @db.VarChar(100)
+  severity          String?   @db.VarChar(20)
+  recipient_user_id String?   @db.Uuid
+  recipient_role    String?   @db.VarChar(100)
+  is_read           Boolean?  @default(false)
+  read_at           DateTime? @db.Timestamp(6)
+  sent_via_email    Boolean?  @default(false)
+  sent_via_sms      Boolean?  @default(false)
+  sent_via_push     Boolean?  @default(false)
+  entity_type       String?   @db.VarChar(50)
+  entity_id         String?   @db.Uuid
+  action_url        String?   @db.VarChar(500)
+  action_label      String?   @db.VarChar(100)
+  expires_at        DateTime? @db.Timestamp(6)
+  created_at        DateTime? @default(now()) @db.Timestamp(6)
+  users             users?    @relation(fields: [recipient_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_notifications_created")
+  @@index([is_read], map: "idx_notifications_read")
+  @@index([recipient_user_id], map: "idx_notifications_recipient")
+}
+
+model permissions {
+  id                                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                String             @unique @db.VarChar(100)
+  code                                String             @unique @db.VarChar(100)
+  module                              String             @db.VarChar(100)
+  action                              String             @db.VarChar(50)
+  resource                            String             @db.VarChar(100)
+  description                         String?
+  created_at                          DateTime?          @default(now()) @db.Timestamp(6)
+  created_by                          String?            @db.Uuid
+  updated_at                          DateTime?          @default(now()) @db.Timestamp(6)
+  updated_by                          String?            @db.Uuid
+  users_permissions_created_byTousers users?             @relation("permissions_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_permissions_updated_byTousers users?             @relation("permissions_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  role_permissions                    role_permissions[]
+}
+
+model role_permissions {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  role_id       String      @db.Uuid
+  permission_id String      @db.Uuid
+  assigned_date DateTime?   @default(now()) @db.Timestamp(6)
+  assigned_by   String?     @db.Uuid
+  created_at    DateTime?   @default(now()) @db.Timestamp(6)
+  users         users?      @relation(fields: [assigned_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  permissions   permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roles         roles       @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([role_id, permission_id])
+}
+
+model roles {
+  id                            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                          String             @unique @db.VarChar(100)
+  code                          String             @unique @db.VarChar(50)
+  description                   String?
+  category                      String?            @db.VarChar(50)
+  level                         Int?               @default(0)
+  status                        String?            @default("Active") @db.VarChar(20)
+  scope                         String?            @db.VarChar(50)
+  parent_role_id                String?            @db.Uuid
+  created_at                    DateTime?          @default(now()) @db.Timestamp(6)
+  created_by                    String?            @db.Uuid
+  updated_at                    DateTime?          @default(now()) @db.Timestamp(6)
+  updated_by                    String?            @db.Uuid
+  deleted_at                    DateTime?          @db.Timestamp(6)
+  role_permissions              role_permissions[]
+  users_roles_created_byTousers users?             @relation("roles_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  roles                         roles?             @relation("rolesToroles", fields: [parent_role_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_roles                   roles[]            @relation("rolesToroles")
+  users_roles_updated_byTousers users?             @relation("roles_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user_roles                    user_roles[]
+}
+
+model RefreshToken {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  token      String   @unique
+  userId     String   @db.Uuid
+  user       users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires_at DateTime
+  created_at DateTime @default(now())
+}
+
+
+model system_alerts {
+  id                                         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alert_code                                 String    @unique @db.VarChar(100)
+  alert_type                                 String    @db.VarChar(100)
+  severity                                   String?   @db.VarChar(20)
+  source_type                                String?   @db.VarChar(50)
+  source_id                                  String?   @db.Uuid
+  source_name                                String?   @db.VarChar(255)
+  title                                      String    @db.VarChar(255)
+  description                                String?
+  latitude                                   Decimal?  @db.Decimal(10, 8)
+  longitude                                  Decimal?  @db.Decimal(11, 8)
+  location_address                           String?   @db.VarChar(500)
+  status                                     String?   @default("Active") @db.VarChar(50)
+  acknowledged_at                            DateTime? @db.Timestamp(6)
+  acknowledged_by                            String?   @db.Uuid
+  resolved_at                                DateTime? @db.Timestamp(6)
+  resolved_by                                String?   @db.Uuid
+  resolution_notes                           String?
+  escalated                                  Boolean?  @default(false)
+  escalated_at                               DateTime? @db.Timestamp(6)
+  escalated_to                               String?   @db.Uuid
+  created_at                                 DateTime? @default(now()) @db.Timestamp(6)
+  updated_at                                 DateTime? @default(now()) @db.Timestamp(6)
+  users_system_alerts_acknowledged_byTousers users?    @relation("system_alerts_acknowledged_byTousers", fields: [acknowledged_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_system_alerts_escalated_toTousers    users?    @relation("system_alerts_escalated_toTousers", fields: [escalated_to], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_system_alerts_resolved_byTousers     users?    @relation("system_alerts_resolved_byTousers", fields: [resolved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([alert_code], map: "idx_system_alerts_code")
+  @@index([status], map: "idx_system_alerts_status")
+  @@index([alert_type], map: "idx_system_alerts_type")
+}
+
+model system_settings {
+  id                                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  setting_key                             String    @unique @db.VarChar(255)
+  setting_value                           String?
+  setting_type                            String?   @db.VarChar(50)
+  category                                String?   @db.VarChar(100)
+  description                             String?
+  is_encrypted                            Boolean?  @default(false)
+  created_at                              DateTime? @default(now()) @db.Timestamp(6)
+  created_by                              String?   @db.Uuid
+  updated_at                              DateTime? @default(now()) @db.Timestamp(6)
+  updated_by                              String?   @db.Uuid
+  users_system_settings_created_byTousers users?    @relation("system_settings_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_system_settings_updated_byTousers users?    @relation("system_settings_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([setting_key], map: "idx_system_settings_key")
+}
+
+model trip_approvals {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trip_request_id     String        @db.Uuid
+  approval_level      Int
+  approver_role       String?       @db.VarChar(100)
+  approver_user_id    String?       @db.Uuid
+  approver_department String?       @db.VarChar(255)
+  status              String?       @default("Pending") @db.VarChar(50)
+  approved_at         DateTime?     @db.Timestamp(6)
+  comments            String?
+  created_at          DateTime?     @default(now()) @db.Timestamp(6)
+  updated_at          DateTime?     @default(now()) @db.Timestamp(6)
+  users               users?        @relation(fields: [approver_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  trip_requests       trip_requests @relation(fields: [trip_request_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([approver_user_id], map: "idx_trip_approvals_approver")
+  @@index([trip_request_id], map: "idx_trip_approvals_request")
+  @@index([status], map: "idx_trip_approvals_status")
+}
+
+model trip_assignments {
+  id                         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trip_request_id            String        @db.Uuid
+  vehicle_id                 String        @db.Uuid
+  driver_id                  String        @db.Uuid
+  assignment_status          String?       @default("Assigned") @db.VarChar(50)
+  assigned_by                String?       @db.Uuid
+  assigned_at                DateTime?     @default(now()) @db.Timestamp(6)
+  started_at                 DateTime?     @db.Timestamp(6)
+  completed_at               DateTime?     @db.Timestamp(6)
+  actual_departure_time      DateTime?     @db.Timestamp(6)
+  actual_arrival_time        DateTime?     @db.Timestamp(6)
+  actual_distance            Decimal?      @db.Decimal(10, 2)
+  actual_duration            Int?
+  current_status             String?       @db.VarChar(50)
+  current_location_latitude  Decimal?      @db.Decimal(10, 8)
+  current_location_longitude Decimal?      @db.Decimal(11, 8)
+  last_location_update       DateTime?     @db.Timestamp(6)
+  passenger_rating           Decimal?      @db.Decimal(3, 2)
+  passenger_feedback         String?
+  driver_rating              Decimal?      @db.Decimal(3, 2)
+  driver_feedback            String?
+  created_at                 DateTime?     @default(now()) @db.Timestamp(6)
+  updated_at                 DateTime?     @default(now()) @db.Timestamp(6)
+  gps_logs                   gps_logs[]
+  users                      users?        @relation(fields: [assigned_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  drivers                    drivers       @relation(fields: [driver_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  trip_requests              trip_requests @relation(fields: [trip_request_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vehicles                   vehicles      @relation(fields: [vehicle_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  trip_costs                 trip_costs[]
+  trip_logs                  trip_logs[]
+
+  @@index([driver_id], map: "idx_trip_assignments_driver")
+  @@index([trip_request_id], map: "idx_trip_assignments_request")
+  @@index([assignment_status], map: "idx_trip_assignments_status")
+  @@index([vehicle_id], map: "idx_trip_assignments_vehicle")
+}
+
+model trip_costs {
+  id                                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trip_assignment_id                 String           @db.Uuid
+  base_fare                          Decimal?         @default(0) @db.Decimal(15, 2)
+  distance_charges                   Decimal?         @default(0) @db.Decimal(15, 2)
+  time_charges                       Decimal?         @default(0) @db.Decimal(15, 2)
+  fuel_cost                          Decimal?         @default(0) @db.Decimal(15, 2)
+  toll_charges                       Decimal?         @default(0) @db.Decimal(15, 2)
+  parking_charges                    Decimal?         @default(0) @db.Decimal(15, 2)
+  waiting_charges                    Decimal?         @default(0) @db.Decimal(15, 2)
+  night_surcharge                    Decimal?         @default(0) @db.Decimal(15, 2)
+  holiday_surcharge                  Decimal?         @default(0) @db.Decimal(15, 2)
+  driver_allowance                   Decimal?         @default(0) @db.Decimal(15, 2)
+  other_charges                      Decimal?         @default(0) @db.Decimal(15, 2)
+  tax_percentage                     Decimal?         @db.Decimal(5, 2)
+  tax_amount                         Decimal?         @default(0) @db.Decimal(15, 2)
+  sub_total                          Decimal?         @db.Decimal(15, 2)
+  discount                           Decimal?         @default(0) @db.Decimal(15, 2)
+  total_cost                         Decimal?         @db.Decimal(15, 2)
+  currency                           String?          @db.VarChar(10)
+  payment_status                     String?          @default("Pending") @db.VarChar(50)
+  payment_method                     String?          @db.VarChar(50)
+  paid_at                            DateTime?        @db.Timestamp(6)
+  invoice_number                     String?          @db.VarChar(100)
+  invoice_date                       DateTime?        @db.Date
+  cost_breakdown_details             Json?
+  created_at                         DateTime?        @default(now()) @db.Timestamp(6)
+  created_by                         String?          @db.Uuid
+  updated_at                         DateTime?        @default(now()) @db.Timestamp(6)
+  updated_by                         String?          @db.Uuid
+  users_trip_costs_created_byTousers users?           @relation("trip_costs_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  trip_assignments                   trip_assignments @relation(fields: [trip_assignment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_trip_costs_updated_byTousers users?           @relation("trip_costs_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([trip_assignment_id], map: "idx_trip_costs_assignment")
+  @@index([payment_status], map: "idx_trip_costs_payment_status")
+}
+
+model trip_logs {
+  id                       String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trip_request_id          String?           @db.Uuid
+  trip_assignment_id       String?           @db.Uuid
+  trip_number              String            @unique @db.VarChar(100)
+  trip_date                DateTime          @db.Date
+  trip_status              String?           @db.VarChar(50)
+  passenger_name           String?           @db.VarChar(255)
+  passenger_department     String?           @db.VarChar(255)
+  driver_name              String?           @db.VarChar(255)
+  vehicle_registration     String?           @db.VarChar(50)
+  from_location            String?           @db.VarChar(500)
+  to_location              String?           @db.VarChar(500)
+  planned_distance         Decimal?          @db.Decimal(10, 2)
+  actual_distance          Decimal?          @db.Decimal(10, 2)
+  planned_departure        DateTime?         @db.Timestamp(6)
+  actual_departure         DateTime?         @db.Timestamp(6)
+  planned_arrival          DateTime?         @db.Timestamp(6)
+  actual_arrival           DateTime?         @db.Timestamp(6)
+  total_duration           Int?
+  on_time                  Boolean?
+  total_cost               Decimal?          @db.Decimal(15, 2)
+  fuel_cost                Decimal?          @db.Decimal(15, 2)
+  toll_charges             Decimal?          @db.Decimal(15, 2)
+  parking_charges          Decimal?          @db.Decimal(15, 2)
+  other_charges            Decimal?          @db.Decimal(15, 2)
+  currency                 String?           @db.VarChar(10)
+  overall_rating           Decimal?          @db.Decimal(3, 2)
+  punctuality_rating       Decimal?          @db.Decimal(3, 2)
+  driver_behavior_rating   Decimal?          @db.Decimal(3, 2)
+  vehicle_condition_rating Decimal?          @db.Decimal(3, 2)
+  comments                 String?
+  created_at               DateTime?         @default(now()) @db.Timestamp(6)
+  trip_assignments         trip_assignments? @relation(fields: [trip_assignment_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  trip_requests            trip_requests?    @relation(fields: [trip_request_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([trip_date], map: "idx_trip_logs_date")
+  @@index([trip_number], map: "idx_trip_logs_number")
+  @@index([trip_status], map: "idx_trip_logs_status")
+}
+
+model trip_passengers {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trip_request_id String        @db.Uuid
+  name            String        @db.VarChar(255)
+  employee_id     String?       @db.VarChar(100)
+  department      String?       @db.VarChar(255)
+  phone_number    String?       @db.VarChar(20)
+  email           String?       @db.VarChar(255)
+  created_at      DateTime?     @default(now()) @db.Timestamp(6)
+  trip_requests   trip_requests @relation(fields: [trip_request_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([trip_request_id], map: "idx_trip_passengers_request")
+}
+
+model trip_requests {
+  id                                               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  request_number                                   String             @unique @db.VarChar(50)
+  requested_by_user_id                             String             @db.Uuid
+  requested_for_user_id                            String?            @db.Uuid
+  from_location_address                            String             @db.VarChar(500)
+  from_location_latitude                           Decimal?           @db.Decimal(10, 8)
+  from_location_longitude                          Decimal?           @db.Decimal(11, 8)
+  from_location_landmark                           String?            @db.VarChar(255)
+  to_location_address                              String             @db.VarChar(500)
+  to_location_latitude                             Decimal?           @db.Decimal(10, 8)
+  to_location_longitude                            Decimal?           @db.Decimal(11, 8)
+  to_location_landmark                             String?            @db.VarChar(255)
+  departure_date                                   DateTime           @db.Date
+  departure_time                                   DateTime           @db.Time(6)
+  return_date                                      DateTime?          @db.Date
+  return_time                                      DateTime?          @db.Time(6)
+  is_round_trip                                    Boolean?           @default(false)
+  estimated_distance                               Decimal?           @db.Decimal(10, 2)
+  estimated_duration                               Int?
+  trip_type                                        String?            @db.VarChar(100)
+  purpose_category                                 String             @db.VarChar(100)
+  purpose_description                              String
+  project_code                                     String?            @db.VarChar(100)
+  cost_center                                      String?            @db.VarChar(100)
+  business_justification                           String?
+  vehicle_type_required                            String?            @db.VarChar(50)
+  passenger_count                                  Int?               @default(1)
+  ac_required                                      Boolean?           @default(true)
+  luggage_type                                     String?            @db.VarChar(50)
+  luggage_requirements                             String?
+  wheelchair_accessible                            Boolean?           @default(false)
+  driver_required                                  Boolean?           @default(true)
+  special_instructions                             String?
+  priority                                         String?            @default("Medium") @db.VarChar(20)
+  status                                           String?            @default("Pending") @db.VarChar(50)
+  estimated_cost                                   Decimal?           @db.Decimal(15, 2)
+  currency                                         String?            @db.VarChar(10)
+  approval_required                                Boolean?           @default(true)
+  approval_level_required                          Int?               @default(1)
+  billing_type                                     String?            @db.VarChar(50)
+  bill_to_department_id                            String?            @db.Uuid
+  budget_code                                      String?            @db.VarChar(100)
+  cancelled_at                                     DateTime?          @db.Timestamp(6)
+  cancelled_by                                     String?            @db.Uuid
+  cancellation_reason                              String?
+  created_at                                       DateTime?          @default(now()) @db.Timestamp(6)
+  updated_at                                       DateTime?          @default(now()) @db.Timestamp(6)
+  trip_approvals                                   trip_approvals[]
+  trip_assignments                                 trip_assignments[]
+  trip_logs                                        trip_logs[]
+  trip_passengers                                  trip_passengers[]
+  departments                                      departments?       @relation(fields: [bill_to_department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_trip_requests_cancelled_byTousers          users?             @relation("trip_requests_cancelled_byTousers", fields: [cancelled_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_trip_requests_requested_by_user_idTousers  users              @relation("trip_requests_requested_by_user_idTousers", fields: [requested_by_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_trip_requests_requested_for_user_idTousers users?             @relation("trip_requests_requested_for_user_idTousers", fields: [requested_for_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([departure_date, departure_time], map: "idx_trip_requests_departure")
+  @@index([request_number], map: "idx_trip_requests_number")
+  @@index([status], map: "idx_trip_requests_status")
+  @@index([requested_by_user_id], map: "idx_trip_requests_user")
+}
+
+model user_roles {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String   @db.Uuid
+  role_id      String   @db.Uuid
+  assigned_date DateTime? @default(now()) @db.Timestamp(6)
+  assigned_by  String?   @db.Uuid
+  status       String?   @default("Active") @db.VarChar(20)
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+  updated_at   DateTime? @default(now()) @db.Timestamp(6)
+
+  // Relations
+  assignedBy   users?    @relation("user_roles_assigned_byTousers", fields: [assigned_by], references: [id])
+  role         roles     @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  user         users     @relation("user_roles_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, role_id])
+  @@map("user_roles")  // This is the key!
+}
+
+model users {
+  id                                                       String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id                                              String                 @unique @db.VarChar(50)
+  email                                                    String                 @unique @db.VarChar(255)
+  password_hash                                            String                 @db.VarChar(255)
+  first_name                                               String                 @db.VarChar(100)
+  last_name                                                String                 @db.VarChar(100)
+  phone                                                    String?                @db.VarChar(20)
+  date_of_birth                                            DateTime?              @db.Date
+  gender                                                   String?                @db.VarChar(20)
+  profile_picture                                          String?
+  address_street                                           String?                @db.VarChar(255)
+  address_city                                             String?                @db.VarChar(100)
+  address_state                                            String?                @db.VarChar(100)
+  address_zip_code                                         String?                @db.VarChar(20)
+  address_country                                          String?                @db.VarChar(100)
+  department_id                                            String?                @db.Uuid
+  business_unit_id                                         String?                @db.Uuid
+  position                                                 String?                @db.VarChar(100)
+  manager_id                                               String?                @db.Uuid
+  hire_date                                                DateTime?              @db.Date
+  employment_type                                          String?                @db.VarChar(50)
+  work_location                                            String?                @db.VarChar(255)
+  salary_amount                                            Decimal?               @db.Decimal(15, 2)
+  salary_currency                                          String?                @db.VarChar(10)
+  salary_frequency                                         String?                @db.VarChar(20)
+  status                                                   String?                @default("Active") @db.VarChar(20)
+  two_factor_enabled                                       Boolean?               @default(false)
+  last_login                                               DateTime?              @db.Timestamp(6)
+  login_count                                              Int?                   @default(0)
+  password_last_changed                                    DateTime?              @db.Timestamp(6)
+  created_at                                               DateTime?              @default(now()) @db.Timestamp(6)
+  created_by                                               String?                @db.Uuid
+  updated_at                                               DateTime?              @default(now()) @db.Timestamp(6)
+  updated_by                                               String?                @db.Uuid
+  deleted_at                                               DateTime?              @db.Timestamp(6)
+  agreement_rate_cards                                     agreement_rate_cards[]
+  audit_logs                                               audit_logs[]
+  expenses_created     department_expenses[] @relation("expense_created_by")
+  expenses_approved    department_expenses[] @relation("expense_approved_by")
+  business_units_business_units_created_byTousers          business_units[]       @relation("business_units_created_byTousers")
+  business_units_business_units_head_idTousers             business_units[]       @relation("business_units_head_idTousers")
+  business_units_business_units_updated_byTousers          business_units[]       @relation("business_units_updated_byTousers")
+  cab_agreements_cab_agreements_created_byTousers          cab_agreements[]       @relation("cab_agreements_created_byTousers")
+  cab_agreements_cab_agreements_updated_byTousers          cab_agreements[]       @relation("cab_agreements_updated_byTousers")
+  cab_services_cab_services_created_byTousers              cab_services[]         @relation("cab_services_created_byTousers")
+  cab_services_cab_services_updated_byTousers              cab_services[]         @relation("cab_services_updated_byTousers")
+  departments_departments_created_byTousers                departments[]          @relation("departments_created_byTousers")
+  departments_departments_head_idTousers                   departments[]          @relation("departments_head_idTousers")
+  departments_departments_updated_byTousers                departments[]          @relation("departments_updated_byTousers")
+  documents_documents_created_byTousers                    documents[]            @relation("documents_created_byTousers")
+  documents_documents_updated_byTousers                    documents[]            @relation("documents_updated_byTousers")
+  documents_documents_verified_byTousers                   documents[]            @relation("documents_verified_byTousers")
+  drivers_drivers_created_byTousers                        drivers[]              @relation("drivers_created_byTousers")
+  drivers_drivers_updated_byTousers                        drivers[]              @relation("drivers_updated_byTousers")
+  drivers_drivers_user_idTousers                           drivers?               @relation("drivers_user_idTousers")
+  email_templates_email_templates_created_byTousers        email_templates[]      @relation("email_templates_created_byTousers")
+  email_templates_email_templates_updated_byTousers        email_templates[]      @relation("email_templates_updated_byTousers")
+  emergency_contacts                                       emergency_contacts[]
+  expiry_alerts_expiry_alerts_assigned_toTousers           expiry_alerts[]        @relation("expiry_alerts_assigned_toTousers")
+  expiry_alerts_expiry_alerts_resolved_byTousers           expiry_alerts[]        @relation("expiry_alerts_resolved_byTousers")
+  geofences_geofences_created_byTousers                    geofences[]            @relation("geofences_created_byTousers")
+  geofences_geofences_updated_byTousers                    geofences[]            @relation("geofences_updated_byTousers")
+  gps_devices_gps_devices_created_byTousers                gps_devices[]          @relation("gps_devices_created_byTousers")
+  gps_devices_gps_devices_updated_byTousers                gps_devices[]          @relation("gps_devices_updated_byTousers")
+  holidays                                                 holidays[]
+  insurance_policies_insurance_policies_created_byTousers  insurance_policies[]   @relation("insurance_policies_created_byTousers")
+  insurance_policies_insurance_policies_updated_byTousers  insurance_policies[]   @relation("insurance_policies_updated_byTousers")
+  login_history                                            login_history[]
+  maintenance_logs_maintenance_logs_created_byTousers      maintenance_logs[]     @relation("maintenance_logs_created_byTousers")
+  maintenance_logs_maintenance_logs_updated_byTousers      maintenance_logs[]     @relation("maintenance_logs_updated_byTousers")
+  notifications                                            notifications[]
+  permissions_permissions_created_byTousers                permissions[]          @relation("permissions_created_byTousers")
+  permissions_permissions_updated_byTousers                permissions[]          @relation("permissions_updated_byTousers")
+  role_permissions                                         role_permissions[]
+  roles_roles_created_byTousers                            roles[]                @relation("roles_created_byTousers")
+  roles_roles_updated_byTousers                            roles[]                @relation("roles_updated_byTousers")
+  system_alerts_system_alerts_acknowledged_byTousers       system_alerts[]        @relation("system_alerts_acknowledged_byTousers")
+  system_alerts_system_alerts_escalated_toTousers          system_alerts[]        @relation("system_alerts_escalated_toTousers")
+  system_alerts_system_alerts_resolved_byTousers           system_alerts[]        @relation("system_alerts_resolved_byTousers")
+  system_settings_system_settings_created_byTousers        system_settings[]      @relation("system_settings_created_byTousers")
+  system_settings_system_settings_updated_byTousers        system_settings[]      @relation("system_settings_updated_byTousers")
+  trip_approvals                                           trip_approvals[]
+  trip_assignments                                         trip_assignments[]
+  trip_costs_trip_costs_created_byTousers                  trip_costs[]           @relation("trip_costs_created_byTousers")
+  trip_costs_trip_costs_updated_byTousers                  trip_costs[]           @relation("trip_costs_updated_byTousers")
+  trip_requests_trip_requests_cancelled_byTousers          trip_requests[]        @relation("trip_requests_cancelled_byTousers")
+  trip_requests_trip_requests_requested_by_user_idTousers  trip_requests[]        @relation("trip_requests_requested_by_user_idTousers")
+  trip_requests_trip_requests_requested_for_user_idTousers trip_requests[]        @relation("trip_requests_requested_for_user_idTousers")
+  user_roles_user_roles_assigned_byTousers                 user_roles[]           @relation("user_roles_assigned_byTousers")
+  user_roles_user_roles_user_idTousers                     user_roles[]           @relation("user_roles_user_idTousers")
+  users_users_created_byTousers                            users?                 @relation("users_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_users_created_by")
+  other_users_users_created_byTousers                      users[]                @relation("users_created_byTousers")
+  users_users_updated_byTousers                            users?                 @relation("users_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_users_updated_by")
+  other_users_users_updated_byTousers                      users[]                @relation("users_updated_byTousers")
+  business_units_users_business_unit_idTobusiness_units    business_units?        @relation("users_business_unit_idTobusiness_units", fields: [business_unit_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  departments_users_department_idTodepartments             departments?           @relation("users_department_idTodepartments", fields: [department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_users_manager_idTousers                            users?                 @relation("users_manager_idTousers", fields: [manager_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_users_users_manager_idTousers                      users[]                @relation("users_manager_idTousers")
+  vehicle_leases_vehicle_leases_created_byTousers          vehicle_leases[]       @relation("vehicle_leases_created_byTousers")
+  vehicle_leases_vehicle_leases_updated_byTousers          vehicle_leases[]       @relation("vehicle_leases_updated_byTousers")
+  vehicles_vehicles_created_byTousers                      vehicles[]             @relation("vehicles_created_byTousers")
+  vehicles_vehicles_updated_byTousers                      vehicles[]             @relation("vehicles_updated_byTousers")
+  refreshTokens                                            RefreshToken[]
+}
+
+model vehicle_leases {
+  id                                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vehicle_id                             String    @db.Uuid
+  lessor_name                            String    @db.VarChar(255)
+  lessor_contact                         String?   @db.VarChar(500)
+  lease_start_date                       DateTime  @db.Date
+  lease_end_date                         DateTime  @db.Date
+  monthly_payment                        Decimal?  @db.Decimal(15, 2)
+  total_lease_amount                     Decimal?  @db.Decimal(15, 2)
+  currency                               String?   @db.VarChar(10)
+  payment_status                         String?   @db.VarChar(50)
+  next_payment_date                      DateTime? @db.Date
+  terms_and_conditions                   String?
+  created_at                             DateTime? @default(now()) @db.Timestamp(6)
+  created_by                             String?   @db.Uuid
+  updated_at                             DateTime? @default(now()) @db.Timestamp(6)
+  updated_by                             String?   @db.Uuid
+  users_vehicle_leases_created_byTousers users?    @relation("vehicle_leases_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_vehicle_leases_updated_byTousers users?    @relation("vehicle_leases_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  vehicles                               vehicles  @relation(fields: [vehicle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model vehicles {
+  id                                           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  registration_number                          String               @unique @db.VarChar(50)
+  make                                         String               @db.VarChar(100)
+  model                                        String               @db.VarChar(100)
+  year                                         Int
+  color                                        String?              @db.VarChar(50)
+  chassis_number                               String?              @unique @db.VarChar(100)
+  engine_number                                String?              @unique @db.VarChar(100)
+  vehicle_type                                 String?              @db.VarChar(50)
+  fuel_type                                    String?              @db.VarChar(50)
+  transmission                                 String?              @db.VarChar(20)
+  seating_capacity                             Int?
+  operational_status                           String?              @default("Active") @db.VarChar(50)
+  availability_status                          String?              @default("Available") @db.VarChar(50)
+  condition_status                             String?              @db.VarChar(50)
+  current_location                             String?              @db.VarChar(255)
+  home_base                                    String?              @db.VarChar(255)
+  latitude                                     Decimal?             @db.Decimal(10, 8)
+  longitude                                    Decimal?             @db.Decimal(11, 8)
+  location_updated_at                          DateTime?            @db.Timestamp(6)
+  current_driver_id                            String?              @db.Uuid
+  assigned_department_id                       String?              @db.Uuid
+  driver_assigned_date                         DateTime?            @db.Timestamp(6)
+  engine_displacement                          String?              @db.VarChar(50)
+  engine_power                                 String?              @db.VarChar(50)
+  engine_torque                                String?              @db.VarChar(50)
+  fuel_capacity                                Decimal?             @db.Decimal(8, 2)
+  mileage_city                                 Decimal?             @db.Decimal(6, 2)
+  mileage_highway                              Decimal?             @db.Decimal(6, 2)
+  mileage_combined                             Decimal?             @db.Decimal(6, 2)
+  length_mm                                    Int?
+  width_mm                                     Int?
+  height_mm                                    Int?
+  wheelbase_mm                                 Int?
+  kerb_weight_kg                               Int?
+  gross_weight_kg                              Int?
+  ownership_type                               String?              @db.VarChar(50)
+  purchase_date                                DateTime?            @db.Date
+  purchase_price                               Decimal?             @db.Decimal(15, 2)
+  current_value                                Decimal?             @db.Decimal(15, 2)
+  total_kilometers                             Decimal?             @default(0) @db.Decimal(10, 2)
+  total_trips                                  Int?                 @default(0)
+  cab_service_id                               String?              @db.Uuid
+  created_at                                   DateTime?            @default(now()) @db.Timestamp(6)
+  created_by                                   String?              @db.Uuid
+  updated_at                                   DateTime?            @default(now()) @db.Timestamp(6)
+  updated_by                                   String?              @db.Uuid
+  deleted_at                                   DateTime?            @db.Timestamp(6)
+  drivers_drivers_current_vehicle_idTovehicles drivers[]            @relation("drivers_current_vehicle_idTovehicles")
+  gps_devices                                  gps_devices[]
+  gps_logs                                     gps_logs[]
+  insurance_policies                           insurance_policies[]
+  maintenance_logs                             maintenance_logs[]
+  trip_assignments                             trip_assignments[]
+  vehicle_leases                               vehicle_leases[]
+  drivers_vehicles_current_driver_idTodrivers  drivers?             @relation("vehicles_current_driver_idTodrivers", fields: [current_driver_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_vehicles_driver")
+  departments                                  departments?         @relation(fields: [assigned_department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cab_services                                 cab_services?        @relation(fields: [cab_service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_vehicles_created_byTousers             users?               @relation("vehicles_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_vehicles_updated_byTousers             users?               @relation("vehicles_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model rate_limit {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key       String   @db.VarChar(255)        // usually the IP address
+  points    Int
+  expire    DateTime @db.Timestamp(6)
+
+  @@unique([key])
+  @@index([key])
+  @@index([expire])
+}
+
+model PasswordReset {
+  id          Int      @id @default(autoincrement())
+  email       String
+  token       String
+  expires_at  DateTime
+  created_at  DateTime @default(now())
+}
+
+
