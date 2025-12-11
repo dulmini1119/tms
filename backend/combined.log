@@ -21,3 +21,8 @@
 {"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-11T04:31:51.875Z"}
 {"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-11T04:31:51.876Z"}
 {"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-11T04:31:51.876Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-11T04:37:41.161Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-11T04:37:41.168Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-11T04:37:41.169Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-11T04:37:41.170Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-11T04:37:41.171Z"}
