@@ -7,17 +7,28 @@ import { ValidatedRequest } from '../../middleware/validation.js';
 export class UsersController {
   private usersService = new UsersService();
 
-  getUsers = async (req: ValidatedRequest, res: Response, next: NextFunction) => {
-    try {
-      const filters = {
-        ...req.validatedQuery,
-        role: req.validatedQuery.forDepartmentHead ? 'hod' : req.validatedQuery.role,
-      };
-      const result = await this.usersService.getUsers(filters);
-      return ApiResponse.success(res, { users: result.users, pagination: result.pagination });
-    } catch (error) { next(error); }
-  };
+getUsers = async (req: ValidatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const filters: any = { ...req.validatedQuery };
 
+    // THIS IS THE FINAL WINNING VERSION
+    if (filters.forDepartmentHead === 'true') {
+      // Ignore all other filters — only return real HODs
+      filters.position = 'HOD';
+      filters.status = 'Active'; // optional: only active HODs
+      delete filters.role;
+      delete filters.forDepartmentHead;
+    }
+
+    const result = await this.usersService.getUsers(filters);
+    return ApiResponse.success(res, { 
+      users: result.users, 
+      pagination: result.pagination 
+    });
+  } catch (error) { 
+    next(error); 
+  }
+};
   getUserById = async (req: ValidatedRequest, res: Response, next: NextFunction) => {
     try {
       const id = req.validatedParams?.id || req.params.id;

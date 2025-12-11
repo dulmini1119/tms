@@ -1,7 +1,12 @@
 import Joi from 'joi';
 
 // Note: these values are aligned with your DB/seed values (Option B)
-const ROLE_VALUES = ['SUPERADMIN', 'VEHICLE_ADMIN', 'MANAGER', 'HOD', 'EMPLOYEE', 'DRIVER'] as const;
+const ROLE_VALUES = ['SUPERADMIN', 'VEHICLE_ADMIN', 'MANAGER', 'HOD', 'EMPLOYEE', 'DRIVER','ACCOUNTANT', 'FINANCE_MANAGER',      // ← new
+  'SECURITY',         // ← new
+  'MECHANIC',         // ← new
+  'IT_SUPPORT',       // ← new (example)
+  'COORDINATOR',      // ← new (example)
+  'DISPATCHER',] as const;
 const STATUS_VALUES = ['Active', 'Inactive', 'Suspended'] as const;
 
 // Create user schema

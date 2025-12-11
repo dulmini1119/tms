@@ -1,1 +1,23 @@
 {"clientVersion":"5.14.0","errorCode":"P1012","level":"error","message":"Database connection failed: error: Environment variable not found: DATABASE_URL.\n  -->  schema.prisma:8\n   | \n 7 |   provider = \"postgresql\"\n 8 |   url      = env(\"DATABASE_URL\")\n   | \n\nValidation Error Count: 1","name":"PrismaClientInitializationError","service":"tms-backend","stack":"PrismaClientInitializationError: error: Environment variable not found: DATABASE_URL.\n  -->  schema.prisma:8\n   | \n 7 |   provider = \"postgresql\"\n 8 |   url      = env(\"DATABASE_URL\")\n   | \n\nValidation Error Count: 1\n    at vr.<anonymous> (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\node_modules\\@prisma\\client\\runtime\\binary.js:168:3104)\n    at vr.emit (node:events:518:28)\n    at addChunk (node:internal/streams/readable:561:12)\n    at readableAddChunkPushObjectMode (node:internal/streams/readable:538:3)\n    at Readable.push (node:internal/streams/readable:393:5)\n    at vr._pushBuffer (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\node_modules\\@prisma\\client\\runtime\\binary.js:73:369)\n    at vr._transform (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\node_modules\\@prisma\\client\\runtime\\binary.js:73:199)\n    at Transform._write (node:internal/streams/transform:171:8)\n    at writeOrBuffer (node:internal/streams/writable:572:12)\n    at _write (node:internal/streams/writable:501:10)","timestamp":"2025-12-10T09:31:17.936Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-11T02:54:04.832Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-11T02:54:04.837Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-11T02:54:04.838Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-11T02:54:04.838Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-11T02:54:04.839Z"}
+{"level":"info","message":"User logged in: superadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2025-12-11T02:54:30.905Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-11T04:23:44.097Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-11T04:23:44.128Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-11T04:23:44.131Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-11T04:23:44.144Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-11T04:23:44.145Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-11T04:23:46.445Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-11T04:23:46.451Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-11T04:23:46.452Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-11T04:23:46.452Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-11T04:23:46.452Z"}
+{"level":"info","message":"User created: nisala.subasinghe@gmail.com","service":"tms-backend","timestamp":"2025-12-11T04:23:54.072Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-11T04:31:51.868Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-11T04:31:51.874Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-11T04:31:51.875Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-11T04:31:51.876Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-11T04:31:51.876Z"}
