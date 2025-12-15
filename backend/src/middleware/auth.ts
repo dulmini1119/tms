@@ -37,6 +37,7 @@ export const authenticate = async (
   res: Response,
   next: NextFunction
 ): Promise<void | Response> => {
+  console.log("Auth middleware: Cokkies received are" ,req.cookies);
   try {
     const accessToken = req.cookies.accessToken;
     const refreshToken = req.cookies.refreshToken;
