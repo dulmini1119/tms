@@ -16,6 +16,8 @@ import permissionRoutes from './modules/permissions/permission.routes.js';
 import rolesRoutes from './modules/roles/roles.routes.js';
 import departmentRoutes from './modules/departments/departments.routes.js';
 import businessUnitsRoute from './modules/business-units/business-units.routes.js';
+import cabServiceRoutes from './modules/cab-service/cab-service.routes.js';
+import cabAgreementsRoutes from './modules/cab-agreements/cab-agreements.routes.js';
 // ADD THIS LINE — CRITICAL!
 import { authenticate } from './middleware/auth.js';
 
@@ -62,7 +64,9 @@ app.use('/users', authenticate, usersRoutes);                    // PROTECTED
 app.use('/roles', authenticate, rolesRoutes);                    // PROTECTED
 app.use('/permissions', authenticate, permissionRoutes); 
 app.use('/departments', authenticate, departmentRoutes);  
-app.use('/business-units',authenticate,businessUnitsRoute)                  // PROTECTED
+app.use('/business-units',authenticate,businessUnitsRoute)
+app.use('/cab-services', cabServiceRoutes); // PROTECTED
+app.use('/cab-agreements', authenticate, cabAgreementsRoutes); // PROTECTED
 
 // 404 & Error handlers
 app.use(notFoundHandler);
