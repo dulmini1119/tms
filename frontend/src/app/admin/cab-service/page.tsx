@@ -10,6 +10,7 @@ import {
   Phone,
   Mail,
   FileText,
+  Globe,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,241 +53,218 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 
+// Interface should match the data structure returned by your API.
+// `vehicles_count` is a derived property and should be calculated on the backend.
 interface CabService {
-  id: number;
+  id: string;
   name: string;
-  businessRegNo: string;
-  contactPerson: string;
-  phone: string;
-  email: string;
-  address: string;
-  vehicleCount: number;
-  status: "Active" | "Inactive";
-  joinedDate: string;
+  code: string;
+  type?: string;
+  status?: "Active" | "Inactive";
+  registration_number?: string;
+  primary_contact_name?: string;
+  primary_contact_phone?: string;
+  primary_contact_email?: string;
+  address_street?: string;
+  website?: string;
+  service_areas?: string[];
+  is_24x7?: boolean;
+  created_at: string; // This will be our "Joined Date"
+  vehicles_count?: number; // Expected from the API, not in the main table schema
 }
-
-const initialCabServices: CabService[] = [
-  {
-    id: 1,
-    name: "City Cabs Ltd",
-    businessRegNo: "BR-4999MH2018PTC123456",
-    contactPerson: "Rajesh Kumar",
-    phone: "+94 765243210",
-    email: "rajesh@citycabs.com",
-    address: "123 Main Street, Andheri, Mumbai - 400058",
-    vehicleCount: 45,
-    status: "Active",
-    joinedDate: "2023-01-15",
-  },
-  {
-    id: 2,
-    name: "Swift Transport Co",
-    businessRegNo: "BR-U74999DL2019PTC789012",
-    contactPerson: "Priya Sharma",
-    phone: "+94 765043211",
-    email: "priya@swifttransport.com",
-    address: "456 Business Park, Gurgaon, Delhi - 122001",
-    vehicleCount: 78,
-    status: "Active",
-    joinedDate: "2023-03-20",
-  },
-  {
-    id: 3,
-    name: "Metro Cab Services",
-    businessRegNo: "BR-U74999KA2020PTC345678",
-    contactPerson: "Amit Patel",
-    phone: "+94 765043212",
-    email: "amit@metrocabs.com",
-    address: "789 Tech Park, Whitefield, Bangalore - 560066",
-    vehicleCount: 32,
-    status: "Inactive",
-    joinedDate: "2023-06-10",
-  },
-  {
-    id: 4,
-    name: "Express Wheels",
-    businessRegNo: "BR-U74999TN2021PTC901234",
-    contactPerson: "Lakshmi Iyer",
-    phone: "+94 765943213",
-    email: "lakshmi@expresswheels.com",
-    address: "321 IT Corridor, OMR, Chennai - 600096",
-    vehicleCount: 56,
-    status: "Active",
-    joinedDate: "2023-08-05",
-  },
-];
 
 export default function CabServices() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all-status");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<CabService | null>(null);
-  const [cabServices, setCabServices] =
-    useState<CabService[]>(initialCabServices);
+  const [cabServices, setCabServices] = useState<CabService[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
   const [formData, setFormData] = useState<Partial<CabService>>({
     name: "",
-    businessRegNo: "",
-    contactPerson: "",
-    phone: "",
-    email: "",
-    address: "",
+    code: "",
+    type: "",
+    registration_number: "",
+    primary_contact_name: "",
+    primary_contact_phone: "",
+    primary_contact_email: "",
+    address_street: "",
+    website: "",
+    service_areas: [],
     status: "Active",
-    joinedDate: new Date().toISOString().split("T")[0],
+    is_24x7: false,
   });
+
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
-    const fetchVehicleCounts = async () => {
-      // Mock API response for vehicleCount
-      const mockResponse = [
-        { id: 1, vehicleCount: 45 },
-        { id: 2, vehicleCount: 78 },
-        { id: 3, vehicleCount: 32 },
-        { id: 4, vehicleCount: 56 },
-      ];
-
-      setCabServices((prev) =>
-        prev.map((service) => {
-          const count =
-            mockResponse.find((r) => r.id === service.id)?.vehicleCount ||
-            service.vehicleCount;
-          return { ...service, vehicleCount: count };
-        })
-      );
-    };
-    fetchVehicleCounts();
+    fetchCabServices();
   }, []);
+
+  const fetchCabServices = async () => {
+    try {
+      setIsLoading(true);
+      // The backend should handle filtering out records where deleted_at is not null
+      const res = await fetch("/cab-services", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch cab services");
+      const data = await res.json();
+      setCabServices(data || []);
+    } catch (error) {
+      console.error("Error fetching cab services:", error);
+      toast.error("An error occurred while fetching cab services.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredServices = cabServices.filter(
     (service) =>
-      (service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        service.contactPerson
-          .toLowerCase()
+      (service.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        service.primary_contact_name
+          ?.toLowerCase()
           .includes(searchTerm.toLowerCase()) ||
-        service.businessRegNo
-          .toLowerCase()
+        service.registration_number
+          ?.toLowerCase()
           .includes(searchTerm.toLowerCase())) &&
       (statusFilter === "all-status" || service.status === statusFilter)
   );
 
-  const handleEditService = (service: CabService) => {
-    setEditingService(service);
-    setFormData(service);
-    setIsDialogOpen(true);
+  const handleChange = <K extends keyof CabService>(
+    field: K,
+    value: CabService[K]
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleCreateService = () => {
     setEditingService(null);
     setFormData({
       name: "",
-      businessRegNo: "",
-      contactPerson: "",
-      phone: "",
-      email: "",
-      address: "",
+      code: "",
+      type: "",
+      registration_number: "",
+      primary_contact_name: "",
+      primary_contact_phone: "",
+      primary_contact_email: "",
+      address_street: "",
+      website: "",
+      service_areas: [],
       status: "Active",
-      joinedDate: new Date().toISOString().split("T")[0],
+      is_24x7: false,
     });
     setIsDialogOpen(true);
   };
 
-  const handleChange = (field: keyof CabService, value: string | number) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+  const handleEditService = (service: CabService) => {
+    setEditingService(service);
+    setFormData({ ...service });
+    setIsDialogOpen(true);
   };
 
-  const handleSubmit = () => {
-    if (
-      !formData.name ||
-      !formData.businessRegNo ||
-      !formData.contactPerson ||
-      !formData.phone ||
-      !formData.email ||
-      !formData.address ||
-      !formData.status ||
-      !formData.joinedDate
-    ) {
-      alert("Please fill in all required fields.");
-      return;
-    }
-    if (!/^\+94 \d{9}$/.test(formData.phone || "")) {
-      alert("Phone number must be in the format +94 987654321");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email || "")) {
-      alert("Please provide a valid email address.");
-      return;
-    }
-    if (isNaN(new Date(formData.joinedDate).getTime())) {
-      alert("Please provide a valid join date.");
-      return;
-    }
-    if (
-      cabServices.some(
-        (service) =>
-          service.businessRegNo === formData.businessRegNo &&
-          (!editingService || service.id !== editingService.id)
-      )
-    ) {
-      alert("Business Registration Number must be unique.");
+  const handleSubmit = async () => {
+    if (!formData.name || !formData.code || !formData.service_areas?.length) {
+      toast.error("Name, Code, and Service Areas are required.");
       return;
     }
 
-    if (editingService) {
-      setCabServices((prev) =>
-        prev.map((service) =>
-          service.id === editingService.id
-            ? {
-                ...service,
-                ...formData,
-                id: service.id,
-                vehicleCount: service.vehicleCount,
-              }
-            : service
-        )
-      );
-    } else {
-      setCabServices((prev) => [
-        ...prev,
+    if (
+      formData.primary_contact_phone &&
+      !/^\+94\d{9}$/.test(formData.primary_contact_phone)
+    ) {
+      toast.error("Phone must be in format +94XXXXXXXXX");
+      return;
+    }
+
+    if (
+      formData.primary_contact_email &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.primary_contact_email)
+    ) {
+      toast.error("Invalid email format");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const payload = {
+        name: formData.name,
+        code: formData.code,
+        type: formData.type || null,
+        status: formData.status,
+        registration_number: formData.registration_number || null,
+        primary_contact_name: formData.primary_contact_name || null,
+        primary_contact_email: formData.primary_contact_email || null,
+        primary_contact_phone: formData.primary_contact_phone || null,
+        address_street: formData.address_street || null,
+        website: formData.website || null,
+        service_areas: formData.service_areas || [],
+        is_24x7: formData.is_24x7 || false,
+      };
+      console.log("Sending payload:", JSON.stringify(payload, null, 2));
+
+      const res = await fetch(
+        editingService ? `/cab-services/${editingService.id}` : "/cab-services",
         {
-          ...formData,
-          id: prev.length + 1,
-          vehicleCount: 0,
-        } as CabService,
-      ]);
+          method: editingService ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to save cab service");
+      }
+
+      await fetchCabServices();
+      setIsDialogOpen(false);
+      toast.success(
+        editingService ? "Updated successfully" : "Created successfully"
+      );
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to save cab service");
+    } finally {
+      setIsLoading(false);
     }
-    setIsDialogOpen(false);
-    setFormData({
-      name: "",
-      businessRegNo: "",
-      contactPerson: "",
-      phone: "",
-      email: "",
-      address: "",
-      status: "Active",
-      joinedDate: new Date().toISOString().split("T")[0],
+  };
+
+  // Soft delete: updates the 'deleted_at' field instead of removing the record.
+// This is the new, correct function
+const handleDeactivate = async (id: string, name: string) => {
+  if (!confirm(`Are you sure you want to deactivate "${name}"? This can be reversed.`)) return;
+  try {
+    setIsLoading(true);
+    // Use the correct DELETE route
+    const res = await fetch(`/cab-services/${id}`, {
+      method: "DELETE", // <-- Correct method
+      credentials: "include",
+      // No body or special headers are needed for this route
     });
-  };
+    if (!res.ok) throw new Error("Failed to deactivate service");
+    await fetchCabServices();
+    toast.success("Deactivated successfully");
+  } catch (error) {
+    console.error(error);
+    toast.error("Failed to deactivate cab service");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-  const handleDelete = (id: number) => {
-    setCabServices((prev) => prev.filter((service) => service.id !== id));
-  };
-
-  const getStatusBadge = (status: string) => {
-    return (
-      <Badge variant={status === "Active" ? "default" : "secondary"}>
-        {status}
-      </Badge>
-    );
-  };
+  const getStatusBadge = (status?: string) => (
+    <Badge variant={status === "Active" ? "default" : "secondary"}>
+      {status || "Inactive"}
+    </Badge>
+  );
 
   const totalPages =
     pageSize > 0 ? Math.ceil(filteredServices.length / pageSize) : 1;
-  const paginatedDocuments = filteredServices.slice(
+  const paginatedServices = filteredServices.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
@@ -314,6 +292,7 @@ export default function CabServices() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Search + Filter */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-3 sm:space-y-0 mb-6">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -324,10 +303,7 @@ export default function CabServices() {
                 className="pl-8"
               />
             </div>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => setStatusFilter(value)}
-            >
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
@@ -339,20 +315,21 @@ export default function CabServices() {
             </Select>
           </div>
 
+          {/* Table */}
           <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Service Provider</TableHead>
-                  <TableHead>Contact Details</TableHead>
-                  <TableHead>Business Registration</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Business Reg No</TableHead>
                   <TableHead>Vehicles</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedDocuments.map((service) => (
+                {paginatedServices.map((service) => (
                   <TableRow key={service.id}>
                     <TableCell>
                       <div className="flex items-center space-x-2">
@@ -360,7 +337,8 @@ export default function CabServices() {
                         <div>
                           <div className="font-medium">{service.name}</div>
                           <div className="text-sm text-muted-foreground">
-                            Joined: {service.joinedDate}
+                            Joined:{" "}
+                            {new Date(service.created_at).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
@@ -368,15 +346,15 @@ export default function CabServices() {
                     <TableCell>
                       <div className="space-y-1">
                         <div className="font-medium">
-                          {service.contactPerson}
+                          {service.primary_contact_name}
                         </div>
                         <div className="text-sm text-muted-foreground flex items-center">
-                          <Phone className="h-3 w-3 mr-1" />
-                          {service.phone}
+                          <Phone className="h-3 w-3 mr-1" />{" "}
+                          {service.primary_contact_phone}
                         </div>
                         <div className="text-sm text-muted-foreground flex items-center">
-                          <Mail className="h-3 w-3 mr-1" />
-                          {service.email}
+                          <Mail className="h-3 w-3 mr-1" />{" "}
+                          {service.primary_contact_email}
                         </div>
                       </div>
                     </TableCell>
@@ -384,14 +362,14 @@ export default function CabServices() {
                       <div className="flex items-center space-x-1">
                         <FileText className="h-3 w-3 text-muted-foreground" />
                         <span className="text-sm font-mono">
-                          {service.businessRegNo}
+                          {service.registration_number}
                         </span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-1">
                         <Car className="h-4 w-4 text-muted-foreground" />
-                        <span>{service.vehicleCount}</span>
+                        <span>{service.vehicles_count || 0}</span>
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(service.status)}</TableCell>
@@ -406,23 +384,22 @@ export default function CabServices() {
                           <DropdownMenuItem
                             onClick={() => handleEditService(service)}
                           >
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit Service
+                            <Edit className="h-4 w-4 mr-2" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() =>
                               alert(`Viewing agreements for ${service.name}`)
                             }
                           >
-                            <FileText className="h-4 w-4 mr-2" />
-                            View Agreements
+                            <FileText className="h-4 w-4 mr-2" /> Agreements
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => handleDelete(service.id)}
-                            className="text-destructive"
+                            onClick={() =>
+                              handleDeactivate(service.id, service.name)
+                            }
+                            className="text-destructive focus:text-destructive"
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Remove Service
+                            <Trash2 className="h-4 w-4 mr-2" /> Deactivate
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -433,9 +410,9 @@ export default function CabServices() {
             </Table>
           </div>
 
-          {/* Mobile Card Layout */}
+          {/* Mobile Cards */}
           <div className="md:hidden space-y-4">
-            {paginatedDocuments.map((service) => (
+            {paginatedServices.map((service) => (
               <div
                 key={service.id}
                 className="border rounded-lg p-4 shadow-sm bg-card text-card-foreground"
@@ -447,35 +424,27 @@ export default function CabServices() {
                   </div>
                   {getStatusBadge(service.status)}
                 </div>
-
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div>
                     <span className="font-medium text-foreground">
                       Contact:
                     </span>{" "}
                     <br />
-                    {service.contactPerson} — {service.phone}
+                    {service.primary_contact_name} —{" "}
+                    {service.primary_contact_phone}
                     <br />
-                    {service.email}
+                    {service.primary_contact_email}
                   </div>
-
                   <div className="flex items-center">
                     <FileText className="h-3 w-3 mr-1" />
                     <span className="text-foreground text-sm">
-                      Reg No: {service.businessRegNo}
+                      Reg No: {service.registration_number}
                     </span>
                   </div>
-
-                  <div className="flex items-center">
-                    <Car className="h-3 w-3 mr-1" />
-                    <span>{service.vehicleCount} Vehicles</span>
-                  </div>
-
                   <p className="text-xs text-muted-foreground">
-                    Joined: {service.joinedDate}
+                    Joined: {new Date(service.created_at).toLocaleDateString()}
                   </p>
                 </div>
-
                 <div className="flex justify-end mt-3">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -497,10 +466,12 @@ export default function CabServices() {
                         <FileText className="h-4 w-4 mr-2" /> Agreements
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => handleDelete(service.id)}
-                        className="text-destructive"
+                        onClick={() =>
+                          handleDeactivate(service.id, service.name)
+                        }
+                        className="text-destructive focus:text-destructive"
                       >
-                        <Trash2 className="h-4 w-4 mr-2" /> Remove
+                        <Trash2 className="h-4 w-4 mr-2" /> Deactivate
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -532,73 +503,69 @@ export default function CabServices() {
                 </SelectContent>
               </Select>
               <span className="text-muted-foreground">
-                of {filteredServices.length} documents
+                of {filteredServices.length} services
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages}
-              </span>
-              <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+              >
+                First
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Prev
+              </Button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let num;
+                if (totalPages <= 5) num = i + 1;
+                else if (currentPage <= 3) num = i + 1;
+                else if (currentPage >= totalPages - 2)
+                  num = totalPages - 4 + i;
+                else num = currentPage - 2 + i;
+                return num;
+              }).map((num) => (
                 <Button
-                  variant="outline"
+                  key={num}
+                  variant={currentPage === num ? "default" : "outline"}
                   size="icon"
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(num)}
+                  className="w-9 h-9"
                 >
-                  First
+                  {num}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Prev
-                </Button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let num;
-                  if (totalPages <= 5) num = i + 1;
-                  else if (currentPage <= 3) num = i + 1;
-                  else if (currentPage >= totalPages - 2)
-                    num = totalPages - 4 + i;
-                  else num = currentPage - 2 + i;
-                  return num;
-                }).map((num) => (
-                  <Button
-                    key={num}
-                    variant={currentPage === num ? "default" : "outline"}
-                    size="icon"
-                    onClick={() => setCurrentPage(num)}
-                    className="w-9 h-9"
-                  >
-                    {num}
-                  </Button>
-                ))}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                >
-                  Last
-                </Button>
-              </div>
+              ))}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+              >
+                Last
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Dialog / Form */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:w-[80vw] md:w-[60vw] lg:w-[625px] max-h-[90vh] overflow-y-auto p-4 sm:p-6 rounded-2xl">
           <DialogHeader>
@@ -611,7 +578,9 @@ export default function CabServices() {
                 : "Register a new cab service provider"}
             </DialogDescription>
           </DialogHeader>
+
           <div className="grid gap-4 py-4">
+            {/* Company Name */}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="name">Company Name</Label>
               <Input
@@ -621,70 +590,146 @@ export default function CabServices() {
                 className="col-span-3"
               />
             </div>
+
+            {/* Code */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="businessRegNo">Business Reg No.</Label>
+              <Label htmlFor="code">Code</Label>
               <Input
-                id="businessRegNo"
-                value={formData.businessRegNo || ""}
-                onChange={(e) => handleChange("businessRegNo", e.target.value)}
-                className="col-span-3"
-                placeholder="BR-XXXXXXXXXXXXXXXXX"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="contactPerson" className="text-right">
-                Contact Person
-              </Label>
-              <Input
-                id="contactPerson"
-                value={formData.contactPerson || ""}
-                onChange={(e) => handleChange("contactPerson", e.target.value)}
+                id="code"
+                value={formData.code || ""}
+                onChange={(e) => handleChange("code", e.target.value)}
                 className="col-span-3"
               />
             </div>
+
+            {/* Type */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phone" className="text-right">
-                Phone
-              </Label>
+              <Label htmlFor="type">Type</Label>
+              <Select
+                value={formData.type || ""}
+                onValueChange={(value) => handleChange("type", value)}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select service type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Taxi">Taxi</SelectItem>
+                  <SelectItem value="Ride-sharing">Ride-sharing</SelectItem>
+                  <SelectItem value="Luxury">Luxury</SelectItem>
+                  <SelectItem value="Airport Transfer">
+                    Airport Transfer
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Registration Number */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="registration_number">Business Reg No.</Label>
               <Input
-                id="phone"
-                value={formData.phone || ""}
-                onChange={(e) => handleChange("phone", e.target.value)}
+                id="registration_number"
+                value={formData.registration_number || ""}
+                onChange={(e) =>
+                  handleChange("registration_number", e.target.value)
+                }
                 className="col-span-3"
-                placeholder="+94 765432100"
+                placeholder="e.g., BR-123456789"
+              />
+            </div>
+
+            {/* Contact */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="primary_contact_name">Contact Person</Label>
+              <Input
+                id="primary_contact_name"
+                value={formData.primary_contact_name || ""}
+                onChange={(e) =>
+                  handleChange("primary_contact_name", e.target.value)
+                }
+                className="col-span-3"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">
-                Email
-              </Label>
+              <Label htmlFor="primary_contact_phone">Phone</Label>
               <Input
-                id="email"
-                type="email"
-                value={formData.email || ""}
-                onChange={(e) => handleChange("email", e.target.value)}
+                id="primary_contact_phone"
+                value={formData.primary_contact_phone || ""}
+                onChange={(e) =>
+                  handleChange("primary_contact_phone", e.target.value)
+                }
+                className="col-span-3"
+                placeholder="+94XXXXXXXXX"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="primary_contact_email">Email</Label>
+              <Input
+                id="primary_contact_email"
+                value={formData.primary_contact_email || ""}
+                onChange={(e) =>
+                  handleChange("primary_contact_email", e.target.value)
+                }
                 className="col-span-3"
               />
             </div>
+
+            {/* Website */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="website">Website</Label>
+              <div className="col-span-3 relative">
+                <Globe className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="website"
+                  value={formData.website || ""}
+                  onChange={(e) => handleChange("website", e.target.value)}
+                  className="pl-8"
+                  placeholder="https://www.example.com"
+                />
+              </div>
+            </div>
+
+            {/* Address */}
             <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="address" className="text-right mt-2">
-                Address
-              </Label>
+              <Label htmlFor="address_street">Address</Label>
               <Textarea
-                id="address"
-                value={formData.address || ""}
-                onChange={(e) => handleChange("address", e.target.value)}
+                id="address_street"
+                value={formData.address_street || ""}
+                onChange={(e) => handleChange("address_street", e.target.value)}
                 className="col-span-3"
                 rows={3}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="status" className="text-right">
-                Status
+
+            {/* Service Areas */}
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="service_areas">
+                Service Areas (comma separated)
               </Label>
+              <Input
+                id="service_areas"
+                value={formData.service_areas?.join(", ") || ""}
+                onChange={(e) =>
+                  handleChange(
+                    "service_areas",
+                    e.target.value
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                  )
+                }
+                className="col-span-3"
+                placeholder="e.g., Colombo, Kandy, Galle"
+              />
+            </div>
+
+            {/* Status */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="status">Status</Label>
               <Select
                 value={formData.status || ""}
-                onValueChange={(value) => handleChange("status", value)}
+                onValueChange={(value: "Active" | "Inactive") =>
+                  handleChange("status", value)
+                }
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select status" />
@@ -695,25 +740,26 @@ export default function CabServices() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* 24x7 */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="joinedDate" className="text-right">
-                Joined Date
-              </Label>
+              <Label htmlFor="is_24x7">24x7 Service</Label>
               <Input
-                id="joinedDate"
-                type="date"
-                value={formData.joinedDate || ""}
-                onChange={(e) => handleChange("joinedDate", e.target.value)}
-                className="col-span-3"
+                id="is_24x7"
+                type="checkbox"
+                checked={!!formData.is_24x7}
+                onChange={(e) => handleChange("is_24x7", e.target.checked)}
+                className="col-span-3 w-5 h-5"
               />
             </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" onClick={handleSubmit}>
-              {editingService ? "Update Service" : "Add Service"}
+            <Button onClick={handleSubmit} disabled={isLoading}>
+              {editingService ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -6,6 +6,25 @@ const nextConfig: NextConfig = {
   // PROXY ALL API CALLS TO YOUR EXPRESS BACKEND (port 3001)
   async rewrites() {
     return [
+      // ── CAB AGREEMENTS ───────────────────────────────────────
+      {
+        source: "/cab-agreements",
+        destination: "http://localhost:3001/cab-agreements",
+      },
+      {
+        source: "/cab-agreements/:path*",
+        destination: "http://localhost:3001/cab-agreements/:path*",
+      },
+      // ── CAB SERVICES ──────────────────────────────────────────
+      {
+        source: "/cab-services",
+        destination: "http://localhost:3001/cab-services",
+      },
+      {
+        source: "/cab-services/:path*",
+        destination: "http://localhost:3001/cab-services/:path*",
+      },
+
       // ── BUSINESS UNITS ─────────────────────────────────────
       {
         source: "/business-units",
