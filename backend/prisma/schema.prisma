@@ -99,6 +99,7 @@ model cab_agreements {
   renewal_period                         String?                @db.VarChar(50)
   notice_period_days                     Int?
   contract_value                         Decimal?               @db.Decimal(15, 2)
+  document_url                           String?                @db.VarChar(500)
   currency                               String?                @db.VarChar(10)
   payment_terms                          String?
   payment_schedule                       String?                @db.VarChar(50)
@@ -115,7 +116,7 @@ model cab_agreements {
   penalty_clause                         String?
   created_at                             DateTime?              @default(now()) @db.Timestamp(6)
   created_by                             String?                @db.Uuid
-  updated_at                             DateTime?              @default(now()) @db.Timestamp(6)
+  updated_at                             DateTime?              @updatedAt @db.Timestamp(6)
   updated_by                             String?                @db.Uuid
   deleted_at                             DateTime?              @db.Timestamp(6)
   agreement_rate_cards                   agreement_rate_cards[]
@@ -149,12 +150,12 @@ model cab_services {
   cancelled_trips                      Int?             @default(0)
   created_at                           DateTime?        @default(now()) @db.Timestamp(6)
   created_by                           String?          @db.Uuid
-  updated_at                           DateTime?        @default(now()) @db.Timestamp(6)
+  updated_at                           DateTime?        @updatedAt @db.Timestamp(6)
   updated_by                           String?          @db.Uuid
   deleted_at                           DateTime?        @db.Timestamp(6)
   cab_agreements                       cab_agreements[]
-  users_cab_services_created_byTousers users?           @relation("cab_services_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  users_cab_services_updated_byTousers users?           @relation("cab_services_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  created_by_user                      users?           @relation("cab_services_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  updated_by_user                      users?           @relation("cab_services_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   vehicles                             vehicles[]
 }
 
