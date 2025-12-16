@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useState, useEffect } from "react";
 import {
   Plus,
@@ -6,11 +7,9 @@ import {
   MoreHorizontal,
   Edit,
   Trash2,
-  FileText,
-  Download,
-  Upload,
   Calendar,
   AlertTriangle,
+  Upload,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +51,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 
 // ---------------- TYPES ----------------
 interface RateCard {
@@ -68,10 +68,11 @@ interface CabService {
 }
 
 interface CabAgreement {
-  id: string;
+  id?: string;
   agreement_number: string;
-  title?: string;
-  cab_services: CabService;
+  title: string;
+  cab_service_id: string;
+  cab_services?: CabService;
   status?: string;
   start_date: string;
   end_date: string;
@@ -86,106 +87,209 @@ interface CabAgreement {
   payment_terms?: string;
   payment_schedule?: string;
   document_url?: string;
-  agreement_rate_cards: RateCard[];
-  created_at?: string;
-  updated_at?: string;
+  agreement_rate_cards?: RateCard[];
 }
 
 // ---------------- COMPONENT ----------------
 export default function CabAgreements() {
   const [agreements, setAgreements] = useState<CabAgreement[]>([]);
+  const [cabServices, setCabServices] = useState<CabService[]>([]);
+  const [selectedAgreement, setSelectedAgreement] =
+    useState<CabAgreement | null>(null);
+  const [formData, setFormData] = useState<CabAgreement | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all-status");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [selectedAgreement, setSelectedAgreement] = useState<CabAgreement | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<CabAgreement | null>(null);
+
+  const isEditMode = Boolean(selectedAgreement);
+
   // ---------------- FETCH DATA ----------------
   const fetchAgreements = async () => {
     try {
       const res = await fetch(`/cab-agreements`);
-      const data = await res.json();
-      setAgreements(data);
-      setTotalPages(Math.ceil(data.length / pageSize));
+      const response = await res.json();
+      if (response && Array.isArray(response.data)) {
+        setAgreements(response.data);
+      } else {
+        setAgreements([]);
+      }
     } catch (err) {
-      console.error("Error fetching cab agreements:", err);
+      console.error("Error fetching agreements:", err);
+      setAgreements([]);
+    }
+  };
+
+  const fetchCabServices = async () => {
+    try {
+      const res = await fetch("/cab-services");
+      const data = await res.json();
+      setCabServices(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching cab services:", err);
     }
   };
 
   useEffect(() => {
     fetchAgreements();
+    fetchCabServices();
   }, []);
 
-  // ---------------- FILTER & PAGINATION ----------------
-  const filteredAgreements = agreements.filter((agreement) => {
-    const number = agreement.agreement_number?.toLowerCase() || "";
-    const cabName = agreement.cab_services?.name?.toLowerCase() || "";
-    const status = agreement.status || "";
+  // ---------------- VALIDATION ----------------
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    if (!formData?.agreement_number)
+      newErrors.agreement_number = "Agreement number is required";
+    if (!formData?.title) newErrors.title = "Title is required";
+    if (!formData?.cab_service_id)
+      newErrors.cab_service_id = "Cab service is required";
+    if (!formData?.start_date) newErrors.start_date = "Start date is required";
+    if (!formData?.end_date) newErrors.end_date = "End date is required";
+    if (
+      formData?.start_date &&
+      formData?.end_date &&
+      new Date(formData.end_date) <= new Date(formData.start_date)
+    ) {
+      newErrors.end_date = "End date must be after start date";
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-    return (
-      (number.includes(searchTerm.toLowerCase()) ||
-        cabName.includes(searchTerm.toLowerCase())) &&
-      (statusFilter === "all-status" || status === statusFilter)
-    );
-  });
+  // ---------------- SUBMIT ----------------
+  const handleSubmit = async () => {
+    if (!formData || !validateForm()) return;
 
-  const paginatedAgreements = filteredAgreements.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+    // Instead of `const payload: any = { ... }`
+    const payload: Partial<CabAgreement> = {
+      agreement_number: formData.agreement_number,
+      title: formData.title,
+      cab_service_id: formData.cab_service_id,
+      status: formData.status || "Draft",
+      start_date: formData.start_date,
+      end_date: formData.end_date,
+      auto_renewal: formData.auto_renewal ?? false,
+      renewal_period: formData.renewal_period || undefined,
+      client_company_name: formData.client_company_name || undefined,
+      client_contact_person: formData.client_contact_person || undefined,
+      client_email: formData.client_email || undefined,
+      client_phone: formData.client_phone || undefined,
+      contract_value: formData.contract_value ?? undefined,
+      currency: formData.currency || undefined,
+      payment_terms: formData.payment_terms || undefined,
+      payment_schedule: formData.payment_schedule || undefined,
+      document_url: formData.document_url || undefined,
+    };
 
-  useEffect(() => {
-    setTotalPages(Math.ceil(filteredAgreements.length / pageSize) || 1);
-  }, [filteredAgreements.length, pageSize]);
+    try {
+      const res = await fetch(
+        isEditMode
+          ? `/cab-agreements/${selectedAgreement?.id}`
+          : "/cab-agreements",
+        {
+          method: isEditMode ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
 
-  // ---------------- UTILS ----------------
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error("Backend error:", errorData);
+        toast.error(errorData.message || "Failed to save agreement");
+        return;
+      }
+
+      setIsDialogOpen(false);
+      fetchAgreements();
+      toast.success("Agreement saved successfully");
+    } catch (err) {
+      console.error("Network error:", err);
+      toast.error("Error submitting agreement");
+    }
+  };
+
+  // ---------------- DIALOG ACTIONS ----------------
+  const handleCreate = () => {
+    setSelectedAgreement(null);
+    setFormData({
+      agreement_number: "",
+      title: "",
+      cab_service_id: "",
+      start_date: "",
+      end_date: "",
+    } as CabAgreement);
+    setErrors({});
+    setIsDialogOpen(true);
+  };
+
+  const handleEdit = (agreement: CabAgreement) => {
+    setSelectedAgreement(agreement);
+    setFormData({ ...agreement });
+    setErrors({});
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this agreement?")) return;
+    try {
+      const res = await fetch(`/cab-agreements/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete");
+      fetchAgreements();
+      toast.success("Agreement deleted");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete agreement");
+    }
+  };
+
+  // ---------------- DATE FORMATTING ----------------
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "-";
+    return new Date(dateString).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
   const getStatusBadge = (status?: string) => {
     if (!status) return <Badge>Unknown</Badge>;
     const variant =
-      status === "Active" ? "default" : status === "Expired" ? "destructive" : "secondary";
+      status === "Active"
+        ? "default"
+        : status === "Expired"
+        ? "destructive"
+        : "secondary";
     return <Badge variant={variant}>{status}</Badge>;
   };
 
   const isRenewalDue = (endDate: string) => {
+    if (!endDate) return false;
     const today = new Date();
     const end = new Date(endDate);
-    const diffDays = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil(
+      (end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
     return diffDays <= 30 && diffDays > 0;
   };
 
-  // ---------------- ACTIONS ----------------
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this agreement?")) {
-      setAgreements((prev) => prev.filter((a) => a.id !== id));
-    }
-  };
-
-  const handleDownload = (url?: string) => {
-    if (!url) return alert("No document available");
-    window.open(url, "_blank");
-  };
-
-const handleEdit = (agreement: CabAgreement) => {
-  setSelectedAgreement(agreement);
-  setFormData(agreement); // copy to editable state
-  setIsDialogOpen(true);
-};
-
-const handleCreate = () => {
-  setSelectedAgreement(null);
-  setFormData(null); // empty form
-  setIsDialogOpen(true);
-};
+  // ---------------- FILTER ----------------
+  const filteredAgreements = agreements.filter((a) => {
+    const term = searchTerm.toLowerCase();
+    const number = a.agreement_number.toLowerCase();
+    const name = a.cab_services?.name.toLowerCase() || "";
+    const status = a.status || "";
+    return (
+      (number.includes(term) || name.includes(term)) &&
+      (statusFilter === "all-status" || status === statusFilter)
+    );
+  });
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="p-3">
-          <h1 className="text-2xl">CAB AGREEMENTS</h1>
-          <p className="text-muted-foreground text-xs">Manage agreements with cab service providers</p>
-        </div>
+        <h1 className="text-2xl">CAB AGREEMENTS</h1>
         <Button onClick={handleCreate}>
           <Plus className="h-4 w-4" /> Add Agreement
         </Button>
@@ -197,7 +301,6 @@ const handleCreate = () => {
           <CardDescription>Active and expired agreements</CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Search & Filter */}
           <div className="flex flex-col sm:flex-row items-center gap-4 mb-6">
             <div className="relative w-full sm:max-w-sm">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -217,11 +320,12 @@ const handleCreate = () => {
                 <SelectItem value="Active">Active</SelectItem>
                 <SelectItem value="Expired">Expired</SelectItem>
                 <SelectItem value="Draft">Draft</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
+                <SelectItem value="Terminated">Terminated</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Table */}
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -230,36 +334,33 @@ const handleCreate = () => {
                   <TableHead>Cab Service</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Validity</TableHead>
-                  <TableHead>Rate/Km</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedAgreements.map((agreement) => (
+                {filteredAgreements.map((agreement) => (
                   <TableRow key={agreement.id}>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium">{agreement.agreement_number}</span>
-                        <span className="text-sm text-muted-foreground">{agreement.title}</span>
+                        <span className="font-medium">
+                          {agreement.agreement_number}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {agreement.title}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell>{agreement.cab_services?.name || "-"}</TableCell>
                     <TableCell>{getStatusBadge(agreement.status)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" /> {agreement.start_date} to {agreement.end_date}
-                        {isRenewalDue(agreement.end_date) && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
+                        <Calendar className="h-3 w-3" />{" "}
+                        {formatDate(agreement.start_date)} to{" "}
+                        {formatDate(agreement.end_date)}
+                        {isRenewalDue(agreement.end_date || "") && (
+                          <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                        )}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {agreement.agreement_rate_cards?.length ? (
-                        <>
-                          Rs.{agreement.agreement_rate_cards[0].rate_per_km}/km <br />
-                          Min: Rs.{agreement.agreement_rate_cards[0].minimum_fare}
-                        </>
-                      ) : (
-                        "-"
-                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
@@ -269,13 +370,15 @@ const handleCreate = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleDownload(agreement.document_url)}>
-                            <Download className="h-4 w-4 mr-2" /> Download
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEdit(agreement)}>
+                          <DropdownMenuItem
+                            onClick={() => handleEdit(agreement)}
+                          >
                             <Edit className="h-4 w-4 mr-2" /> Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(agreement.id)} className="text-destructive">
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(agreement.id || "")}
+                            className="text-destructive"
+                          >
                             <Trash2 className="h-4 w-4 mr-2" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -286,58 +389,182 @@ const handleCreate = () => {
               </TableBody>
             </Table>
           </div>
-
-          {/* Pagination */}
-          <div className="flex justify-between items-center mt-4">
-            <div>
-              <span className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages}
-              </span>
-            </div>
-            <div className="flex gap-1">
-              <Button variant="outline" size="icon" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>
-                First
-              </Button>
-              <Button variant="outline" size="icon" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
-                Prev
-              </Button>
-              <Button variant="outline" size="icon" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
-                Next
-              </Button>
-              <Button variant="outline" size="icon" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>
-                Last
-              </Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
-      {/* Dialog for create/edit */}
+      {/* ---------------- CREATE / EDIT DIALOG ---------------- */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>{selectedAgreement ? "Edit Agreement" : "Create Agreement"}</DialogTitle>
+            <DialogTitle>
+              {isEditMode ? "Edit Agreement" : "Create Agreement"}
+            </DialogTitle>
             <DialogDescription>
-              {selectedAgreement ? "Update details" : "Fill in agreement details"}
+              {isEditMode ? "Update details" : "Fill in agreement details"}
             </DialogDescription>
           </DialogHeader>
+
           <div className="grid gap-4 py-2">
-            <Label>Agreement Number</Label>
-            <Input value={selectedAgreement?.agreement_number || ""} readOnly className="w-full" />
-            <Label>Title</Label>
-            <Input value={selectedAgreement?.title || ""} className="w-full" />
-            <Label>Cab Service</Label>
-            <Input value={selectedAgreement?.cab_services?.name || ""} readOnly className="w-full" />
-            <Label>Status</Label>
-            <Input value={selectedAgreement?.status || ""} className="w-full" />
-            <Label>Start Date</Label>
-            <Input type="date" value={selectedAgreement?.start_date?.split("T")[0] || ""} className="w-full" />
-            <Label>End Date</Label>
-            <Input type="date" value={selectedAgreement?.end_date?.split("T")[0] || ""} className="w-full" />
+            <div>
+              <Label>Agreement Number</Label>
+              <Input
+                value={formData?.agreement_number || ""}
+                onChange={(e) =>
+                  setFormData((prev) =>
+                    prev ? { ...prev, agreement_number: e.target.value } : prev
+                  )
+                }
+                placeholder="AGR-2025-001"
+                className={`w-full ${
+                  errors.agreement_number ? "border-red-500" : ""
+                }`}
+              />
+
+              {errors.agreement_number && (
+                <p className="text-red-500 text-sm">
+                  {errors.agreement_number}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label>Title</Label>
+              <Input
+                value={formData?.title || ""}
+                onChange={(e) =>
+                  setFormData((prev) =>
+                    prev ? { ...prev, title: e.target.value } : prev
+                  )
+                }
+              />
+              {errors.title && (
+                <p className="text-red-500 text-sm">{errors.title}</p>
+              )}
+            </div>
+
+            <div>
+              <Label>Cab Service</Label>
+              <Select
+                value={formData?.cab_service_id || ""}
+                onValueChange={(value) => {
+                  const selectedService = cabServices.find(
+                    (c) => c.id === value
+                  );
+                  setFormData((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          cab_service_id: value,
+                          cab_services: selectedService
+                            ? {
+                                id: selectedService.id,
+                                name: selectedService.name,
+                              }
+                            : prev.cab_services,
+                        }
+                      : prev
+                  );
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select cab service" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cabServices.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.cab_service_id && (
+                <p className="text-red-500 text-sm">{errors.cab_service_id}</p>
+              )}
+            </div>
+
+            <div>
+              <Label>Status</Label>
+              <Select
+                value={formData?.status || "Draft"}
+                onValueChange={(value) =>
+                  setFormData((prev) =>
+                    prev ? { ...prev, status: value } : prev
+                  )
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Draft">Draft</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Expired">Expired</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="Terminated">Terminated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Start Date</Label>
+              <Input
+                type="date"
+                value={
+                  formData?.start_date ? formData.start_date.split("T")[0] : ""
+                }
+                onChange={(e) =>
+                  setFormData((prev) =>
+                    prev ? { ...prev, start_date: e.target.value } : prev
+                  )
+                }
+              />
+              {errors.start_date && (
+                <p className="text-red-500 text-sm">{errors.start_date}</p>
+              )}
+            </div>
+
+            <div>
+              <Label>End Date</Label>
+              <Input
+                type="date"
+                value={
+                  formData?.end_date ? formData.end_date.split("T")[0] : ""
+                }
+                onChange={(e) =>
+                  setFormData((prev) =>
+                    prev ? { ...prev, end_date: e.target.value } : prev
+                  )
+                }
+              />
+              {errors.end_date && (
+                <p className="text-red-500 text-sm">{errors.end_date}</p>
+              )}
+            </div>
+
+            <div>
+  <Label>Agreement Document</Label>
+  <div className="flex items-center gap-2">
+    <Input
+      type="file"
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) setFormData(prev => prev ? { ...prev, document_file: file } : prev);
+      }}
+    />
+    <Upload className="w-5 h-5 text-gray-500" />
+  </div>
+  {formData?.document_url && (
+    <p className="text-sm text-gray-500 mt-1">Uploaded: {formData.document_url}</p>
+  )}
+</div>
+
           </div>
+
           <DialogFooter className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button>Save</Button>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
