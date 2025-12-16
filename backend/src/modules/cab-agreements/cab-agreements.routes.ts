@@ -10,6 +10,7 @@ router.use(authenticate);
 
 router.post("/", controller.createAgreement);
 router.get("/", controller.listAgreements);
+router.get("/:id", controller.getAgreement);
 router.put("/:id", controller.updateAgreement);
 router.delete("/:id", controller.deleteAgreement);
 
