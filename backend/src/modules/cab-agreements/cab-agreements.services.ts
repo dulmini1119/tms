@@ -9,7 +9,7 @@ export class CabAgreementsService {
       cab_service_id: data.cab_service_id,
       agreement_number: data.agreement_number,
       title: data.title,
-      type: data.type,
+      type: data.type, // Added this missing field
       status: data.status,
       document_url: data.document_url,
       priority: data.priority,
@@ -49,30 +49,71 @@ export class CabAgreementsService {
       },
       include: {
         cab_services: { select: { name: true } },
+        agreement_rate_cards: true, // Added this relationship
       },
     });
   }
 
-  static async findMany(filters: any) {
-    return prisma.cab_agreements.findMany({
-      where: {
-        status: filters.status !== "all-status" ? filters.status : undefined,
-        OR: [
-          { agreement_number: { contains: filters.search || "", mode: "insensitive" } },
-          { title: { contains: filters.search || "", mode: "insensitive" } },
-          { client_company_name: { contains: filters.search || "", mode: "insensitive" } },
-        ],
-        deleted_at: null,
+  static async findMany(filters: any, page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+    
+    const [agreements, totalCount] = await Promise.all([
+      prisma.cab_agreements.findMany({
+        where: {
+          status: filters.status !== "all-status" ? filters.status : undefined,
+          OR: [
+            { agreement_number: { contains: filters.search || "", mode: "insensitive" } },
+            { title: { contains: filters.search || "", mode: "insensitive" } },
+            { client_company_name: { contains: filters.search || "", mode: "insensitive" } },
+          ],
+          deleted_at: null,
+        },
+        include: {
+          cab_services: { select: { name: true } },
+          agreement_rate_cards: true, // Added this relationship
+        },
+        orderBy: { created_at: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.cab_agreements.count({
+        where: {
+          status: filters.status !== "all-status" ? filters.status : undefined,
+          OR: [
+            { agreement_number: { contains: filters.search || "", mode: "insensitive" } },
+            { title: { contains: filters.search || "", mode: "insensitive" } },
+            { client_company_name: { contains: filters.search || "", mode: "insensitive" } },
+          ],
+          deleted_at: null,
+        },
+      })
+    ]);
+    
+    return {
+      data: agreements,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit)
+      }
+    };
+  }
+
+  static async findById(id: string) {
+    return prisma.cab_agreements.findUnique({
+      where: { 
+        id,
+        deleted_at: null
       },
       include: {
         cab_services: { select: { name: true } },
-        // agreement_rate_cards: true, // Uncomment if you want to fetch rate cards
+        agreement_rate_cards: true,
       },
-      orderBy: { created_at: "desc" },
     });
   }
 
-  static async update(id: string, data: any, userId: string, documentUrl?: string ) {
+  static async update(id: string, data: any, userId: string, documentUrl?: string) {
     const dbData = this.mapToDbFormat({ ...data, document_url: documentUrl });
     return prisma.cab_agreements.update({
       where: { id },
@@ -82,6 +123,7 @@ export class CabAgreementsService {
       },
       include: {
         cab_services: { select: { name: true } },
+        agreement_rate_cards: true, // Added this relationship
       },
     });
   }
