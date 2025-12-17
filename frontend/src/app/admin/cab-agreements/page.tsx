@@ -74,6 +74,7 @@ interface CabAgreement {
   cab_service_id: string;
   cab_services?: CabService;
   status?: string;
+  priority?: "Low" | "Medium" | "High";
   start_date: string;
   end_date: string;
   auto_renewal?: boolean;
@@ -87,7 +88,10 @@ interface CabAgreement {
   payment_terms?: string;
   payment_schedule?: string;
   document_url?: string;
+  document_file?: File;
   agreement_rate_cards?: RateCard[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ---------------- COMPONENT ----------------
@@ -101,6 +105,8 @@ export default function CabAgreements() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all-status");
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [viewAgreement, setViewAgreement] = useState<CabAgreement | null>(null);
 
   const isEditMode = Boolean(selectedAgreement);
 
@@ -160,26 +166,35 @@ export default function CabAgreements() {
   const handleSubmit = async () => {
     if (!formData || !validateForm()) return;
 
-    // Instead of `const payload: any = { ... }`
-    const payload: Partial<CabAgreement> = {
-      agreement_number: formData.agreement_number,
-      title: formData.title,
-      cab_service_id: formData.cab_service_id,
-      status: formData.status || "Draft",
-      start_date: formData.start_date,
-      end_date: formData.end_date,
-      auto_renewal: formData.auto_renewal ?? false,
-      renewal_period: formData.renewal_period || undefined,
-      client_company_name: formData.client_company_name || undefined,
-      client_contact_person: formData.client_contact_person || undefined,
-      client_email: formData.client_email || undefined,
-      client_phone: formData.client_phone || undefined,
-      contract_value: formData.contract_value ?? undefined,
-      currency: formData.currency || undefined,
-      payment_terms: formData.payment_terms || undefined,
-      payment_schedule: formData.payment_schedule || undefined,
-      document_url: formData.document_url || undefined,
-    };
+    const fd = new FormData();
+
+    fd.append("agreement_number", formData.agreement_number);
+    fd.append("title", formData.title);
+    fd.append("cab_service_id", formData.cab_service_id);
+    fd.append("status", formData.status || "Draft");
+    fd.append("start_date", formData.start_date);
+    fd.append("end_date", formData.end_date);
+    if (formData.auto_renewal !== undefined)
+      fd.append("auto_renewal", String(formData.auto_renewal));
+    if (formData.renewal_period)
+      fd.append("renewal_period", formData.renewal_period);
+    if (formData.client_company_name)
+      fd.append("client_company_name", formData.client_company_name);
+    if (formData.client_contact_person)
+      fd.append("client_contact_person", formData.client_contact_person);
+    if (formData.client_email) fd.append("client_email", formData.client_email);
+    if (formData.client_phone) fd.append("client_phone", formData.client_phone);
+    if (formData.contract_value)
+      fd.append("contract_value", String(formData.contract_value));
+    if (formData.currency) fd.append("currency", formData.currency);
+    if (formData.payment_terms)
+      fd.append("payment_terms", formData.payment_terms);
+    if (formData.payment_schedule)
+      fd.append("payment_schedule", formData.payment_schedule);
+
+    // ✅ Attach file with the correct field name
+    if (formData.document_file)
+      fd.append("documentFile", formData.document_file);
 
     try {
       const res = await fetch(
@@ -188,14 +203,12 @@ export default function CabAgreements() {
           : "/cab-agreements",
         {
           method: isEditMode ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: fd,
         }
       );
 
       if (!res.ok) {
         const errorData = await res.json();
-        console.error("Backend error:", errorData);
         toast.error(errorData.message || "Failed to save agreement");
         return;
       }
@@ -243,6 +256,11 @@ export default function CabAgreements() {
     }
   };
 
+  const handleView = (agreement: CabAgreement) => {
+    setViewAgreement(agreement);
+    setIsViewOpen(true);
+  };
+
   // ---------------- DATE FORMATTING ----------------
   const formatDate = (dateString: string) => {
     if (!dateString) return "-";
@@ -273,6 +291,36 @@ export default function CabAgreements() {
     );
     return diffDays <= 30 && diffDays > 0;
   };
+
+  const SectionHeader = ({ title }: { title: string }) => (
+    <TableRow>
+      <TableCell
+        colSpan={2}
+        className="bg-muted text-sm font-semibold text-muted-foreground uppercase tracking-wide py-3"
+      >
+        {title}
+      </TableCell>
+    </TableRow>
+  );
+
+  const DetailRow = ({
+    label,
+    value,
+    isComponent = false,
+  }: {
+    label: string;
+    value: React.ReactNode;
+    isComponent?: boolean;
+  }) => (
+    <TableRow className="hover:bg-muted/50">
+      <TableCell className="font-medium text-muted-foreground w-1/3">
+        {label}
+      </TableCell>
+      <TableCell>
+        {isComponent ? value : <span className="font-medium">{value}</span>}
+      </TableCell>
+    </TableRow>
+  );
 
   // ---------------- FILTER ----------------
   const filteredAgreements = agreements.filter((a) => {
@@ -326,7 +374,8 @@ export default function CabAgreements() {
             </Select>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* DESKTOP TABLE */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -337,6 +386,7 @@ export default function CabAgreements() {
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {filteredAgreements.map((agreement) => (
                   <TableRow key={agreement.id}>
@@ -350,11 +400,14 @@ export default function CabAgreements() {
                         </span>
                       </div>
                     </TableCell>
+
                     <TableCell>{agreement.cab_services?.name || "-"}</TableCell>
+
                     <TableCell>{getStatusBadge(agreement.status)}</TableCell>
+
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />{" "}
+                        <Calendar className="h-3 w-3" />
                         {formatDate(agreement.start_date)} to{" "}
                         {formatDate(agreement.end_date)}
                         {isRenewalDue(agreement.end_date || "") && (
@@ -362,6 +415,7 @@ export default function CabAgreements() {
                         )}
                       </div>
                     </TableCell>
+
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -370,6 +424,11 @@ export default function CabAgreements() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleView(agreement)}
+                          >
+                            <Search className="h-4 w-4 mr-2" /> View
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleEdit(agreement)}
                           >
@@ -388,6 +447,81 @@ export default function CabAgreements() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* MOBILE CARDS */}
+          <div className="md:hidden space-y-4">
+            {filteredAgreements.map((agreement) => (
+              <div
+                key={agreement.id}
+                className="
+        rounded-xl
+        border
+        bg-background
+        shadow-sm
+        p-4
+        space-y-3
+      "
+              >
+                {/* Header */}
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-semibold">
+                      {agreement.agreement_number}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {agreement.title}
+                    </p>
+                  </div>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleView(agreement)}>
+                        <Search className="h-4 w-4 mr-2" /> View
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEdit(agreement)}>
+                        <Edit className="h-4 w-4 mr-2" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDelete(agreement.id || "")}
+                        className="text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Cab Service */}
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Cab Service:</span>{" "}
+                  <span className="font-medium">
+                    {agreement.cab_services?.name || "-"}
+                  </span>
+                </div>
+
+                {/* Status */}
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Status:</span>
+                  {getStatusBadge(agreement.status)}
+                </div>
+
+                {/* Validity */}
+                <div className="flex items-center gap-1 text-sm">
+                  <Calendar className="h-3 w-3" />
+                  {formatDate(agreement.start_date)} –{" "}
+                  {formatDate(agreement.end_date)}
+                  {isRenewalDue(agreement.end_date || "") && (
+                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -542,22 +676,26 @@ export default function CabAgreements() {
             </div>
 
             <div>
-  <Label>Agreement Document</Label>
-  <div className="flex items-center gap-2">
-    <Input
-      type="file"
-      onChange={(e) => {
-        const file = e.target.files?.[0];
-        if (file) setFormData(prev => prev ? { ...prev, document_file: file } : prev);
-      }}
-    />
-    <Upload className="w-5 h-5 text-gray-500" />
-  </div>
-  {formData?.document_url && (
-    <p className="text-sm text-gray-500 mt-1">Uploaded: {formData.document_url}</p>
-  )}
-</div>
-
+              <Label>Agreement Document</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="file"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file)
+                      setFormData((prev) =>
+                        prev ? { ...prev, document_file: file } : prev
+                      );
+                  }}
+                />
+                <Upload className="w-5 h-5 text-gray-500" />
+              </div>
+              {formData?.document_url && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Uploaded: {formData.document_url}
+                </p>
+              )}
+            </div>
           </div>
 
           <DialogFooter className="flex justify-end gap-2 mt-4">
@@ -565,6 +703,159 @@ export default function CabAgreements() {
               Cancel
             </Button>
             <Button onClick={handleSubmit}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* ---------------- VIEW DIALOG ---------------- */}
+      <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border bg-background p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">
+              Agreement Details
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Complete information of the selected agreement
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewAgreement && (
+            <div className="mt-4 rounded-xl border bg-muted/30">
+              <Table>
+                <TableBody>
+                  {/* BASIC INFO */}
+                  <SectionHeader title="Basic Information" />
+
+                  <DetailRow
+                    label="Agreement Number"
+                    value={viewAgreement.agreement_number}
+                  />
+                  <DetailRow label="Title" value={viewAgreement.title} />
+                  <DetailRow
+                    label="Cab Service"
+                    value={viewAgreement.cab_services?.name || "-"}
+                  />
+                  <DetailRow
+                    label="Status"
+                    value={getStatusBadge(viewAgreement.status)}
+                    isComponent
+                  />
+                  <DetailRow
+                    label="Priority"
+                    value={viewAgreement.priority || "-"}
+                  />
+
+                  {/* DATES */}
+                  <SectionHeader title="Dates" />
+
+                  <DetailRow
+                    label="Start Date"
+                    value={formatDate(viewAgreement.start_date)}
+                  />
+                  <DetailRow
+                    label="End Date"
+                    value={formatDate(viewAgreement.end_date)}
+                  />
+                  <DetailRow
+                    label="Auto Renewal"
+                    value={viewAgreement.auto_renewal ? "Yes" : "No"}
+                  />
+                  <DetailRow
+                    label="Renewal Period"
+                    value={viewAgreement.renewal_period || "-"}
+                  />
+
+                  {/* CLIENT INFO */}
+                  <SectionHeader title="Client Information" />
+
+                  <DetailRow
+                    label="Client Company"
+                    value={viewAgreement.client_company_name || "-"}
+                  />
+                  <DetailRow
+                    label="Contact Person"
+                    value={viewAgreement.client_contact_person || "-"}
+                  />
+                  <DetailRow
+                    label="Client Email"
+                    value={viewAgreement.client_email || "-"}
+                  />
+                  <DetailRow
+                    label="Client Phone"
+                    value={viewAgreement.client_phone || "-"}
+                  />
+
+                  {/* FINANCIAL */}
+                  <SectionHeader title="Financial Details" />
+
+                  <DetailRow
+                    label="Contract Value"
+                    value={
+                      viewAgreement.contract_value
+                        ? `${viewAgreement.currency || ""} ${
+                            viewAgreement.contract_value
+                          }`
+                        : "-"
+                    }
+                  />
+                  <DetailRow
+                    label="Payment Terms"
+                    value={viewAgreement.payment_terms || "-"}
+                  />
+                  <DetailRow
+                    label="Payment Schedule"
+                    value={viewAgreement.payment_schedule || "-"}
+                  />
+
+                  {/* DOCUMENT */}
+                  <SectionHeader title="Documents" />
+
+                  <TableRow className="hover:bg-muted/50">
+                    <TableCell className="font-medium text-muted-foreground w-1/3">
+                      Agreement Document
+                    </TableCell>
+                    <TableCell>
+                      {viewAgreement.document_url ? (
+                        <a
+                          href={viewAgreement.document_url}
+                          target="_blank"
+                          className="text-primary font-medium underline underline-offset-4"
+                        >
+                          View Document
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
+                  </TableRow>
+
+                  {/* META */}
+                  <SectionHeader title="Meta Information" />
+
+                  <DetailRow
+                    label="Created At"
+                    value={
+                      viewAgreement.created_at
+                        ? formatDate(viewAgreement.created_at)
+                        : "-"
+                    }
+                  />
+                  <DetailRow
+                    label="Updated At"
+                    value={
+                      viewAgreement.updated_at
+                        ? formatDate(viewAgreement.updated_at)
+                        : "-"
+                    }
+                  />
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={() => setIsViewOpen(false)}>
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
