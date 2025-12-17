@@ -275,3 +275,22 @@
 {"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-16T07:52:56.340Z"}
 {"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-16T07:52:56.341Z"}
 {"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-16T07:52:56.341Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-16T11:27:25.283Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-16T11:27:25.288Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-16T11:27:25.289Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-16T11:27:25.290Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-16T11:27:25.290Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-17T02:51:24.014Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-17T02:51:24.022Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-17T02:51:24.023Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-17T02:51:24.023Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-17T02:51:24.024Z"}
+{"level":"info","message":"User logged in: superadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2025-12-17T02:56:21.426Z"}
+{"error":"ENOENT: no such file or directory, open 'C:\\Users\\admin\\Desktop\\new\\tms\\backend\\uploads\\agreements\\documentFile-1765954421040-132725318.pdf'","ip":"::1","level":"error","message":"Error occurred:","method":"PUT","path":"/cab-agreements/47d3efb9-0e9e-42f9-bf44-bcd54df9ea6f","service":"tms-backend","stack":"Error: ENOENT: no such file or directory, open 'C:\\Users\\admin\\Desktop\\new\\tms\\backend\\uploads\\agreements\\documentFile-1765954421040-132725318.pdf'","timestamp":"2025-12-17T06:53:41.044Z"}
+{"error":"ENOENT: no such file or directory, open 'C:\\Users\\admin\\Desktop\\new\\tms\\backend\\uploads\\agreements\\documentFile-1765954422988-157160628.pdf'","ip":"::1","level":"error","message":"Error occurred:","method":"PUT","path":"/cab-agreements/47d3efb9-0e9e-42f9-bf44-bcd54df9ea6f","service":"tms-backend","stack":"Error: ENOENT: no such file or directory, open 'C:\\Users\\admin\\Desktop\\new\\tms\\backend\\uploads\\agreements\\documentFile-1765954422988-157160628.pdf'","timestamp":"2025-12-17T06:53:42.989Z"}
+{"error":"ENOENT: no such file or directory, open 'C:\\Users\\admin\\Desktop\\new\\tms\\backend\\uploads\\agreements\\documentFile-1765954463306-366690675.pdf'","ip":"::1","level":"error","message":"Error occurred:","method":"PUT","path":"/cab-agreements/47d3efb9-0e9e-42f9-bf44-bcd54df9ea6f","service":"tms-backend","stack":"Error: ENOENT: no such file or directory, open 'C:\\Users\\admin\\Desktop\\new\\tms\\backend\\uploads\\agreements\\documentFile-1765954463306-366690675.pdf'","timestamp":"2025-12-17T06:54:23.306Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-17T07:48:49.782Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-17T07:48:49.788Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-17T07:48:49.789Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-17T07:48:49.789Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-17T07:48:49.789Z"}
