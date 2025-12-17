@@ -8,10 +8,15 @@ import path from "path";
 import fs from "fs";
 import { Prisma } from "@prisma/client";
 
+const uploadFolder = path.join(process.cwd(), "uploads/agreements");
+if(!fs.existsSync(uploadFolder)){
+  fs.mkdirSync(uploadFolder, { recursive: true });
+}
+
 // --- Configure Multer for file uploads ---
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/agreements/"); // Ensure this folder exists
+    cb(null, uploadFolder); // Ensure this folder exists
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
