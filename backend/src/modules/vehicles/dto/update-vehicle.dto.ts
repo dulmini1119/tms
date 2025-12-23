@@ -3,6 +3,7 @@ export interface UpdateVehicleDto {
   model?: string;
   year?: number;
   color?: string;
+  registration_number?: string;
 
   operational_status?: string;
   availability_status?: string;

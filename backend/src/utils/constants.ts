@@ -24,3 +24,8 @@ export const ERROR_CODES = {
   TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
   BAD_REQUEST:  'BAD_REQUEST',
 } as const;
+
+export const DOCUMENT_ENTITY = {
+  VEHICLE: 'VEHICLE',
+  DRIVER: 'DRIVER',
+} as const;
