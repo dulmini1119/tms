@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
   // PROXY ALL API CALLS TO YOUR EXPRESS BACKEND (port 3001)
   async rewrites() {
     return [
+      {
+        source: "/vehicles",
+        destination: "http://localhost:3001/vehicles",
+      },
+      {
+        source: "/vehicles/:path*",
+        destination: "http://localhost:3001/vehicles/:path*",
+      },
       // ── CAB AGREEMENTS ───────────────────────────────────────
       {
         source: "/cab-agreements",
