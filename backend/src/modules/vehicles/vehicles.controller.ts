@@ -18,8 +18,12 @@ export const getVehicles = async (
   _req: AuthRequest,
   res: Response
 ) => {
-  const vehicles = await service.getVehicles();
+  try {
+      const vehicles = await service.getVehicles(_req.query);
   res.json(vehicles);
+  } catch (err : any) {
+    res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
+  }
 };
 
 // GET BY ID
