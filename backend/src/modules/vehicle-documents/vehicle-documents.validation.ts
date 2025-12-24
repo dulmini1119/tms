@@ -7,7 +7,9 @@ export const createVehicleDocumentSchema = Joi.object({
   issue_date: Joi.date().optional(),
   expiry_date: Joi.date().optional(),
   issuing_authority: Joi.string().max(255).allow(null, ""),
-  file_name: Joi.string().required(),
-  file_path: Joi.string().required(),
   status: Joi.string().valid("Valid", "Expired").optional(),
+});
+
+export const deleteVehicleDocumentSchema = Joi.object({
+  id: Joi.string().uuid().required(),
 });
