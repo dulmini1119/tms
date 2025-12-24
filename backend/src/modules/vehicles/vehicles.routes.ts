@@ -9,13 +9,16 @@ import {
 import {
   validateBody,
   validateParams,
+  validateQuery,
 } from "../../middleware/validation.js";
 import {
   createVehicleSchema,
+  getVehiclesQuerySchema,
   updateVehicleSchema,
 } from "./vehicles.validation.js";
-import { authenticate } from "../../middleware/auth.js";
+import { authenticate, AuthRequest } from "../../middleware/auth.js";
 import Joi from "joi";
+import prisma from "../../config/database.js";
 
 const router = Router();
 
@@ -26,8 +29,6 @@ const idParamSchema = Joi.object({
   id: Joi.string().uuid().required(),
 });
 
-// GET ALL
-router.get("/", authenticate, getVehicles);
 
 // GET BY ID
 router.get(
@@ -61,5 +62,35 @@ router.delete(
   validateParams(idParamSchema),
   deleteVehicle
 );
+
+router.get(
+  "/",
+  authenticate,
+  validateQuery(getVehiclesQuerySchema),
+  getVehicles
+)
+
+// GET maintenance logs for a vehicle
+router.get("/:vehicleId/maintenance-logs", authenticate, async (req, res) => {
+  const logs = await prisma.maintenance_logs.findMany({
+    where: { vehicle_id: req.params.vehicleId },
+    orderBy: { scheduled_date: "desc" },
+    include: { maintenance_parts: true }
+  });
+  res.json(logs);
+});
+
+// CREATE maintenance log for a vehicle
+router.post("/:vehicleId/maintenance-logs", authenticate, async (req: AuthRequest, res) => {
+  const log = await prisma.maintenance_logs.create({
+    data: {
+      ...req.body,
+      vehicle_id: req.params.vehicleId,
+      created_by: req.user!.id,
+    },
+  });
+  res.status(201).json(log);
+});
+
 
 export default router;
