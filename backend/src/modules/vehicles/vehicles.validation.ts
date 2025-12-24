@@ -28,3 +28,21 @@ export const updateVehicleSchema = createVehicleSchema.fork(
   ["registration_number", "make", "model", "year"],
   (schema) => schema.optional()
 );
+// vehicles.validation.ts
+export const getVehiclesQuerySchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+
+  vehicle_type: Joi.string().max(50).optional(),
+
+  availability_status: Joi.string()
+    .valid('Available', 'In Use', 'Maintenance', 'Out of Service')
+    .optional(),
+
+  ownership_type: Joi.string()
+    .valid('Owned', 'Leased', 'Rented')
+    .optional(),
+
+  cab_service_id: Joi.string().uuid().optional(),
+});
+
