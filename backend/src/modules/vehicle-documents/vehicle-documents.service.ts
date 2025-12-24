@@ -14,7 +14,10 @@ export class VehicleDocumentsService {
         issuing_authority: data.issuing_authority,
         file_name: data.file_name,
         file_path: data.file_path,
+        file_size: data.file_size,
+        mime_type: data.mime_type,
         status: data.status ?? "Valid",
+        created_by: data.created_by,
       },
     });
   }
