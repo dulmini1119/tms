@@ -20,9 +20,9 @@ export const getVehicles = async (
 ) => {
   try {
       const vehicles = await service.getVehicles(_req.query);
-  res.json(vehicles);
-  } catch (err : any) {
-    res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
+      res.json(vehicles);
+  } catch (err: any) { // <--- FIXED: Changed "err : any" to "err: any"
+      res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
   }
 };
 
