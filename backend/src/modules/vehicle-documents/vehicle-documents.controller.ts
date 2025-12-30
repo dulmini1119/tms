@@ -36,31 +36,68 @@ export const uploadVehicleDocumentMiddleware = multer({
 // ── CREATE ──
 export const createVehicleDocument = async (req: AuthRequest, res: Response) => {
   try {
-    // File is attached by the middleware running before this handler
     if (!req.file) {
       return res.status(400).json({ message: "Document file is required." });
     }
 
-    // FIX: Use relative path for storage to ensure correct deletion later
-    // The absolute path on disk is handled by multer, but we store relative in DB
+    // Extract vehicle ID from form data (match whatever name your frontend sends)
+    const vehicleId = req.body.vehicle_id || req.body.vehicle || req.body.vehicleId;
+
+    if (!vehicleId) {
+      return res.status(400).json({ 
+        message: "Vehicle ID is required (sent as 'vehicle_id' or 'vehicle' in form data)" 
+      });
+    }
+
+    // Basic UUID check
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vehicleId)) {
+      return res.status(400).json({ message: "Invalid vehicle ID format (must be UUID)." });
+    }
+
     const filePath = path.join("uploads", "vehicle-documents", req.file.filename);
 
-    const doc = await VehicleDocumentsService.create({
-      ...req.body,
-      file_path: filePath,
-      file_name: req.file.originalname,
-      file_size: req.file.size,
-      mime_type: req.file.mimetype,
-      created_by: req.user!.id,
-    });
+    const payload = {
+      entity_type:        "VEHICLE",
+      entity_id:          vehicleId,                          // ← THIS LINE MUST BE HERE
+      document_type:      req.body.document_type      || null,
+      document_number:    req.body.document_number    || null,
+      issue_date:         req.body.issue_date         ? new Date(req.body.issue_date) : null,
+      expiry_date:        req.body.expiry_date        ? new Date(req.body.expiry_date) : null,
+      issuing_authority:  req.body.issuing_authority  || null,
+      file_name:          req.file.originalname,
+      file_path:          filePath,
+      file_size:          req.file.size,
+      mime_type:          req.file.mimetype,
+      status:             "Valid",
+      verification_status: null,
+      verified_by:        null,
+      verified_at:        null,
+      created_by:         req.user!.id,
+      updated_by:         req.user!.id,
+      replaces_document_id: null,
+      notes:              req.body.notes              || null,
+    };
 
-    res.status(201).json(doc);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Failed to create document." });
+    // DEBUG: Log exactly what Prisma will receive
+    console.log("[CREATE DOCUMENT PAYLOAD]", JSON.stringify(payload, null, 2));
+
+    const doc = await VehicleDocumentsService.create(payload);
+    const safeDoc = {
+      ...doc,
+      file_size: doc.file_size ? doc.file_size.toString() : null,
+    }
+    res.status(201).json(safeDoc);
+  } catch (error: any) {
+    console.error("[CREATE DOCUMENT ERROR]", error);
+    res.status(500).json({
+      message: "Failed to create document",
+      error: error.message || "Unknown error",
+      details: error instanceof Error ? error.stack : null
+    });
   }
 };
 
+// ── GET BY VEHICLE ──
 // ── GET BY VEHICLE ──
 export const getVehicleDocuments = async (
   req: AuthRequest<{ vehicleId: string }>,
@@ -68,9 +105,17 @@ export const getVehicleDocuments = async (
 ) => {
   try {
     const docs = await VehicleDocumentsService.getByVehicle(req.params.vehicleId);
-    res.json(docs);
+
+    // FIX: Convert any BigInt fields (file_size) to string or number
+    const safeDocs = docs.map(doc => ({
+      ...doc,
+      file_size: doc.file_size ? doc.file_size.toString() : null,   // BigInt → string (safe for large values)
+      // Add other BigInt fields here if you have them
+    }));
+
+    res.json(safeDocs);
   } catch (error) {
-    console.error(error);
+    console.error("[GET DOCUMENTS ERROR]", error);
     res.status(500).json({ message: "Failed to fetch documents." });
   }
 };
