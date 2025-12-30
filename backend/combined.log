@@ -435,3 +435,84 @@
 {"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-24T11:08:35.904Z"}
 {"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-24T11:08:35.905Z"}
 {"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-24T11:08:35.905Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T02:36:16.139Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T02:36:16.151Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T02:36:16.152Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T02:36:16.153Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T02:36:16.154Z"}
+{"level":"info","message":"User logged in: superadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2025-12-30T02:37:13.932Z"}
+{"level":"error","message":"Prisma Error: \nInvalid `prisma.documents.create()` invocation in\nC:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\vehicle-documents\\vehicle-documents.service.ts:6:29\n\n  3 \n  4 export class VehicleDocumentsService {\n  5   static async create(data: any) {\n→ 6     return prisma.documents.create({\n          data: {\n            entity_type: \"VEHICLE\",\n            entity_id: \"c62a3aed-311d-4dcb-a791-3579024b8a97\",\n            document_type: \"Insurance_Policy\",\n            document_number: \"545rgfv\",\n            issue_date: \"2025-12-30\",\n                        ~~~~~~~~~~~~\n            expiry_date: \"2026-01-09\",\n            issuing_authority: \"hnbn\",\n            file_name: \"Excel functions.pdf\",\n            file_path: \"uploads\\\\vehicle-documents\\\\documentFile-1767065189974-983948804.pdf\",\n            file_size: 737457,\n            mime_type: \"application/pdf\",\n            status: \"Valid\",\n            created_by: \"9aa93d17-dc9f-4283-8758-0b55f2bb3e81\"\n          }\n        })\n\nInvalid value for argument `issue_date`: premature end of input. Expected ISO-8601 DateTime.","service":"tms-backend","target":"documents.create","timestamp":"2025-12-30T03:26:30.012Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T03:35:34.160Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T03:35:34.165Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T03:35:34.166Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T03:35:34.166Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T03:35:34.167Z"}
+{"level":"error","message":"Prisma Error: \nInvalid `prisma.documents.create()` invocation in\nC:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\vehicle-documents\\vehicle-documents.service.ts:6:29\n\n  3 \n  4 export class VehicleDocumentsService {\n  5   static async create(data: any) {\n→ 6     return prisma.documents.create({\n          data: {\n            entity_type: \"VEHICLE\",\n            document_type: undefined,\n            document_number: undefined,\n            issue_date: undefined,\n            expiry_date: undefined,\n            issuing_authority: undefined,\n            file_name: \"Excel functions.pdf\",\n            file_path: \"uploads\\\\vehicle-documents\\\\documentFile-1767066092315-369963119.pdf\",\n            file_size: 737457,\n            mime_type: \"application/pdf\",\n            status: \"Valid\",\n            created_by: \"9aa93d17-dc9f-4283-8758-0b55f2bb3e81\",\n        +   entity_id: String\n          }\n        })\n\nArgument `entity_id` is missing.","service":"tms-backend","target":"documents.create","timestamp":"2025-12-30T03:41:32.337Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T04:10:12.370Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T04:10:12.375Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T04:10:12.376Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T04:10:12.376Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T04:10:12.377Z"}
+{"level":"error","message":"Prisma Error: \nInvalid `prisma.documents.create()` invocation in\nC:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\vehicle-documents\\vehicle-documents.service.ts:6:29\n\n  3 \n  4 export class VehicleDocumentsService {\n  5   static async create(data: any) {\n→ 6     return prisma.documents.create({\n          data: {\n            entity_type: \"VEHICLE\",\n            document_type: undefined,\n            document_number: undefined,\n            issue_date: undefined,\n            expiry_date: undefined,\n            issuing_authority: undefined,\n            file_name: \"Excel functions.pdf\",\n            file_path: \"uploads\\\\vehicle-documents\\\\documentFile-1767067864872-500316357.pdf\",\n            file_size: 737457,\n            mime_type: \"application/pdf\",\n            status: \"Valid\",\n            created_by: \"9aa93d17-dc9f-4283-8758-0b55f2bb3e81\",\n        +   entity_id: String\n          }\n        })\n\nArgument `entity_id` is missing.","service":"tms-backend","target":"documents.create","timestamp":"2025-12-30T04:11:04.897Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T04:13:50.882Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T04:13:50.887Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T04:13:50.887Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T04:13:50.888Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T04:13:50.888Z"}
+{"level":"error","message":"Prisma Error: \nInvalid `prisma.documents.create()` invocation in\nC:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\vehicle-documents\\vehicle-documents.service.ts:6:29\n\n  3 \n  4 export class VehicleDocumentsService {\n  5   static async create(data: any) {\n→ 6     return prisma.documents.create({\n          data: {\n            entity_type: \"VEHICLE\",\n            document_type: \"Fitness_Certificate\",\n            document_number: \"dwr424\",\n            issue_date: new Date(\"2025-12-17T00:00:00.000Z\"),\n            expiry_date: new Date(\"2026-01-10T00:00:00.000Z\"),\n            issuing_authority: \"fgg\",\n            file_name: \"Excel functions.pdf\",\n            file_path: \"uploads\\\\vehicle-documents\\\\documentFile-1767068079170-249054478.pdf\",\n            file_size: 737457,\n            mime_type: \"application/pdf\",\n            status: \"Valid\",\n            created_by: \"9aa93d17-dc9f-4283-8758-0b55f2bb3e81\",\n        +   entity_id: String\n          }\n        })\n\nArgument `entity_id` is missing.","service":"tms-backend","target":"documents.create","timestamp":"2025-12-30T04:14:39.195Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T04:16:26.369Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T04:16:26.373Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T04:16:26.374Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T04:16:26.374Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T04:16:26.375Z"}
+{"level":"error","message":"Prisma Error: \nInvalid `prisma.documents.create()` invocation in\nC:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\vehicle-documents\\vehicle-documents.service.ts:6:29\n\n  3 \n  4 export class VehicleDocumentsService {\n  5   static async create(data: any) {\n→ 6     return prisma.documents.create({\n          data: {\n            entity_type: \"VEHICLE\",\n            document_type: \"Inspection_Report\",\n            document_number: \"78yyui-99o0\",\n            issue_date: new Date(\"2025-12-30T00:00:00.000Z\"),\n            expiry_date: new Date(\"2026-01-10T00:00:00.000Z\"),\n            issuing_authority: \"hhhghgh\",\n            file_name: \"Pivot Tables in Excel.pdf\",\n            file_path: \"uploads\\\\vehicle-documents\\\\documentFile-1767068260350-897277148.pdf\",\n            file_size: 601423,\n            mime_type: \"application/pdf\",\n            status: \"Valid\",\n            created_by: \"9aa93d17-dc9f-4283-8758-0b55f2bb3e81\",\n        +   entity_id: String\n          }\n        })\n\nArgument `entity_id` is missing.","service":"tms-backend","target":"documents.create","timestamp":"2025-12-30T04:17:40.371Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T04:24:22.139Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T04:24:22.144Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T04:24:22.145Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T04:24:22.145Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T04:24:22.145Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T06:00:08.051Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T06:00:08.056Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T06:00:08.057Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T06:00:08.057Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T06:00:08.058Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T06:04:26.884Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T06:04:26.888Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T06:04:26.889Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T06:04:26.889Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T06:04:26.889Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T06:09:37.926Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T06:09:37.931Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T06:09:37.932Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T06:09:37.933Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T06:09:37.933Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T09:29:01.600Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T09:29:01.608Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T09:29:01.609Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T09:29:01.610Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T09:29:01.610Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T10:49:28.547Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T10:49:28.554Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T10:49:28.555Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T10:49:28.556Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T10:49:28.556Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T11:06:44.727Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T11:06:44.733Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T11:06:44.733Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T11:06:44.734Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T11:06:44.734Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T11:07:15.951Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T11:07:15.957Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T11:07:15.958Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T11:07:15.958Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T11:07:15.959Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T11:09:58.033Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T11:09:58.044Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T11:09:58.046Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T11:09:58.047Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T11:09:58.048Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2025-12-30T11:15:25.853Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2025-12-30T11:15:25.861Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2025-12-30T11:15:25.862Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2025-12-30T11:15:25.862Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2025-12-30T11:15:25.863Z"}
