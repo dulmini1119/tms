@@ -66,14 +66,11 @@ import { VariantProps } from "class-variance-authority";
 import { toast } from "sonner";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
+import { RawVehicleDocument } from "@/types/documents";
+import { Vehicle } from "@/types/vehicles";
 
-// Simple Vehicle Interface for the dropdown
-interface Vehicle {
-  id: string;
-  registration_number: string;
-  make: string;
-  model: string;
-}
+
+
 
 export default function VehicleDocuments() {
   /* ────────────────────── STATE ────────────────────── */
@@ -132,21 +129,67 @@ export default function VehicleDocuments() {
   };
 
   // Fetch Documents
-  const fetchDocuments = async () => {
-    try {
-      setIsLoading(true);
-      const res = await fetch("/vehicle-documents");
-      if (!res.ok) throw new Error("Failed to fetch documents");
-      const data = await res.json();
-      setVehicleDocuments(data);
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to load documents");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+const fetchDocuments = async () => {
+  try {
+    setIsLoading(true);
+    const res = await fetch("/vehicle-documents");
+    if (!res.ok) throw new Error("Failed to fetch documents");
 
+    const rawData: RawVehicleDocument[] = await res.json();
+
+    // Normalize & map to frontend shape
+    const normalized: VehicleDocument[] = rawData.map((item) => ({
+      id: item.id,
+      entity_type: item.entity_type,
+      entity_id: item.entity_id,
+
+      documentType: item.document_type,
+      documentNumber: item.document_number,
+      // Create a useful name since backend doesn't send document_name
+      documentName:
+        item.document_number
+          ? `${item.document_type ?? "Document"} (${item.document_number})`
+          : item.document_type ?? "Unnamed Document",
+
+      // Vehicle info (you can improve later with join)
+      vehicleNumber: item.vehicle?.registration_number, // or fetch separately or join in backend
+      issuingAuthority: item.issuing_authority ?? "—",
+
+      issueDate: item.issue_date,
+      expiryDate: item.expiry_date,
+
+      status: item.status ?? "Pending",
+      fileName: item.file_name,
+      fileUrl: item.file_path ? item.file_path.replace(/\\/g, "/") : null,
+
+      file_size: item.file_size ? Number(item.file_size) : null,
+      mime_type: item.mime_type ?? null,
+
+      notes: item.notes ?? null,
+
+      // Defaults for missing optional fields
+      priority: "Medium",
+      renewalCost: 0,
+      currency: "LKR",
+      vendor: "",
+      contactNumber: "",
+      remindersSent: 0,
+
+      // These can be calculated later if needed
+      daysToExpiry: undefined,
+      complianceScore: undefined,
+      riskLevel: undefined,
+    }));
+
+    console.log("Normalized documents:", normalized);
+    setVehicleDocuments(normalized);
+  } catch (error) {
+    console.error("Fetch error:", error);
+    toast.error("Failed to load documents");
+  } finally {
+    setIsLoading(false);
+  }
+};
   useEffect(() => {
     fetchVehicles();
     fetchDocuments();
@@ -259,42 +302,44 @@ export default function VehicleDocuments() {
   }, [requiredDocumentTypes, vehicleDocuments]);
 
   /* ────────────────────── FILTER / SORT / PAGE ────────────────────── */
-  const filteredDocuments = useMemo(() => {
-    const list = vehicleDocuments
-      .map((doc) => ({
-        ...doc,
-        daysToExpiry: calculateDaysToExpiry(doc.expiryDate),
-      }))
-      .filter(
-        (doc) =>
-          (doc.documentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            doc.vehicleNumber
-              .toLowerCase()
-              .includes(searchTerm.toLowerCase()) ||
-            doc.documentNumber
-              .toLowerCase()
-              .includes(searchTerm.toLowerCase()) ||
-            doc.issuingAuthority
-              .toLowerCase()
-              .includes(searchTerm.toLowerCase())) &&
-          (statusFilter === "all" ||
-            doc.status.toLowerCase().replace("_", "-") === statusFilter) &&
-          (typeFilter === "all" ||
-            doc.documentType.toLowerCase().replace("_", "-") === typeFilter) &&
-          (categoryFilter === "all" ||
-            doc.category.toLowerCase() === categoryFilter) &&
-          (vehicleFilter === "all" || doc.vehicleNumber === vehicleFilter)
-      );
-    return list;
-  }, [
-    searchTerm,
-    statusFilter,
-    typeFilter,
-    categoryFilter,
-    vehicleFilter,
-    vehicleDocuments,
-    calculateDaysToExpiry,
-  ]);
+const filteredDocuments = useMemo(() => {
+  return vehicleDocuments
+    .map((doc) => ({
+      ...doc,
+      daysToExpiry: calculateDaysToExpiry(doc.expiryDate),
+    }))
+    .filter((doc) => {
+      const searchLower = searchTerm.toLowerCase();
+
+      // Safe string access with fallback to empty string
+      const nameMatch = (doc.documentName ?? "").toLowerCase().includes(searchLower);
+      const vehicleMatch = (doc.vehicleNumber ?? "").toLowerCase().includes(searchLower);
+      const numberMatch = (doc.documentNumber ?? "").toLowerCase().includes(searchLower);
+      const authorityMatch = (doc.issuingAuthority ?? "").toLowerCase().includes(searchLower);
+
+      return (
+        nameMatch ||
+        vehicleMatch ||
+        numberMatch ||
+        authorityMatch
+      ) &&
+        (statusFilter === "all" ||
+          (doc.status ?? "").toLowerCase().replace("_", "-") === statusFilter) &&
+        (typeFilter === "all" ||
+          (doc.documentType ?? "").toLowerCase().replace("_", "-") === typeFilter) &&
+        (categoryFilter === "all" ||
+          (doc.category ?? "").toLowerCase() === categoryFilter) &&
+        (vehicleFilter === "all" || doc.vehicleNumber === vehicleFilter);
+    });
+}, [
+  searchTerm,
+  statusFilter,
+  typeFilter,
+  categoryFilter,
+  vehicleFilter,
+  vehicleDocuments,
+  calculateDaysToExpiry,
+]);
 
   const totalPages =
     pageSize > 0 ? Math.ceil(filteredDocuments.length / pageSize) : 1;
@@ -723,12 +768,12 @@ export default function VehicleDocuments() {
 
     filteredDocuments.forEach((doc) => {
       worksheet.addRow({
-        vehicle: `${doc.vehicleNumber} (${doc.vehicleMake} ${doc.vehicleModel})`,
-        document: doc.documentName,
-        number: doc.documentNumber,
-        type: doc.documentType.replace(/_/g, " "),
-        category: doc.category,
-        status: doc.status.replace(/_/g, " "),
+        vehicle: `${doc.vehicleNumber ?? "—"} (${doc.vehicleMake ?? ""} ${doc.vehicleModel ?? ""})`,
+        document: doc.documentName ?? "Unnamed Document",
+        number: doc.documentNumber ?? "-",
+        type: (doc.documentType ?? "").replace(/_/g, " "),
+        category: doc.category ?? "-",
+        status: (doc.status ?? "").replace(/_/g, " "),
         issued: formatDate(doc.issueDate),
         expires: doc.expiryDate ? formatDate(doc.expiryDate) : "N/A",
         daysLeft:
@@ -737,14 +782,14 @@ export default function VehicleDocuments() {
               ? `-${Math.abs(doc.daysToExpiry)}`
               : doc.daysToExpiry
             : "N/A",
-        compliance: doc.complianceScore,
-        risk: doc.riskLevel,
-        priority: doc.priority,
-        authority: doc.issuingAuthority,
+        compliance: doc.complianceScore ?? 0,
+        risk: doc.riskLevel ?? "Low",
+        priority: doc.priority ?? "Medium",
+        authority: doc.issuingAuthority ?? "-",
         cost: doc.renewalCost ? `${doc.renewalCost} ${doc.currency || ""}` : "",
-        vendor: doc.vendor || "",
-        contact: doc.contactNumber || "",
-        reminders: doc.remindersSent,
+        vendor: doc.vendor ?? "",
+        contact: doc.contactNumber ?? "",
+        reminders: doc.remindersSent ?? 0,
       });
     });
 
@@ -864,7 +909,7 @@ export default function VehicleDocuments() {
                 <SelectItem value="all">All Vehicles</SelectItem>
                 {/* Use the fetched vehicles list */}
                 {vehicles.map((v) => (
-                  <SelectItem key={v.id} value={v.registration_number}>
+                  <SelectItem key={v.id} value={v.id}>
                     {v.registration_number}
                   </SelectItem>
                 ))}
@@ -928,7 +973,7 @@ export default function VehicleDocuments() {
                       <div className="space-y-1">
                         <div className="font-medium flex items-center">
                           <Car className="h-3 w-3 mr-1" />
-                          {doc.vehicleNumber}
+                          {doc.vehicleNumber || doc.entity_id || "Unknown VEhicle"}
                         </div>
                         <div className="text-sm text-muted-foreground">
                           {doc.vehicleMake} {doc.vehicleModel}
