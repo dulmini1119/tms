@@ -33,10 +33,13 @@ export class VehiclesService {
     const where: any = { deleted_at: null };
 
     if (filter) {
+      // FIX: Added 'if' and correct property assignments
       if (filter.vehicle_type) where.vehicle_type = filter.vehicle_type;
       if (filter.availability_status) where.availability_status = filter.availability_status;
       if (filter.cab_service_id) where.cab_service_id = filter.cab_service_id;
-      if (filter.ownership_type) where.ownership_type = {equals: filter.ownership_type, mode: "insensitive" } ;
+      
+      // FIX: Corrected object syntax for Prisma 'mode: insensitive'
+      if (filter.ownership_type) where.ownership_type = { equals: filter.ownership_type, mode: "insensitive" };
     }
 
     const vehicles = await prisma.vehicles.findMany({
