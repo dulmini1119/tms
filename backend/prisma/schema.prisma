@@ -1092,6 +1092,68 @@ model vehicle_leases {
   vehicles                               vehicles  @relation(fields: [vehicle_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
+model vehicles {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  registration_number String @unique @db.VarChar(50)
+  make String @db.VarChar(100)
+  model String @db.VarChar(100)
+  year Int
+  color String? @db.VarChar(50)
+  chassis_number String? @unique @db.VarChar(100)
+  engine_number String? @unique @db.VarChar(100)
+  vehicle_type String? @db.VarChar(50)
+  fuel_type String? @db.VarChar(50)
+  transmission String? @db.VarChar(20)
+  seating_capacity Int?
+  operational_status String? @default("Active") @db.VarChar(50)
+  availability_status String? @default("Available") @db.VarChar(50)
+  condition_status String? @db.VarChar(50)
+  current_location String? @db.VarChar(255)
+  home_base String? @db.VarChar(255)
+  latitude Decimal? @db.Decimal(10, 8)
+  longitude Decimal? @db.Decimal(11, 8)
+  location_updated_at DateTime? @db.Timestamp(6)
+  current_driver_id String? @db.Uuid
+  assigned_department_id String? @db.Uuid
+  driver_assigned_date DateTime? @db.Timestamp(6)
+  engine_displacement String? @db.VarChar(50)
+  engine_power String? @db.VarChar(50)
+  engine_torque String? @db.VarChar(50)
+  fuel_capacity Decimal? @db.Decimal(8, 2)
+  mileage_city Decimal? @db.Decimal(6, 2)
+  mileage_highway Decimal? @db.Decimal(6, 2)
+  mileage_combined Decimal? @db.Decimal(6, 2)
+  length_mm Int?
+  width_mm Int?
+  height_mm Int?
+  wheelbase_mm Int?
+  kerb_weight_kg Int?
+  gross_weight_kg Int?
+  ownership_type String? @db.VarChar(50)
+  purchase_date DateTime? @db.Date
+  purchase_price Decimal? @db.Decimal(15, 2)
+  current_value Decimal? @db.Decimal(15, 2)
+  total_kilometers Decimal? @default(0) @db.Decimal(10, 2)
+  total_trips Int? @default(0)
+  cab_service_id String? @db.Uuid
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  created_by String? @db.Uuid
+  updated_at DateTime? @default(now()) @db.Timestamp(6)
+  updated_by String? @db.Uuid
+  deleted_at DateTime? @db.Timestamp(6)
+  drivers_drivers_current_vehicle_idTovehicles drivers[] @relation("drivers_current_vehicle_idTovehicles")
+  gps_devices gps_devices[]
+  gps_logs gps_logs[]
+  insurance_policies insurance_policies[]
+  maintenance_logs maintenance_logs[]
+  trip_assignments trip_assignments[]
+  vehicle_leases vehicle_leases[]
+  drivers_vehicles_current_driver_idTodrivers drivers? @relation("vehicles_current_driver_idTodrivers", fields: [current_driver_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_vehicles_driver")
+  departments departments? @relation(fields: [assigned_department_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cab_services cab_services? @relation(fields: [cab_service_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_vehicles_created_byTousers users? @relation("vehicles_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_vehicles_updated_byTousers users? @relation("vehicles_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
  
 model rate_limit {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
