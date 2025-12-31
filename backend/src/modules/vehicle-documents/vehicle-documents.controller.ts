@@ -146,3 +146,19 @@ export const deleteVehicleDocument = async (
     res.status(500).json({ message: "Failed to delete document." });
   }
 };
+
+export const getAllVehicleDocuments = async (req: AuthRequest, res: Response) => {
+  try {
+    const docs = await VehicleDocumentsService.getAll();
+
+    const safeDocs = docs.map(doc => ({
+      ...doc,
+      file_size: doc.file_size ? doc.file_size.toString() : null,
+    }));
+
+    res.json(safeDocs);
+  } catch (error) {
+    console.error("[GET ALL DOCUMENTS ERROR]", error);
+    res.status(500).json({ message: "Failed to fetch documents." });
+  }
+};
