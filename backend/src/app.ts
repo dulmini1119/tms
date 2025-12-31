@@ -20,6 +20,7 @@ import cabServiceRoutes from './modules/cab-service/cab-service.routes.js';
 import cabAgreementsRoutes from './modules/cab-agreements/cab-agreements.routes.js';
 import vehicleRoutes from './modules/vehicles/vehicles.routes.js';
 import vehicledocumentsRoutes from './modules/vehicle-documents/vehicle-documents.routes.js';
+import tripRequestRoutes from './modules/trip-request/trip-request.routes.js';
 // ADD THIS LINE — CRITICAL!
 import { authenticate } from './middleware/auth.js';
 
@@ -70,7 +71,8 @@ app.use('/business-units',authenticate,businessUnitsRoute)
 app.use('/cab-services', cabServiceRoutes); // PROTECTED
 app.use('/cab-agreements', authenticate, cabAgreementsRoutes); 
 app.use('/vehicles', authenticate,vehicleRoutes)
-app.use('/vehicle-documents', authenticate,vehicledocumentsRoutes); // PROTECTED
+app.use('/vehicle-documents', authenticate,vehicledocumentsRoutes);
+app.use('/trip-requests', authenticate, tripRequestRoutes);
 
 // 404 & Error handlers
 app.use(notFoundHandler);

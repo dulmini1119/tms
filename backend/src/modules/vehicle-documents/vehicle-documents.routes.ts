@@ -3,7 +3,8 @@ import {
   createVehicleDocument,
   getVehicleDocuments,
   deleteVehicleDocument,
-  uploadVehicleDocumentMiddleware, // Import middleware
+  uploadVehicleDocumentMiddleware,
+  getAllVehicleDocuments, // Import middleware
 } from "./vehicle-documents.controller.js";
 import { validateBody } from "../../middleware/validation.js";
 import { createVehicleDocumentSchema } from "./vehicle-documents.validation.js";
@@ -16,7 +17,6 @@ router.post(
   "/",
   authenticate,
   uploadVehicleDocumentMiddleware,
-  validateBody(createVehicleDocumentSchema),
   createVehicleDocument
 );
 
@@ -25,7 +25,7 @@ router.post(
 router.get(
   "/",
   authenticate,
-  getVehicleDocuments
+  getAllVehicleDocuments
 );
 
 // ── GET BY VEHICLE ──
