@@ -1,7 +1,27 @@
 import { Response } from "express";
-import { AuthRequest } from "../../middleware/auth.js"; // use your AuthRequest type
+import { AuthRequest } from "../../middleware/auth.js";
 import * as tripService from "./trip-request.service.js";
 import { createTripRequestSchema, updateTripRequestSchema } from "./trip-request.validation.js";
+
+// Helper function
+const validateRequest = (schema: any, data: any) => {
+  const { error, value } = schema.validate(data, { abortEarly: false, stripUnknown: true });
+  if (error) {
+    const errors = error.details.map((detail: any) => detail.message);
+    return { isValid: false, errors };
+  }
+  return { isValid: true, value };
+};
+
+// Helper specifically for updates to ensure partial data is valid
+const validateUpdateRequest = (schema: any, data: any) => {
+  const { error, value } = schema.validate(data, { abortEarly: false, stripUnknown: false });
+  if (error) {
+    const errors = error.details.map((detail: any) => detail.message);
+    return { isValid: false, errors };
+  }
+  return { isValid: true, value };
+};
 
 export const getAllTripRequests = async (req: AuthRequest, res: Response) => {
   try {
@@ -23,17 +43,7 @@ export const getAllTripRequests = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-// Helper function
-const validateRequest = (schema: any, data: any) => {
-  const { error, value } = schema.validate(data, { abortEarly: false });
-  if (error) {
-    const errors = error.details.map((detail: any) => detail.message);
-    return { isValid: false, errors };
-  }
-  return { isValid: true, value };
-};
 
-// --- Use AuthRequest instead of Request ---
 export const getTripRequestById = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -60,7 +70,7 @@ export const createTripRequest = async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error("Controller Error:", error);
     if (error.code === 'P2002') {
-        return res.status(400).json({ error: "Unique constraint failed" });
+        return res.status(400).json({ error: "Unique constraint failed (Request Number might exist)" });
     }
     res.status(500).json({ error: "Internal Server Error" });
   }
@@ -69,7 +79,7 @@ export const createTripRequest = async (req: AuthRequest, res: Response) => {
 export const updateTripRequest = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const validation = validateRequest(updateTripRequestSchema, req.body);
+    const validation = validateUpdateRequest(updateTripRequestSchema, req.body);
     if (!validation.isValid) {
       return res.status(400).json({ errors: validation.errors });
     }
