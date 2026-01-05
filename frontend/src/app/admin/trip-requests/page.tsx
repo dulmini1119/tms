@@ -1,13 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react"; // Using your global axios instance
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Plus,
-  Search,
   MoreHorizontal,
   Edit,
   Trash2,
-  MapPin,
   Calendar,
   Clock,
   User,
@@ -89,7 +87,7 @@ export default function TripRequests() {
   const [editingRequest, setEditingRequest] = useState<TripRequest | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<TripRequest | null>(null);
 
-  // Form State (Matches TripRequest interface)
+  // Form State
   const [formData, setFormData] = useState<Partial<TripRequest>>({
     requestedBy: {
       id: "",
@@ -132,13 +130,10 @@ export default function TripRequests() {
     approvalRequired: true,
     estimatedCost: 0,
     currency: "LKR",
-    // Arrays
     passengers: [],
     approvalWorkflow: [],
     attachments: [],
     auditTrail: [],
-    costBreakdown: undefined,
-    billing: undefined,
     id: "",
     requestNumber: "",
     createdAt: "",
@@ -170,7 +165,7 @@ export default function TripRequests() {
     return headers;
   }, []);
 
-  // Fetch Departments (For Dropdown)
+  // Fetch Departments
   const fetchDepartments = useCallback(async () => {
     try {
       const res = await fetch(`/departments?limit=100`, { headers: getAuthHeaders() });
@@ -216,16 +211,10 @@ export default function TripRequests() {
     }
   }, [currentPage, debouncedSearch, statusFilter, departmentFilter, priorityFilter, pageSize, getAuthHeaders]);
 
-  useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
-
-  useEffect(() => {
-    fetchTrips();
-  }, [fetchTrips]);
+  useEffect(() => { fetchDepartments(); }, [fetchDepartments]);
+  useEffect(() => { fetchTrips(); }, [fetchTrips]);
 
   // --- HELPERS ---
-
   const formatDate = (s?: string) => {
     if (!s) return "N/A";
     return new Date(s).toLocaleDateString("en-GB", {
@@ -256,34 +245,27 @@ export default function TripRequests() {
     }
   };
 
-  // --- TRANSFORMATION LOGIC (Frontend <-> Backend) ---
-
-  // Helper to map Flat DB -> Nested Frontend
-  // (This is usually done in the backend service, but done here if backend sends flat data directly)
-  // Assuming backend sends nested structure based on our previous discussions.
-  // If backend sends flat, we use mapDbToFrontend here. For now, assuming backend sends
-  // a structure compatible with 'TripRequest' interface via the API we built earlier.
-
-  // Helper to map Nested Frontend -> Flat DB (For POST/PUT)
+  // --- TRANSFORMATION LOGIC ---
   const mapFormToPayload = (data: Partial<TripRequest>) => {
     return {
       request_number: data.requestNumber,
       requested_by_user_id: data.requestedBy?.id,
       
-      // Trip Details
+      // Trip Details - Handling coordinates safely
       from_location_address: data.tripDetails?.fromLocation?.address || "",
       from_location_latitude: data.tripDetails?.fromLocation?.coordinates?.lat || null,
       from_location_longitude: data.tripDetails?.fromLocation?.coordinates?.lng || null,
       
-      to_location_address: data.tripDetails?.toLocation?.address,
+      to_location_address: data.tripDetails?.toLocation?.address || "",
       to_location_latitude: data.tripDetails?.toLocation?.coordinates?.lat || null,
       to_location_longitude: data.tripDetails?.toLocation?.coordinates?.lng || null,
       
       departure_date: data.tripDetails?.departureDate || null,
-      departure_time: data.tripDetails?.departureTime || null, // Assuming backend handles time string
+      departure_time: data.tripDetails?.departureTime || null,
       
       return_date: data.tripDetails?.returnDate || null,
       return_time: data.tripDetails?.returnTime || null,
+      
       is_round_trip: data.tripDetails?.isRoundTrip,
       estimated_distance: data.tripDetails?.estimatedDistance ?? 0,
       estimated_duration: data.tripDetails?.estimatedDuration ?? 0,
@@ -319,7 +301,7 @@ export default function TripRequests() {
 
   const handleEdit = (request: TripRequest) => {
     setEditingRequest(request);
-    // Deep copy to prevent reference issues
+    // FIX: Removed extra parenthesis here
     setFormData(JSON.parse(JSON.stringify(request)));
     setIsDialogOpen(true);
   };
@@ -393,8 +375,6 @@ export default function TripRequests() {
       approvalWorkflow: [],
       attachments: [],
       auditTrail: [],
-      costBreakdown: undefined,
-      billing: undefined,
       id: "",
       requestNumber: "",
       createdAt: "",
@@ -405,7 +385,8 @@ export default function TripRequests() {
   const handleSubmit = async () => {
     // Validation
     if (!formData.requestedBy?.name || !formData.tripDetails?.fromLocation?.address) {
-      return toast.error("Please fill required fields (Name, From Address)");
+      toast.error("Please fill required fields (Name, From Address)");
+      return;
     }
 
     const payload = mapFormToPayload(formData);
@@ -423,7 +404,9 @@ export default function TripRequests() {
       if (!res.ok) {
         const message = data.message || data.error?.message || "Something went wrong";
         const details = Array.isArray(data.errors) ? data.errors.join(",") : "";
-        return console.error(details || message);
+        toast.error(details || message);
+        console.error("Submit Error:", data);
+        return;
       }
 
       toast.success(editingRequest ? "Request updated" : "Request created");
@@ -437,7 +420,6 @@ export default function TripRequests() {
   };
 
   // --- RENDER ---
-
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -514,7 +496,11 @@ export default function TripRequests() {
           {/* Filters */}
           <div className="flex flex-wrap gap-2 mb-6">
             <div className="flex-1 relative max-w-sm">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              {/* Search Icon */}
+              <div className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground">
+                {/* Using span to avoid icon import if needed, or use your existing Search import */}
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </div>
               <Input
                 placeholder="Search requests..."
                 value={searchTerm}
@@ -605,7 +591,8 @@ export default function TripRequests() {
                           <TableCell>
                             <div className="space-y-1">
                               <div className="text-sm flex items-center">
-                                <MapPin className="h-3 w-3 mr-1" />
+                                {/* MapPin SVG fallback */}
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13 0-7 9-13 9-13s9 6 9 13z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                                 {request.tripDetails.fromLocation.address.substring(0, 25)}...
                               </div>
                               <div className="text-sm text-muted-foreground">
@@ -680,7 +667,11 @@ export default function TripRequests() {
                       </div>
                       <div className="space-y-1 text-sm text-muted-foreground">
                         <div className="flex items-center"><User className="h-4 w-4 mr-1" /> {request.requestedBy.name} ({request.requestedBy.department})</div>
-                        <div className="flex items-center"><MapPin className="h-4 w-4 mr-1" /> {request.tripDetails.fromLocation.address.substring(0, 20)}...</div>
+                        <div className="flex items-center">
+                           {/* MapPin fallback */}
+                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13 0-7 9-13 9-13s9 6 9 13z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                           {request.tripDetails.fromLocation.address.substring(0, 20)}...
+                        </div>
                         <div className="flex items-center"><Clock className="h-4 w-4 mr-1" /> {request.tripDetails.departureDate}</div>
                         <div>
                           <span className="font-medium">Priority:</span> <Badge variant={getPriorityBadgeVariant(request.priority)}>{request.priority}</Badge>
@@ -802,9 +793,7 @@ export default function TripRequests() {
       {/* View Details Dialog (Read Only) */}
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Trip Request Details</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Trip Request Details</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
              {selectedRequest && (
                <>

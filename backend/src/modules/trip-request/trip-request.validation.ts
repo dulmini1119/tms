@@ -1,26 +1,26 @@
-// backend/src/validations/trip-request.validation.ts
 import Joi from "joi";
 
-// Define Sub-Schemas
 const locationSchema = Joi.object({
   address: Joi.string().required().messages({ "string.empty": "Address is required" }),
-  lat: Joi.number().allow(null).optional(),
-  lng: Joi.number().allow(null).optional(),
+  coordinates: Joi.object({
+    lat: Joi.number().allow(null).optional(),
+    lng: Joi.number().allow(null).optional(),
+  }).optional(),
 });
 
 const userSchema = Joi.object({
-  id: Joi.string().required().messages({ "string.empty": "User ID is required" }),
-  name: Joi.string().required().messages({ "string.empty": "Name is required" }),
-  email: Joi.string().email().required().messages({ "string.email": "Invalid email" }),
-  department: Joi.string().required().messages({ "string.empty": "Department is required" }),
+  id: Joi.string().required(),
+  name: Joi.string().required(),
+  email: Joi.string().email().required(),
+  department: Joi.string().required(),
   employeeId: Joi.string().allow("", null).optional(),
 });
 
 const tripDetailsSchema = Joi.object({
   fromLocation: locationSchema.required(),
   toLocation: locationSchema.required(),
-  departureDate: Joi.string().isoDate().required().messages({ "string.empty": "Departure date is required" }),
-  departureTime: Joi.string().pattern(/^([01]\d|2[0-3]):([0-5]\d)$/).required().messages({ "string.pattern.base": "Time must be HH:mm" }),
+  departureDate: Joi.string().isoDate().required(),
+  departureTime: Joi.string().pattern(/^([01]\d|2[0-3]):([0-5]\d)$/).required(),
   returnDate: Joi.string().isoDate().allow(null, "").optional(),
   returnTime: Joi.string().pattern(/^([01]\d|2[0-3]):([0-5]\d)$/).allow(null, "").optional(),
   isRoundTrip: Joi.boolean().optional().default(false),
@@ -44,8 +44,10 @@ const requirementsSchema = Joi.object({
   specialRequirements: Joi.string().allow("", null).optional(),
 });
 
-// Main Schema
-const createTripRequestSchema = Joi.object({
+// Frontend sends a flat structure in mapFormToPayload.
+// However, your controller validates against 'req.body' which IS the object sent by frontend.
+// So the Schema matches the Frontend's Input Object (Nested).
+export const createTripRequestSchema = Joi.object({
   requestNumber: Joi.string().optional(),
   requestedBy: userSchema,
   tripDetails: tripDetailsSchema,
@@ -57,11 +59,10 @@ const createTripRequestSchema = Joi.object({
   approvalRequired: Joi.boolean().optional().default(true),
 });
 
-// --- FIX: Manual Update Schema ---
-// Instead of using .fork(), we create a new schema where all fields are optional
+// Update Schema - All fields optional
 export const updateTripRequestSchema = Joi.object({
   requestNumber: Joi.string().optional(),
-  requestedBy: userSchema.optional(), // Make nested schemas optional too
+  requestedBy: userSchema.optional(),
   tripDetails: tripDetailsSchema.optional(),
   purpose: purposeSchema.optional(),
   requirements: requirementsSchema.optional(),
@@ -70,5 +71,3 @@ export const updateTripRequestSchema = Joi.object({
   estimatedCost: Joi.number().min(0).optional(),
   approvalRequired: Joi.boolean().optional(),
 });
-
-export { createTripRequestSchema };
