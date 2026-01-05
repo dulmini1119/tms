@@ -88,7 +88,7 @@ login = async (req: AuthRequest, res: Response, next: NextFunction): Promise<voi
     next: NextFunction
   ): Promise<void> => {
     try {
-      const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
+      const refreshToken = req.cookies.refreshToken;
       if (!refreshToken) {
         throw new AppError(
           ERROR_CODES.UNAUTHORIZED,
@@ -98,6 +98,23 @@ login = async (req: AuthRequest, res: Response, next: NextFunction): Promise<voi
       }
 
       const result = await this.authService.refreshToken(refreshToken);
+
+      res.cookie("accessToken", result.accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        maxAge: 15 * 60 * 1000,
+      })
+
+      res.cookie("refreshToken", result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+
       ApiResponse.success(res, result, "Token refreshed");
     } catch (error) {
       next(error);
