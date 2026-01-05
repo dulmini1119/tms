@@ -1,12 +1,11 @@
-// backend/src/services/trip-request.service.ts
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 // --- HELPER: Transform DB Flat -> Frontend Nested ---
 const mapDbToFrontend = (dbRecord: any) => {
-  // Get the user object from the relation
   const user = dbRecord.users_trip_requests_requested_by_user_idTousers;
+  const departmentRelation = user?.departments_users_department_idTodepartments;
 
   return {
     id: dbRecord.id,
@@ -20,32 +19,34 @@ const mapDbToFrontend = (dbRecord: any) => {
 
     requestedBy: {
       id: dbRecord.requested_by_user_id,
-      // Concatenate First and Last Name
       name: user ? `${user.first_name} ${user.last_name}` : "Unknown", 
       email: user?.email || "",
-      // Access department name from the nested relation
-      department: user?.departments?.name || "Unassigned", 
+      department: departmentRelation?.name || "Unassigned", 
       employeeId: user?.employee_id || "",
     },
 
     tripDetails: {
       fromLocation: {
         address: dbRecord.from_location_address,
-        lat: Number(dbRecord.from_location_latitude),
-        lng: Number(dbRecord.from_location_longitude),
+        coordinates: dbRecord.from_location_latitude ? {
+          lat: Number(dbRecord.from_location_latitude),
+          lng: Number(dbRecord.from_location_longitude)
+        } : undefined,
       },
       toLocation: {
         address: dbRecord.to_location_address,
-        lat: Number(dbRecord.to_location_latitude),
-        lng: Number(dbRecord.to_location_longitude),
+        coordinates: dbRecord.to_location_latitude ? {
+          lat: Number(dbRecord.to_location_latitude),
+          lng: Number(dbRecord.to_location_longitude)
+        } : undefined,
       },
       departureDate: dbRecord.departure_date.toISOString().split('T')[0],
       departureTime: dbRecord.departure_time.toTimeString().substring(0, 5),
       returnDate: dbRecord.return_date ? dbRecord.return_date.toISOString().split('T')[0] : null,
       returnTime: dbRecord.return_time ? dbRecord.return_time.toTimeString().substring(0, 5) : null,
       isRoundTrip: dbRecord.is_round_trip,
-      estimatedDistance: Number(dbRecord.estimated_distance),
-      estimatedDuration: dbRecord.estimated_duration,
+      estimatedDistance: dbRecord.estimated_distance ? Number(dbRecord.estimated_distance) : 0,
+      estimatedDuration: dbRecord.estimated_duration || 0,
     },
 
     purpose: {
@@ -58,13 +59,12 @@ const mapDbToFrontend = (dbRecord: any) => {
 
     requirements: {
       vehicleType: dbRecord.vehicle_type_required,
-      passengerCount: dbRecord.passenger_count,
+      passengerCount: dbRecord.passenger_count || 1,
       luggage: dbRecord.luggage_type,
       acRequired: dbRecord.ac_required,
       specialRequirements: dbRecord.special_instructions,
     },
 
-    // Arrays (can be populated via includes if needed)
     passengers: [], 
     approvalWorkflow: [],
     attachments: [],
@@ -72,19 +72,21 @@ const mapDbToFrontend = (dbRecord: any) => {
 };
 
 // --- HELPER: Transform Frontend Nested -> DB Flat ---
+// This matches the structure sent by Frontend's 'mapFormToPayload'
 const mapInputToDb = (input: any) => {
   return {
     request_number: input.requestNumber, 
     requested_by_user_id: input.requestedBy.id,
     
     // Locations
+    // Frontend uses input.tripDetails.fromLocation.coordinates.lat
     from_location_address: input.tripDetails.fromLocation.address,
-    from_location_latitude: input.tripDetails.fromLocation.lat || null,
-    from_location_longitude: input.tripDetails.fromLocation.lng || null,
+    from_location_latitude: input.tripDetails.fromLocation.coordinates?.lat || null,
+    from_location_longitude: input.tripDetails.fromLocation.coordinates?.lng || null,
     
     to_location_address: input.tripDetails.toLocation.address,
-    to_location_latitude: input.tripDetails.toLocation.lat || null,
-    to_location_longitude: input.tripDetails.toLocation.lng || null,
+    to_location_latitude: input.tripDetails.toLocation.coordinates?.lat || null,
+    to_location_longitude: input.tripDetails.toLocation.coordinates?.lng || null,
     
     // Dates & Times
     departure_date: new Date(input.tripDetails.departureDate),
@@ -119,14 +121,10 @@ const mapInputToDb = (input: any) => {
   };
 };
 
-// --- Service Methods ---
-
 export const getAllTripRequests = async (filters: any) => {
   const { searchTerm, status, department, priority, page, pageSize } = filters;
-  
   const skip = (parseInt(page) - 1) * parseInt(pageSize);
   const take = parseInt(pageSize);
-
   const where: any = {};
 
   if (searchTerm) {
@@ -134,7 +132,6 @@ export const getAllTripRequests = async (filters: any) => {
       { request_number: { contains: searchTerm, mode: "insensitive" } },
       { from_location_address: { contains: searchTerm, mode: "insensitive" } },
       { to_location_address: { contains: searchTerm, mode: "insensitive" } },
-      // Searching by user name (concatenated is hard in DB, usually searching first_name OR last_name)
       { users_trip_requests_requested_by_user_idTousers: { 
           OR: [
              { first_name: { contains: searchTerm, mode: "insensitive" } },
@@ -150,7 +147,7 @@ export const getAllTripRequests = async (filters: any) => {
   
   if (department && department !== "all-departments") {
     where.users_trip_requests_requested_by_user_idTousers = {
-      departments: {
+      departments_users_department_idTodepartments: {
         name: department
       }
     };
@@ -170,11 +167,8 @@ export const getAllTripRequests = async (filters: any) => {
             last_name: true,
             email: true,
             employee_id: true,
-            // Include the departments relation to get the name
             departments_users_department_idTodepartments: {
-              select: {
-                name: true
-              }
+              select: { name: true }
             }
           }
         }
@@ -220,6 +214,12 @@ export const getTripRequestById = async (id: string) => {
 };
 
 export const createTripRequest = async (input: any) => {
+  if (!input.requestNumber) {
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    input.requestNumber = `REQ-${timestamp}-${random}`;
+  }
+
   const data = mapInputToDb(input);
   
   const newRequest = await prisma.trip_requests.create({
@@ -257,7 +257,7 @@ export const updateTripRequest = async (id: string, input: any) => {
           last_name: true,
           email: true,
           employee_id: true,
-          departments_departments_head_idTousers: {
+          departments_users_department_idTodepartments: {
             select: { name: true }
           }
         }
