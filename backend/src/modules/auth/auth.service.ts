@@ -175,7 +175,7 @@ async login(email: string, password: string, rememberMe: boolean = false) {
     try {
       const decoded = verifyRefreshToken(refreshToken);
 
-      const storedToken = await (prisma as any).refreshToken.findUnique({
+      const storedToken = await prisma.refreshToken.findUnique({
         where: { token: refreshToken },
       });
 
@@ -188,7 +188,7 @@ async login(email: string, password: string, rememberMe: boolean = false) {
       }
 
       if (new Date() > storedToken.expires_at) {
-        await (prisma as any).refreshToken.delete({ where: { token: refreshToken } });
+        await prisma.refreshToken.delete({ where: { token: refreshToken } });
         throw new AppError(
           ERROR_CODES.TOKEN_EXPIRED,
           'Refresh token expired',
@@ -208,13 +208,31 @@ async login(email: string, password: string, rememberMe: boolean = false) {
         );
       }
 
-      const accessToken = generateAccessToken({
+      const newAccessToken = generateAccessToken({
         userId: user.id,
         email: user.email,
         role: user.position || 'USER',
+      })
+      const newRefreshToken = generateRefreshToken({ userId: user.id });
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); 
+
+      await prisma.refreshToken.create({
+        data: {
+          token: newRefreshToken,
+          userId: user.id,
+          expires_at: expiresAt,
+        }
       });
 
-      return { accessToken, expiresIn: 3600 };
+      await prisma.refreshToken.delete({ where: { token: refreshToken } });
+
+
+      return { 
+        accessToken : newAccessToken,
+        refreshToken: newRefreshToken, 
+        expiresIn: 3600 };
 
     } catch (err) {
       if (err instanceof AppError) throw err;
