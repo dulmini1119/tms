@@ -619,3 +619,111 @@
 {"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-05T11:28:27.345Z"}
 {"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-05T11:28:27.345Z"}
 {"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-05T11:28:27.345Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-06T03:14:43.961Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-06T03:14:43.973Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-06T03:14:43.975Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-06T03:14:43.976Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-06T03:14:43.978Z"}
+{"level":"info","message":"User logged in: superadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-06T03:16:28.204Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T02:43:03.758Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T02:43:03.773Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T02:43:03.788Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T02:43:03.796Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T02:43:03.804Z"}
+{"level":"info","message":"User logged in: superadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-07T02:44:35.812Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T03:32:27.761Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T03:32:27.767Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T03:32:27.768Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T03:32:27.769Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T03:32:27.770Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T03:32:30.574Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T03:32:30.581Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T03:32:30.582Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T03:32:30.583Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T03:32:30.585Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T03:42:08.810Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T03:42:08.818Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T03:42:08.819Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T03:42:08.819Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T03:42:08.820Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T03:42:11.786Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T03:42:11.795Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T03:42:11.795Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T03:42:11.796Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T03:42:11.797Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T06:32:02.543Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T06:32:02.548Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T06:32:02.549Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T06:32:02.549Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T06:32:02.550Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T06:35:53.160Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T06:35:53.167Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T06:35:53.168Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T06:35:53.169Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T06:35:53.170Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T06:47:18.549Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T06:47:18.553Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T06:47:18.554Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T06:47:18.554Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T06:47:18.555Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T06:51:06.420Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T06:51:06.426Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T06:51:06.427Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T06:51:06.427Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T06:51:06.427Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T07:40:11.736Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T07:40:11.741Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T07:40:11.742Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T07:40:11.742Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T07:40:11.743Z"}
+{"error":"Your account is not active. Please contact administrator.","ip":"::1","level":"error","message":"Error occurred:","method":"POST","path":"/auth/login","service":"tms-backend","stack":"Error: Your account is not active. Please contact administrator.\n    at AuthService.login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.service.ts:33:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.controllers.ts:32:20)","timestamp":"2026-01-07T08:48:05.928Z"}
+{"error":"Your account is not active. Please contact administrator.","ip":"::1","level":"error","message":"Error occurred:","method":"POST","path":"/auth/login","service":"tms-backend","stack":"Error: Your account is not active. Please contact administrator.\n    at AuthService.login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.service.ts:33:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.controllers.ts:32:20)","timestamp":"2026-01-07T08:48:20.209Z"}
+{"error":"Invalid email or password","ip":"::1","level":"error","message":"Error occurred:","method":"POST","path":"/auth/login","service":"tms-backend","stack":"Error: Invalid email or password\n    at AuthService.login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.service.ts:25:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.controllers.ts:32:20)","timestamp":"2026-01-07T08:49:55.570Z"}
+{"error":"Invalid email or password","ip":"::1","level":"error","message":"Error occurred:","method":"POST","path":"/auth/login","service":"tms-backend","stack":"Error: Invalid email or password\n    at AuthService.login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.service.ts:25:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.controllers.ts:32:20)","timestamp":"2026-01-07T08:50:03.940Z"}
+{"error":"Invalid email or password","ip":"::1","level":"error","message":"Error occurred:","method":"POST","path":"/auth/login","service":"tms-backend","stack":"Error: Invalid email or password\n    at AuthService.login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.service.ts:25:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.controllers.ts:32:20)","timestamp":"2026-01-07T08:50:42.637Z"}
+{"error":"Your account is not active. Please contact administrator.","ip":"::1","level":"error","message":"Error occurred:","method":"POST","path":"/auth/login","service":"tms-backend","stack":"Error: Your account is not active. Please contact administrator.\n    at AuthService.login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.service.ts:33:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.controllers.ts:32:20)","timestamp":"2026-01-07T08:51:14.190Z"}
+{"level":"info","message":"User logged in: vehicleadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-07T08:52:41.090Z"}
+{"level":"info","message":"User logged in: vehicleadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-07T08:54:47.871Z"}
+{"level":"info","message":"User logged in: vehicleadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-07T08:59:56.047Z"}
+{"level":"info","message":"User logged in: vehicleadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-07T08:59:59.661Z"}
+{"level":"info","message":"\nSIGINT received. Starting graceful shutdown...","service":"tms-backend","timestamp":"2026-01-07T09:01:57.966Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T09:02:04.263Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T09:02:04.268Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T09:02:04.269Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T09:02:04.270Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T09:02:04.270Z"}
+{"level":"info","message":"User logged in: vehicleadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-07T09:02:43.433Z"}
+{"level":"info","message":"User logged in: vehicleadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-07T09:07:41.191Z"}
+{"level":"info","message":"User logged in: manager@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-07T09:08:08.125Z"}
+{"level":"info","message":"User logged in: hod@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-07T09:08:31.014Z"}
+{"error":"Your account is not active. Please contact administrator.","ip":"::1","level":"error","message":"Error occurred:","method":"POST","path":"/auth/login","service":"tms-backend","stack":"Error: Your account is not active. Please contact administrator.\n    at AuthService.login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.service.ts:33:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.controllers.ts:32:20)","timestamp":"2026-01-07T09:08:56.464Z"}
+{"level":"info","message":"User logged in: driver@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-07T09:09:19.140Z"}
+{"error":"Your account is not active. Please contact administrator.","ip":"::1","level":"error","message":"Error occurred:","method":"POST","path":"/auth/login","service":"tms-backend","stack":"Error: Your account is not active. Please contact administrator.\n    at AuthService.login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.service.ts:33:11)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.controllers.ts:32:20)","timestamp":"2026-01-07T09:10:44.293Z"}
+{"level":"info","message":"User logged in: superadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-07T09:13:50.180Z"}
+{"error":"User with this email already exists","ip":"::1","level":"error","message":"Error occurred:","method":"POST","path":"/users","service":"tms-backend","stack":"Error: User with this email already exists\n    at UsersService.createUser (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\users\\users.service.ts:198:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async createUser (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\users\\users.controller.ts:43:20)","timestamp":"2026-01-07T09:16:14.678Z"}
+{"level":"info","message":"User logged in: employee@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-01-07T09:18:32.593Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T09:54:32.031Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T09:54:32.037Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T09:54:32.038Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T09:54:32.038Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T09:54:32.039Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T09:54:44.467Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T09:54:44.472Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T09:54:44.472Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T09:54:44.473Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T09:54:44.473Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T10:35:55.169Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T10:35:55.174Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T10:35:55.175Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T10:35:55.176Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T10:35:55.176Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T10:51:45.225Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T10:51:45.230Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T10:51:45.230Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T10:51:45.231Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T10:51:45.231Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-01-07T10:56:26.781Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-01-07T10:56:26.789Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-01-07T10:56:26.789Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-01-07T10:56:26.790Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-01-07T10:56:26.790Z"}
