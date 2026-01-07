@@ -1,6 +1,6 @@
 "use client";
-import React, { useEffect, useState } from "react";
 
+import React, { useEffect, useState, useCallback } from "react";
 import {
   CheckCircle,
   XCircle,
@@ -13,17 +13,16 @@ import {
   Calendar,
   MapPin,
   AlertCircle,
-  Users as UsersIcon,
   History,
-  Info,
-  Target,
   Shield,
   ListChecks,
+  ChevronLeft,
+  ChevronRight,
+  ChevronFirst,
+  ChevronLast,
 } from "lucide-react";
-import { mockTripData } from "@/data/mock-trip-data";
-import { TripApproval, TripRequest } from "@/types/trip-interfaces";
-import { VariantProps } from "class-variance-authority";
-import { Badge, badgeVariants } from "@/components/ui/badge";
+
+import { TripRequest, TripApproval } from "@/types/trip-interfaces";
 import {
   Card,
   CardContent,
@@ -47,6 +46,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge, badgeVariants } from "@/components/ui/badge";
+import { VariantProps } from "class-variance-authority";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,124 +63,141 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+
+// ── TYPES ────────────────────────────────────────────────────────────────
+
+// The API returns a merged object containing Approval fields + Request fields
+interface TripRequestExtended extends TripApproval {
+  requestedBy: {
+    id: string;
+    name: string;
+    email: string;
+    employeeId: string;
+    department: string;
+  };
+  tripDetails: {
+    fromLocation: { address: string };
+    toLocation: { address: string };
+    departureDate: string;
+    departureTime: string;
+  };
+  purpose: {
+    description: string;
+    category: string;
+  };
+  estimatedCost: number;
+  currency: string;
+}
+
+
+// ── MAIN COMPONENT ───────────────────────────────────────────────────────
 
 export default function TripApprovals() {
+  // ── STATE ────────────────────────────────────────────────────────────────
+
+  const [approvals, setApprovals] = useState<TripRequestExtended[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalApprovals, setTotalApprovals] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Filters
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+
+  // Modals & Selection
+  const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
-  const [selectedApproval, setSelectedApproval] = useState<TripApproval | null>(
-    null
-  );
-  const [selectedRequest, setSelectedRequest] = useState<TripRequest | null>(
-    null
-  );
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+
+  const [selectedApproval, setSelectedApproval] =
+    useState<TripRequestExtended | null>(null);
+
+  // Action Form State
   const [approvalAction, setApprovalAction] = useState<
     "approve" | "reject" | null
   >(null);
   const [comments, setComments] = useState("");
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [viewRequest, setViewRequest] = useState<TripRequest | null>(null);
-  const [viewApproval, setViewApproval] = useState<TripApproval | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  // Get trip approvals and related requests
-  const tripApprovals = mockTripData.approvals;
-  const tripRequests = mockTripData.requests;
 
-  // Create a map for quick request lookup
-  const requestMap = new Map(tripRequests.map((req) => [req.id, req]));
+  // ── EFFECTS ──────────────────────────────────────────────────────────────
 
-  const filteredApprovals = tripApprovals.filter((approval) => {
-    const request = requestMap.get(approval.tripRequestId);
-    if (!request) return false;
+  // Debounce search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
-    return (
-      (approval.requestNumber
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-        request.requestedBy.name
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        request.purpose.description
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase())) &&
-      (statusFilter === "all" ||
-        approval.finalStatus.toLowerCase() === statusFilter)
-    );
-  });
+  // Reset page on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, statusFilter]);
+
+  const getAuthHeaders = useCallback((): Record<string, string> => {
+    const token = localStorage.getItem("authToken");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return headers;
+  }, []);
+
+  // Fetch Approvals
+  const fetchApprovals = useCallback(async () => {
+    setLoading(true);
+    try {
+      const query = new URLSearchParams({
+        page: currentPage.toString(),
+        pageSize: pageSize.toString(),
+      });
+      if (debouncedSearch) query.set("search", debouncedSearch);
+      if (statusFilter !== "all") query.set("status", statusFilter);
+
+      const res = await fetch(`/trip-approvals?${query}`, {
+        headers: getAuthHeaders(),
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch approvals");
+
+      const data = await res.json();
+      setApprovals(data.data || []);
+      setTotalApprovals(data.meta?.total || 0);
+      setTotalPages(data.meta?.totalPages || 1);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load approvals");
+      setApprovals([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, pageSize, debouncedSearch, statusFilter, getAuthHeaders]);
+
+  useEffect(() => {
+    fetchApprovals();
+  }, [fetchApprovals]);
+
+  // ── HELPERS ──────────────────────────────────────────────────────────────
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
 
   const formatCost = (amount: number, currency: string): string => {
     const symbol = currency === "LKR" ? "Rs." : currency;
     return `${symbol} ${amount.toLocaleString()}`;
   };
 
-  // Calculate stats
-  const stats = {
-    pending: tripApprovals.filter((a) => a.finalStatus === "Pending").length,
-    approved: tripApprovals.filter((a) => a.finalStatus === "Approved").length,
-    rejected: tripApprovals.filter((a) => a.finalStatus === "Rejected").length,
-    escalated: tripApprovals.filter((a) => a.escalated).length,
-  };
-
-  const handleApprovalAction = (
-    approval: TripApproval,
-    action: "approve" | "reject"
-  ) => {
-    const request = requestMap.get(approval.tripRequestId);
-    if (!request) return;
-
-    setSelectedApproval(approval);
-    setSelectedRequest(request);
-    setApprovalAction(action);
-    setComments("");
-    setIsApprovalDialogOpen(true);
-  };
-
-  const handleViewRequest = (approval: TripApproval) => {
-    const request = requestMap.get(approval.tripRequestId);
-    if (!request) return;
-
-    setViewApproval(approval);
-    setViewRequest(request);
-    setIsViewDialogOpen(true);
-  };
-
-  const handleViewHistory = (approval: TripApproval) => {
-    const request = requestMap.get(approval.tripRequestId);
-    if (!request) return;
-
-    setSelectedApproval(approval);
-    setSelectedRequest(request);
-    setIsHistoryDialogOpen(true);
-  };
-
-  const submitApproval = () => {
-    // In a real app, this would make an API call
-    console.log("Submitting approval:", {
-      approvalId: selectedApproval?.id,
-      action: approvalAction,
-      comments,
-    });
-    setIsApprovalDialogOpen(false);
-    setComments("");
-  };
-
-  // Pagination
-  const totalPages =
-    pageSize > 0 ? Math.ceil(filteredApprovals.length / pageSize) : 1;
-  const paginatedDocuments = filteredApprovals.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-
-  // Reset page on filter change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
-
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string): React.ReactNode => {
     const variants: Record<
       string,
       {
@@ -206,31 +224,81 @@ export default function TripApprovals() {
     );
   };
 
-  const getCurrentApprovalStep = (approval: TripApproval) => {
-    if (approval.finalStatus !== "Pending") return null;
+  // ── HANDLERS ─────────────────────────────────────────────────────────────
 
-    const currentStep =
-      approval.approvalWorkflow[approval.currentApprovalLevel - 1];
-    return currentStep;
+  const handleViewHistory = (approval: TripRequestExtended) => {
+    setSelectedApproval(approval);
+    setIsHistoryDialogOpen(true);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const handleViewRequest = (approval: TripRequestExtended) => {
+    setSelectedApproval(approval);
+    setIsViewDialogOpen(true);
   };
+
+  const submitApproval = async () => {
+    if (!selectedApproval) return;
+
+    // We need to find the specific approval step ID from the history to send to backend
+    const currentStep = selectedApproval.approvalHistory.find(
+      (h) =>
+        h.action === "Pending" &&
+        h.level === selectedApproval.currentApprovalLevel
+    );
+
+    if (!currentStep) {
+      toast.error("Could not determine the approval step ID.");
+      return;
+    }
+
+    // In a real app, your backend API for approving takes the `trip_approvals` ID (step ID)
+    // However, the frontend usually only knows the Request ID.
+    // Assuming your backend endpoint is /trip-approvals/:id (where id is the step ID)
+    // We will assume the `id` in the History object is the step ID.
+    // If your API expects the Request ID, adjust accordingly.
+
+    // For this demo, we'll assume we are sending a payload that identifies the request and action
+    // and the backend handles finding the correct step.
+
+    try {
+      const res = await fetch(`/trip-approvals/${selectedApproval.id}`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          status: approvalAction === "approve" ? "Approved" : "Rejected",
+          comments: comments,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Action failed");
+      }
+
+      toast.success(
+        `Request ${approvalAction === "approve" ? "Approved" : "Rejected"}`
+      );
+      setIsActionDialogOpen(false);
+      setComments("");
+      fetchApprovals();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to process approval";
+      console.error(error);
+      toast.error(message);
+    }
+  };
+
+  // ── RENDER ───────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="p-3">
           <h1 className="text-2xl">TRIP APPROVALS</h1>
           <p className="text-muted-foreground text-xs">
-            Review and approve pending trip requests
+            Review and manage pending trip requests
           </p>
         </div>
       </div>
@@ -242,10 +310,10 @@ export default function TripApprovals() {
             <div className="flex items-center space-x-2">
               <Clock className="h-5 w-5 text-yellow-500" />
               <div>
-                <div className="text-2xl font-bold">{stats.pending}</div>
-                <p className="text-sm text-muted-foreground">
-                  Pending Approval
-                </p>
+                <div className="text-2xl font-bold">
+                  {approvals.filter((a) => a.finalStatus === "Pending").length}
+                </div>
+                <p className="text-sm text-muted-foreground">Pending</p>
               </div>
             </div>
           </CardContent>
@@ -255,7 +323,9 @@ export default function TripApprovals() {
             <div className="flex items-center space-x-2">
               <CheckCircle className="h-5 w-5 text-green-500" />
               <div>
-                <div className="text-2xl font-bold">{stats.approved}</div>
+                <div className="text-2xl font-bold">
+                  {approvals.filter((a) => a.finalStatus === "Approved").length}
+                </div>
                 <p className="text-sm text-muted-foreground">Approved</p>
               </div>
             </div>
@@ -266,7 +336,9 @@ export default function TripApprovals() {
             <div className="flex items-center space-x-2">
               <XCircle className="h-5 w-5 text-red-500" />
               <div>
-                <div className="text-2xl font-bold">{stats.rejected}</div>
+                <div className="text-2xl font-bold">
+                  {approvals.filter((a) => a.finalStatus === "Rejected").length}
+                </div>
                 <p className="text-sm text-muted-foreground">Rejected</p>
               </div>
             </div>
@@ -277,7 +349,9 @@ export default function TripApprovals() {
             <div className="flex items-center space-x-2">
               <AlertCircle className="h-5 w-5 text-orange-500" />
               <div>
-                <div className="text-2xl font-bold">{stats.escalated}</div>
+                <div className="text-2xl font-bold">
+                  {approvals.filter((a) => a.escalated).length}
+                </div>
                 <p className="text-sm text-muted-foreground">Escalated</p>
               </div>
             </div>
@@ -285,11 +359,13 @@ export default function TripApprovals() {
         </Card>
       </div>
 
-      {/* Approvals Table */}
+      {/* Main Content Card */}
       <Card>
         <CardHeader>
           <CardTitle>Approval Queue</CardTitle>
-          <CardDescription>Trip requests requiring approval</CardDescription>
+          <CardDescription>
+            Review pending requests and take action
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {/* Filters */}
@@ -297,7 +373,7 @@ export default function TripApprovals() {
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search approvals..."
+                placeholder="Search ID, requester, or purpose..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-8"
@@ -309,260 +385,378 @@ export default function TripApprovals() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
+                <SelectItem value="Approved">Approved</SelectItem>
+                <SelectItem value="Rejected">Rejected</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Approvals Table */}
-          {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Request Details</TableHead>
-                  <TableHead>Requester</TableHead>
-                  <TableHead>Trip Info</TableHead>
-                  <TableHead>Current Status</TableHead>
-                  <TableHead>Cost</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedDocuments.map((approval) => {
-                  const request = requestMap.get(approval.tripRequestId);
-                  if (!request) return null;
-
-                  return (
-                    <TableRow key={approval.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">
-                            {approval.requestNumber}
-                          </div>
-                          <div className="text-sm text-muted-foreground mt-1">
-                            {request.purpose.description}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Created: {formatDate(approval.createdAt)}
-                          </div>
-                          <Badge variant="outline" className="text-xs mt-1">
-                            {request.purpose.category}
-                          </Badge>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <div className="font-medium">
-                              {request.requestedBy.name}
-                            </div>
-                            <div className="text-sm text-muted-foreground flex items-center">
-                              <Building2 className="h-3 w-3 mr-1" />
-                              {request.requestedBy.department}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              ID: {request.requestedBy.employeeId}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="text-sm flex items-center">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            {request.tripDetails.departureDate}
-                          </div>
-                          <div className="text-sm flex items-start">
-                            <MapPin className="h-3 w-3 mr-1 mt-0.5 text-green-500" />
-                            <span className="text-xs">
-                              {request.tripDetails.fromLocation.address}
-                            </span>
-                          </div>
-                          <div className="text-sm flex items-start">
-                            <MapPin className="h-3 w-3 mr-1 mt-0.5 text-red-500" />
-                            <span className="text-xs">
-                              {request.tripDetails.toLocation.address}
-                            </span>
-                          </div>
-                          <div className="text-xs text-muted-foreground flex items-center">
-                            <UsersIcon className="h-3 w-3 mr-1" />
-                            {request.requirements.passengerCount} passenger(s)
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        {getStatusBadge(approval.finalStatus)}
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="flex items-center">
-                          <span className="text-sm">
-                            {formatCost(
-                              request.estimatedCost,
-                              request.currency
-                            )}
-                          </span>
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleViewHistory(approval)}
-                            >
-                              <History className="h-4 w-4 mr-2" />
-                              View History
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleViewRequest(approval)}
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Request
-                            </DropdownMenuItem>
-                            {approval.finalStatus === "Pending" && (
-                              <>
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    handleApprovalAction(approval, "approve")
-                                  }
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-2" />{" "}
-                                  Approve
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    handleApprovalAction(approval, "reject")
-                                  }
-                                >
-                                  <XCircle className="h-4 w-4 mr-2" /> Reject
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+          {loading ? (
+            <div className="py-12 text-center text-muted-foreground">
+              Loading approvals...
+            </div>
+          ) : approvals.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              No approvals found
+            </div>
+          ) : (
+            <>
+              {/* Desktop Table */}
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Request Details & Progress</TableHead>
+                      <TableHead>Requester</TableHead>
+                      <TableHead>Trip Info</TableHead>
+                      <TableHead>Current Approver</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Cost</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {approvals.map((approval) => (
+                      <TableRow key={approval.id}>
+                        {/* Request Details + Progress Timeline */}
+                        <TableCell>
+                          <div className="space-y-2">
+                            <div className="font-medium">
+                              {approval.requestNumber}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {approval.purpose?.description?.substring(
+                                0,
+                                60
+                              ) || "No description"}
+                              ...
+                            </div>
 
-          {/* Mobile Card Layout */}
-          <div className="md:hidden space-y-4">
-            {paginatedDocuments.map((approval) => {
-              const request = requestMap.get(approval.tripRequestId);
-              if (!request) return null;
+                            {/* Mini Approval Progress Timeline */}
+                            <div className="flex items-center gap-2 flex-wrap mt-2">
+                              {approval.approvalWorkflow.map((step, idx) => (
+                                <React.Fragment key={step.level}>
+                                  <div className="flex flex-col items-center text-xs">
+                                    <div
+                                      className={`w-6 h-6 rounded-full flex items-center justify-center font-medium border-2 ${
+                                        step.level <
+                                        approval.currentApprovalLevel
+                                          ? "bg-green-100 border-green-500 text-green-800"
+                                          : step.level ===
+                                            approval.currentApprovalLevel
+                                          ? "bg-yellow-100 border-yellow-500 text-yellow-800 ring-2 ring-yellow-400"
+                                          : "bg-gray-100 border-gray-300 text-gray-600"
+                                      }`}
+                                    >
+                                      {step.level}
+                                    </div>
+                                    <span className="mt-1 text-muted-foreground whitespace-nowrap">
+                                      {step.approverRole}
+                                    </span>
+                                  </div>
+                                  {idx <
+                                    approval.approvalWorkflow.length - 1 && (
+                                    <div className="h-px w-8 bg-muted" />
+                                  )}
+                                </React.Fragment>
+                              ))}
+                              {approval.escalated && (
+                                <Badge
+                                  variant="destructive"
+                                  className="ml-2 text-xs"
+                                >
+                                  Escalated
+                                </Badge>
+                              )}
+                            </div>
 
-              return (
-                <div
-                  key={approval.id}
-                  className="border rounded-lg p-4 shadow-sm bg-card text-card-foreground"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="font-semibold">
-                      {approval.requestNumber}
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {request.purpose.category}
-                    </Badge>
-                  </div>
+                            {/* Category & Created */}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                              <Badge variant="outline">
+                                {approval.purpose?.category || "General"}
+                              </Badge>
+                              <span>
+                                Created: {formatDate(approval.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+                        </TableCell>
 
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <div>{request.purpose.description}</div>
-                    <div>
-                      <span className="font-medium">Requester:</span>{" "}
-                      {request.requestedBy.name} (
-                      {request.requestedBy.department})
-                    </div>
-                    <div>
-                      <span className="font-medium">ID:</span>{" "}
-                      {request.requestedBy.employeeId}
-                    </div>
-                    <div className="flex items-center">
-                      <MapPin className="h-4 w-4 mr-1 text-green-500" />
-                      {request.tripDetails.fromLocation.address}
-                    </div>
-                    <div className="flex items-center">
-                      <MapPin className="h-4 w-4 mr-1 text-red-500" />
-                      {request.tripDetails.toLocation.address}
-                    </div>
-                    <div className="flex items-center">
-                      <UsersIcon className="h-4 w-4 mr-1" />
-                      {request.requirements.passengerCount} passenger(s)
-                    </div>
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      {request.tripDetails.departureDate}
-                    </div>
-                    <div>
-                      <span className="font-medium">Status:</span>{" "}
-                      {approval.finalStatus}
-                    </div>
-                    <div>
-                      <span className="font-medium">Cost:</span>{" "}
-                      {formatCost(request.estimatedCost, request.currency)}
-                    </div>
-                  </div>
+                        {/* Requester */}
+                        <TableCell>
+                          <div className="flex items-start gap-2">
+                            <User className="h-4 w-4 text-muted-foreground mt-1" />
+                            <div>
+                              <div className="font-medium">
+                                {approval.requestedBy?.name || "Unknown"}
+                              </div>
+                              <div className="text-sm text-muted-foreground flex items-center gap-1">
+                                <Building2 className="h-3 w-3" />
+                                {approval.requestedBy?.department ||
+                                  "Unassigned"}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
 
-                  <div className="flex justify-end mt-3">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleViewHistory(approval)}
-                        >
-                          <History className="h-4 w-4 mr-2" /> View History
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleViewRequest(approval)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" /> View Request
-                        </DropdownMenuItem>
-                        {approval.finalStatus === "Pending" && (
-                          <>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleApprovalAction(approval, "approve")
-                              }
-                            >
-                              <CheckCircle className="h-4 w-4 mr-2" /> Approve
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleApprovalAction(approval, "reject")
-                              }
-                            >
-                              <XCircle className="h-4 w-4 mr-2" /> Reject
-                            </DropdownMenuItem>
-                          </>
+                        {/* Trip Info */}
+                        <TableCell>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex items-start gap-1">
+                              <MapPin className="h-4 w-4 text-green-600 mt-0.5" />
+                              <span className="truncate max-w-[180px]">
+                                {approval.tripDetails?.fromLocation?.address ||
+                                  "—"}
+                              </span>
+                            </div>
+                            <div className="flex items-start gap-1">
+                              <MapPin className="h-4 w-4 text-red-600 mt-0.5" />
+                              <span className="truncate max-w-[180px]">
+                                {approval.tripDetails?.toLocation?.address ||
+                                  "—"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Calendar className="h-3 w-3" />
+                              {approval.tripDetails?.departureDate || "—"}{" "}
+                              {approval.tripDetails?.departureTime || ""}
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        {/* Current Approver */}
+                        <TableCell>
+                          {approval.finalStatus === "Pending" ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs font-medium text-yellow-700">
+                                Pending at Level {approval.currentApprovalLevel}
+                              </span>
+                              <span className="text-sm">
+                                {approval.approvalWorkflow.find(
+                                  (w) =>
+                                    w.level === approval.currentApprovalLevel
+                                )?.approverName || "Pending Assignment"}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {approval.approvalWorkflow.find(
+                                  (w) =>
+                                    w.level === approval.currentApprovalLevel
+                                )?.approverRole || ""}
+                              </span>
+                            </div>
+                          ) : approval.finalStatus === "Approved" ? (
+                            <div className="flex items-center gap-2 text-green-600">
+                              <CheckCircle className="h-4 w-4" />
+                              <span>Approved</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-red-600">
+                              <XCircle className="h-4 w-4" />
+                              <span>Rejected</span>
+                            </div>
+                          )}
+                        </TableCell>
+
+                        {/* Status */}
+                        <TableCell>
+                          {getStatusBadge(approval.finalStatus)}
+                        </TableCell>
+
+                        {/* Cost */}
+                        <TableCell>
+                          <div className="font-medium">
+                            {formatCost(
+                              approval.estimatedCost,
+                              approval.currency
+                            )}
+                          </div>
+                        </TableCell>
+
+                        {/* Actions */}
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleViewHistory(approval)}
+                              >
+                                <History className="h-4 w-4 mr-2" />
+                                View History
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleViewRequest(approval)}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Card Layout */}
+              {/* Mobile Card Layout */}
+              <div className="md:hidden space-y-4">
+                {approvals.map((approval) => (
+                  <div
+                    key={approval.id}
+                    className="border rounded-lg p-4 shadow-sm bg-card"
+                  >
+                    {/* Header: Request Number + Status + Escalation */}
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <div className="font-semibold text-base">
+                          {approval.requestNumber}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {approval.purpose?.category || "General"} • Created:{" "}
+                          {formatDate(approval.createdAt)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {approval.escalated && (
+                          <Badge variant="destructive" className="text-xs">
+                            Escalated
+                          </Badge>
                         )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                        {getStatusBadge(approval.finalStatus)}
+                      </div>
+                    </div>
 
-          {/* Pagination */}
+                    {/* Requester */}
+                    <div className="flex items-start gap-2 mb-3">
+                      <User className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <div>
+                        <div className="font-medium text-sm">
+                          {approval.requestedBy?.name || "Unknown"}
+                        </div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Building2 className="h-3 w-3" />
+                          {approval.requestedBy?.department || "Unassigned"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Trip Info */}
+                    <div className="space-y-2 mb-3 text-sm">
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-4 w-4 text-green-600 mt-0.5" />
+                        <span className="truncate">
+                          {approval.tripDetails?.fromLocation?.address || "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-4 w-4 text-red-600 mt-0.5" />
+                        <span className="truncate">
+                          {approval.tripDetails?.toLocation?.address || "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        {approval.tripDetails?.departureDate || "—"}{" "}
+                        {approval.tripDetails?.departureTime || ""}
+                      </div>
+                    </div>
+
+                    {/* Cost */}
+                    <div className="mb-3 text-sm font-medium">
+                      Cost:{" "}
+                      {formatCost(approval.estimatedCost, approval.currency)}
+                    </div>
+
+                    {/* Approval Progress Timeline (horizontal on mobile) */}
+                    <div className="mb-4">
+                      <div className="text-xs font-medium text-muted-foreground mb-2">
+                        Approval Progress
+                      </div>
+                      <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                        {approval.approvalWorkflow.map((step, idx) => (
+                          <React.Fragment key={step.level}>
+                            <div className="flex flex-col items-center min-w-[60px]">
+                              <div
+                                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
+                                  step.level < approval.currentApprovalLevel
+                                    ? "bg-green-100 border-green-500 text-green-800"
+                                    : step.level ===
+                                      approval.currentApprovalLevel
+                                    ? "bg-yellow-100 border-yellow-500 text-yellow-800 ring-2 ring-yellow-400"
+                                    : "bg-gray-100 border-gray-300 text-gray-600"
+                                }`}
+                              >
+                                {step.level}
+                              </div>
+                              <span className="mt-1 text-[10px] text-muted-foreground whitespace-nowrap">
+                                {step.approverRole}
+                              </span>
+                            </div>
+                            {idx < approval.approvalWorkflow.length - 1 && (
+                              <div className="h-px w-10 bg-muted shrink-0" />
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Current Approver (if pending) */}
+                    {approval.finalStatus === "Pending" && (
+                      <div className="mb-4 p-2 bg-yellow-50 rounded border border-yellow-200 text-sm">
+                        <div className="font-medium text-yellow-800">
+                          Pending at Level {approval.currentApprovalLevel}
+                        </div>
+                        <div className="text-yellow-700">
+                          {approval.approvalWorkflow.find(
+                            (w) => w.level === approval.currentApprovalLevel
+                          )?.approverName || "Pending Assignment"}
+                        </div>
+                        <div className="text-xs text-yellow-600 mt-1">
+                          {approval.approvalWorkflow.find(
+                            (w) => w.level === approval.currentApprovalLevel
+                          )?.approverRole || ""}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <MoreHorizontal className="h-4 w-4 mr-2" />
+                            Actions
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleViewHistory(approval)}
+                          >
+                            <History className="h-4 w-4 mr-2" />
+                            View History
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleViewRequest(approval)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
             <div className="flex items-center gap-2 text-sm">
               <span className="text-muted-foreground">Show</span>
@@ -577,7 +771,7 @@ export default function TripApprovals() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[10, 25, 50, 100].map((s) => (
+                  {[10, 25, 50].map((s) => (
                     <SelectItem key={s} value={s.toString()}>
                       {s}
                     </SelectItem>
@@ -585,10 +779,9 @@ export default function TripApprovals() {
                 </SelectContent>
               </Select>
               <span className="text-muted-foreground">
-                of {filteredApprovals.length} documents
+                of {totalApprovals} documents
               </span>
             </div>
-
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
                 Page {currentPage} of {totalPages}
@@ -600,7 +793,7 @@ export default function TripApprovals() {
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
                 >
-                  First
+                  <ChevronFirst className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
@@ -608,28 +801,12 @@ export default function TripApprovals() {
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                 >
-                  Prev
+                  <ChevronLeft className="h-4 w-4" />
                 </Button>
 
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let num;
-                  if (totalPages <= 5) num = i + 1;
-                  else if (currentPage <= 3) num = i + 1;
-                  else if (currentPage >= totalPages - 2)
-                    num = totalPages - 4 + i;
-                  else num = currentPage - 2 + i;
-                  return num;
-                }).map((num) => (
-                  <Button
-                    key={num}
-                    variant={currentPage === num ? "default" : "outline"}
-                    size="icon"
-                    onClick={() => setCurrentPage(num)}
-                    className="w-9 h-9"
-                  >
-                    {num}
-                  </Button>
-                ))}
+                <Button variant="outline" size="icon" disabled>
+                  {currentPage}
+                </Button>
 
                 <Button
                   variant="outline"
@@ -639,7 +816,7 @@ export default function TripApprovals() {
                   }
                   disabled={currentPage === totalPages}
                 >
-                  Next
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
@@ -647,230 +824,111 @@ export default function TripApprovals() {
                   onClick={() => setCurrentPage(totalPages)}
                   disabled={currentPage === totalPages}
                 >
-                  Last
+                  <ChevronLast className="h-4 w-4" />
                 </Button>
               </div>
             </div>
-          </div>
+          </div>          {/* Pagination Controls */}
+
         </CardContent>
       </Card>
 
-      {/* Approval Action Dialog */}
-      <Dialog
-        open={isApprovalDialogOpen}
-        onOpenChange={setIsApprovalDialogOpen}
-      >
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {approvalAction === "approve"
-                ? "Approve Trip Request"
-                : "Reject Trip Request"}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedRequest && (
-                <>
-                  Request: {selectedApproval?.requestNumber} by{" "}
-                  {selectedRequest.requestedBy.name}
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {selectedRequest && (
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium">Trip Date:</span>{" "}
-                    {selectedRequest.tripDetails.departureDate}
-                  </div>
-                  <div>
-                    <span className="font-medium">Estimated Cost:</span>{" "}
-                    {selectedRequest.estimatedCost} {selectedRequest.currency}
-                  </div>
-                </div>
-                <div className="text-sm">
-                  <span className="font-medium">Purpose:</span>{" "}
-                  {selectedRequest.purpose.description}
-                </div>
-                <div className="text-sm">
-                  <span className="font-medium">Route:</span>{" "}
-                  {selectedRequest.tripDetails.fromLocation.address} →{" "}
-                  {selectedRequest.tripDetails.toLocation.address}
-                </div>
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Comments</label>
-              <Textarea
-                placeholder={`Add your ${
-                  approvalAction === "approve" ? "approval" : "rejection"
-                } comments...`}
-                value={comments}
-                onChange={(e) => setComments(e.target.value)}
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsApprovalDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={submitApproval}
-              variant={approvalAction === "approve" ? "default" : "destructive"}
-            >
-              {approvalAction === "approve"
-                ? "Approve Request"
-                : "Reject Request"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Approval History Dialog */}
+      {/* ── HISTORY DIALOG ─────────────────────────────────────────────────── */}
       <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
-        <DialogContent className="w-[90vw] max-w-3xl max-h-[85vh] overflow-y-auto rounded-xl border bg-background shadow-lg">
-          <DialogHeader className="border-b pb-3">
-            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" /> Approval History
+        <DialogContent className="max-w-2xl w-full max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-background shadow-lg p-6">
+          {/* Header */}
+          <DialogHeader className="mb-4">
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold text-foreground">
+              <History className="h-5 w-5 text-primary" />
+              Approval History
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              {selectedRequest && (
-                <>
-                  Request{" "}
-                  <span className="font-medium">
-                    {selectedApproval?.requestNumber}
-                  </span>{" "}
-                  by{" "}
-                  <span className="font-medium">
-                    {selectedRequest.requestedBy.name}
-                  </span>
-                </>
-              )}
+            <DialogDescription className="text-sm text-muted-foreground mt-1">
+              Tracking the workflow for {selectedApproval?.requestNumber || "—"}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          {/* Content */}
+          <div className="space-y-6">
             {selectedApproval && (
-              <div className="space-y-6">
-                {/* ── 1. Approval Rules ── */}
-                <section className="bg-muted/30 p-4 rounded-lg">
-                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground">
+              <>
+                {/* Approval Rules Section */}
+                <section className="bg-muted/20 p-4 rounded-lg border border-muted">
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground">
                     <Shield className="h-4 w-4" /> Approval Rules
                   </h3>
-                  <ul className="space-y-2 text-sm text-foreground">
-                    <li className="flex justify-between border-b border-muted/30 pb-1">
-                      <span className="text-muted-foreground">
-                        Cost Threshold
-                      </span>
-                      <span className="font-medium">
-                        {selectedApproval.approvalRules.costThreshold}{" "}
-                        {selectedRequest?.currency}
-                      </span>
-                    </li>
-                    <li className="flex justify-between border-b border-muted/30 pb-1">
-                      <span className="text-muted-foreground">
-                        Department Approval
-                      </span>
-                      <span className="font-medium">
-                        {selectedApproval.approvalRules
-                          .departmentApprovalRequired
-                          ? "Required"
-                          : "Not Required"}
-                      </span>
-                    </li>
-                    <li className="flex justify-between border-b border-muted/30 pb-1">
-                      <span className="text-muted-foreground">
-                        Manager Approval
-                      </span>
-                      <span className="font-medium">
-                        {selectedApproval.approvalRules.managerApprovalRequired
-                          ? "Required"
-                          : "Not Required"}
-                      </span>
-                    </li>
-                    <li className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        Finance Approval
-                      </span>
-                      <span className="font-medium">
-                        {selectedApproval.approvalRules.financeApprovalRequired
-                          ? "Required"
-                          : "Not Required"}
-                      </span>
-                    </li>
-                  </ul>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-foreground">
+                    <div>
+                      <span className="text-muted-foreground font-medium">
+                        Cost Threshold:
+                      </span>{" "}
+                      LKR{" "}
+                      {selectedApproval.approvalRules.costThreshold.toLocaleString()}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground font-medium">
+                        Department:
+                      </span>{" "}
+                      {selectedApproval.approvalRules.departmentApprovalRequired
+                        ? "Required"
+                        : "Skipped"}
+                    </div>
+                  </div>
                 </section>
 
-                {/* ── 2. Approval Timeline ── */}
-                <section className="bg-muted/30 p-4 rounded-lg">
-                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground">
-                    <ListChecks className="h-4 w-4" /> Approval Timeline
+                {/* Timeline Section */}
+                <section className="bg-muted/20 p-4 rounded-lg border border-muted">
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-foreground">
+                    <ListChecks className="h-4 w-4" /> Timeline
                   </h3>
 
-                  <div className="space-y-3">
-                    {selectedApproval.approvalHistory.map((step, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start space-x-3 p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex-shrink-0">
-                          {step.action === "Approved" ? (
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                          ) : step.action === "Rejected" ? (
-                            <XCircle className="h-5 w-5 text-red-500" />
-                          ) : (
-                            <Clock className="h-5 w-5 text-yellow-500" />
-                          )}
-                        </div>
+                  <div className="relative pl-6 border-l-2 border-muted space-y-4">
+                    {selectedApproval.approvalHistory.map((step, idx) => (
+                      <div key={idx} className="relative">
+                        {/* Dot */}
+                        <div
+                          className={`absolute -left-3.5 top-2 h-3 w-3 rounded-full border-2 border-background 
+                    ${
+                      step.action === "Approved"
+                        ? "bg-green-500"
+                        : step.action === "Rejected"
+                        ? "bg-red-500"
+                        : "bg-yellow-500"
+                    }`}
+                        />
 
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <div className="font-medium text-sm">
+                        {/* Step Card */}
+                        <div className="bg-card p-3 rounded-lg shadow-sm border text-sm space-y-1">
+                          <div className="flex justify-between items-start">
+                            <span className="font-medium text-foreground">
                               Level {step.level}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {formatDate(step.timestamp)}
-                            </div>
-                          </div>
-
-                          <div className="text-sm">
-                            <span className="font-medium">
-                              {step.approver.name}
-                            </span>{" "}
-                            <span className="text-muted-foreground">
-                              ({step.approver.role})
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(step.timestamp).toLocaleString()}
                             </span>
                           </div>
 
-                          <div className="text-sm">
-                            Action:{" "}
-                            <span
-                              className={
-                                step.action === "Approved"
-                                  ? "text-green-600 font-medium"
-                                  : step.action === "Rejected"
-                                  ? "text-red-600 font-medium"
-                                  : "text-yellow-600 font-medium"
-                              }
-                            >
-                              {step.action}
-                            </span>
+                          <div className="font-semibold text-foreground">
+                            {step.approver.name}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {step.approver.role}
+                          </div>
+
+                          <div
+                            className={`font-medium ${
+                              step.action === "Approved"
+                                ? "text-green-600"
+                                : step.action === "Rejected"
+                                ? "text-red-600"
+                                : "text-yellow-600"
+                            }`}
+                          >
+                            {step.action}
                           </div>
 
                           {step.comments && (
-                            <div className="text-sm text-muted-foreground italic">
-                              “{step.comments}”
-                            </div>
-                          )}
-
-                          {step.ipAddress && (
-                            <div className="text-xs text-muted-foreground">
-                              IP: {step.ipAddress}
+                            <div className="mt-2 italic text-muted-foreground border-t pt-1">
+                              &ldquo;{step.comments}&rdquo;
                             </div>
                           )}
                         </div>
@@ -878,11 +936,12 @@ export default function TripApprovals() {
                     ))}
                   </div>
                 </section>
-              </div>
+              </>
             )}
           </div>
 
-          <DialogFooter className="border-t pt-3 mt-2">
+          {/* Footer */}
+          <DialogFooter className="mt-6 flex justify-end">
             <Button
               variant="outline"
               onClick={() => setIsHistoryDialogOpen(false)}
@@ -893,157 +952,115 @@ export default function TripApprovals() {
         </DialogContent>
       </Dialog>
 
-      {/* View Request Dialog */}
+      {/* ── VIEW DETAILS DIALOG ───────────────────────────────────────────── */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto rounded-xl border bg-background shadow-lg overflow-x-hidden">
-          <DialogHeader className="border-b pb-3">
-            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+        <DialogContent className="max-w-3xl w-full max-h-[85vh] overflow-y-auto rounded-xl border border-border bg-background shadow-lg p-6">
+          {/* Header */}
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-lg font-bold text-foreground">
               Trip Request Details
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              {viewApproval && viewRequest && (
-                <>
-                  Request #{viewApproval.requestNumber} –{" "}
-                  <span className="font-medium">
-                    {viewRequest.requestedBy.name}
-                  </span>
-                </>
-              )}
+            <DialogDescription className="text-sm text-muted-foreground mt-1">
+              Full information for request #
+              {selectedApproval?.requestNumber || "—"}. View requester, route,
+              purpose, and other details below.
             </DialogDescription>
           </DialogHeader>
 
-          {viewRequest && viewApproval && (
-            <div className="space-y-6 py-4">
-              {/* ── 1. Basic Info ── */}
-              <section className="bg-muted/30 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground">
-                  <Info className="h-4 w-4" /> Basic Information
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-muted-foreground">Created</span>
-                    <span className="font-medium">
-                      {formatDate(viewApproval.createdAt)}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status</span>
-                    <span>{getStatusBadge(viewApproval.finalStatus)}</span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Estimated Cost
-                    </span>
-                    <span className="font-medium">
+          {/* Content Sections */}
+          <div className="space-y-6">
+            {selectedApproval && (
+              <>
+                {/* General Info */}
+                <section className="p-4 border rounded-lg bg-muted/20">
+                  <h4 className="font-semibold text-sm mb-3 text-foreground">
+                    General Info
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-foreground">
+                    <div>
+                      <span className="text-muted-foreground font-medium">
+                        ID:
+                      </span>{" "}
+                      {selectedApproval.requestNumber}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground font-medium">
+                        Status:
+                      </span>{" "}
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          selectedApproval.finalStatus === "Pending"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : selectedApproval.finalStatus === "Approved"
+                            ? "bg-green-100 text-green-800"
+                            : selectedApproval.finalStatus === "Rejected"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {selectedApproval.finalStatus}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground font-medium">
+                        Cost:
+                      </span>{" "}
                       {formatCost(
-                        viewRequest.estimatedCost,
-                        viewRequest.currency
+                        selectedApproval.estimatedCost,
+                        selectedApproval.currency
                       )}
-                    </span>
+                    </div>
                   </div>
+                </section>
 
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Category</span>
-                    <Badge variant="outline">
-                      {viewRequest.purpose.category}
-                    </Badge>
+                {/* Requester */}
+                <section className="p-4 border rounded-lg bg-muted/20">
+                  <h4 className="font-semibold text-sm mb-2 text-foreground">
+                    Requester
+                  </h4>
+                  <div className="text-sm text-foreground">
+                    {selectedApproval.requestedBy.name} -{" "}
+                    {selectedApproval.requestedBy.department}
                   </div>
-                </div>
-              </section>
+                </section>
 
-              {/* ── 2. Requester ── */}
-              <section className="bg-muted/30 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground">
-                  <User className="h-4 w-4" /> Requester Details
-                </h3>
-                <div className="pl-1 text-sm space-y-1">
-                  <div>
-                    {viewRequest.requestedBy.name}{" "}
-                    <span className="text-muted-foreground">
-                      ({viewRequest.requestedBy.employeeId})
-                    </span>
+                {/* Route & Dates */}
+                <section className="p-4 border rounded-lg bg-muted/20">
+                  <h4 className="font-semibold text-sm mb-2 text-foreground">
+                    Route & Dates
+                  </h4>
+                  <div className="text-sm text-foreground space-y-1">
+                    <div>
+                      <span className="font-medium">From:</span>{" "}
+                      {selectedApproval.tripDetails.fromLocation.address}
+                    </div>
+                    <div>
+                      <span className="font-medium">To:</span>{" "}
+                      {selectedApproval.tripDetails.toLocation.address}
+                    </div>
+                    <div>
+                      <span className="font-medium">Date:</span>{" "}
+                      {formatDate(selectedApproval.tripDetails.departureDate)}{" "}
+                      at {selectedApproval.tripDetails.departureTime}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Building2 className="h-3 w-3" />
-                    {viewRequest.requestedBy.department}
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              {/* ── 3. Purpose ── */}
-              <section className="bg-muted/30 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground">
-                  <Target className="h-4 w-4" /> Purpose
-                </h3>
-                <p className="text-sm text-foreground">
-                  {viewRequest.purpose.description}
-                </p>
-              </section>
-
-              {/* ── 4. Trip Details ── */}
-              <section className="bg-muted/30 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="h-4 w-4" /> Trip Details
-                </h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium">Departure:</span>{" "}
-                    {viewRequest.tripDetails.departureDate}
-                  </div>
-                  <div>
-                    <span className="font-medium">Passengers:</span>{" "}
-                    {viewRequest.requirements.passengerCount}
-                  </div>
-                </div>
-
-                <div className="mt-3 space-y-1">
-                  <span className="font-medium">Route:</span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <MapPin className="h-4 w-4 text-green-500" />
-                    <span>{viewRequest.tripDetails.fromLocation.address}</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <MapPin className="h-4 w-4 text-red-500" />
-                    <span>{viewRequest.tripDetails.toLocation.address}</span>
-                  </div>
-                </div>
-              </section>
-
-              {/* ── 5. Additional Requirements ── */}
-              {viewRequest.requirements.specialRequirements && (
-                <section className="bg-muted/30 p-4 rounded-lg">
-                  <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
-                    Additional Requirements
-                  </h3>
+                {/* Purpose */}
+                <section className="p-4 border rounded-lg bg-muted/20">
+                  <h4 className="font-semibold text-sm mb-2 text-foreground">
+                    Purpose
+                  </h4>
                   <p className="text-sm text-foreground">
-                    {viewRequest.requirements.specialRequirements}
+                    {selectedApproval.purpose.description}
                   </p>
                 </section>
-              )}
+              </>
+            )}
+          </div>
 
-              {/* ── 6. Current Approval Step ── */}
-              {viewApproval.finalStatus === "Pending" && (
-                <section className="bg-muted/30 p-4 rounded-lg">
-                  <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
-                    Current Approval Step
-                  </h3>
-                  <div className="text-sm text-foreground">
-                    {(() => {
-                      const step = getCurrentApprovalStep(viewApproval);
-                      return step
-                        ? `${step.approverRole} – ${step.approverName}`
-                        : "—";
-                    })()}
-                  </div>
-                </section>
-              )}
-            </div>
-          )}
-
-          <DialogFooter className="border-t pt-3 mt-2">
+          {/* Footer */}
+          <DialogFooter className="mt-6 flex justify-end">
             <Button
               variant="outline"
               onClick={() => setIsViewDialogOpen(false)}
