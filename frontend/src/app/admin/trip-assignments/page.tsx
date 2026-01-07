@@ -1,7 +1,7 @@
 "use client";
-import React, { useEffect, useState } from "react";
+
+import React, { useEffect, useState, useCallback } from "react";
 import {
-  Users,
   Car,
   Search,
   MoreHorizontal,
@@ -18,8 +18,7 @@ import {
   ClipboardCheck,
   ShieldCheck,
 } from "lucide-react";
-import { TripAssignment, TripRequest } from "@/types/trip-interfaces";
-import { mockTripData } from "@/data/mock-trip-data";
+import { TripAssignment } from "@/types/trip-interfaces";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,8 +62,38 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { VariantProps } from "class-variance-authority";
 import { toast } from "sonner";
-import { parse, isValid, isAfter } from "date-fns";
-//import Image from "next/image";
+
+// Define Types for API responses
+interface AssignmentApiResponse {
+  data: TripAssignment[];
+  meta: {
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
+}
+
+// Define Types for API Request payload
+interface AssignmentPayload {
+  vehicleId: string;
+  driverId: string;
+  assignmentStatus: string;
+  scheduledDeparture?: string;
+  scheduledReturn?: string;
+  assignmentNotes?: string;
+  vehicleDetails?: {
+    mileage?: string;
+    seatingCapacity?: string;
+    insuranceExpiry?: string;
+    lastService?: string;
+    nextService?: string;
+    status?: string;
+  };
+  driverDetails?: {
+    licenseExpiryDate?: string;
+  };
+}
 
 export default function TripAssignments() {
   const VALID_ASSIGNMENT_STATUSES = [
@@ -78,359 +107,184 @@ export default function TripAssignments() {
 
   type AssignmentStatus = (typeof VALID_ASSIGNMENT_STATUSES)[number];
 
+  // State
+  const [tripAssignments, setTripAssignments] = useState<TripAssignment[]>([]);
+  const [loading, setLoading] = useState(false);
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
-  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [selectedAssignment, setSelectedAssignment] =
-    useState<TripAssignment | null>(null);
-  const [selectedRequest, setSelectedRequest] = useState<TripRequest | null>(
-    null
-  );
+  
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  // Edit Assignment Form State
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalAssignments, setTotalAssignments] = useState(0);
+
+  // Dialogs
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [isPreTripDialogOpen, setIsPreTripDialogOpen] = useState(false);
+
+  const [selectedAssignment, setSelectedAssignment] = useState<TripAssignment | null>(null);
+  const [selectedPreTrip, setSelectedPreTrip] = useState<TripAssignment["preTrip"] | null>(null);
+
+  // Edit Form State
   const [editVehicleId, setEditVehicleId] = useState<string>("");
   const [editDriverId, setEditDriverId] = useState<string>("");
   const [editNotes, setEditNotes] = useState<string>("");
-  const [editInsuranceExpiry, setEditInsuranceExpiry] = useState<string>("");
   const [editMileage, setEditMileage] = useState<string>("");
+  const [editSeatingCapacity, setEditSeatingCapacity] = useState<string>("");
+  const [editInsuranceExpiry, setEditInsuranceExpiry] = useState<string>("");
   const [editLastService, setEditLastService] = useState<string>("");
   const [editNextService, setEditNextService] = useState<string>("");
-  const [editSeatingCapacity, setEditSeatingCapacity] = useState<string>("");
   const [editStatus, setEditStatus] = useState<string>("");
   const [editCurrentDriver, setEditCurrentDriver] = useState<string>("");
-  const [editDriverLicenseExpiry, setEditDriverLicenseExpiry] =
-    useState<string>("");
+  const [editDriverLicenseExpiry, setEditDriverLicenseExpiry] = useState<string>("");
+  
   const [editDepartureDate, setEditDepartureDate] = useState<string>("");
   const [editDepartureTime, setEditDepartureTime] = useState<string>("");
   const [editReturnDate, setEditReturnDate] = useState<string>("");
   const [editReturnTime, setEditReturnTime] = useState<string>("");
-  const [editVehicleType, setEditVehicleType] = useState<string>("");
-  const [editPassengerCount, setEditPassengerCount] = useState<string>("");
-  //const [editAssignmentStatus, setEditAssignmentStatus] = useState<string>("");
-  const [editAssignmentStatus, setEditAssignmentStatus] =
-    useState<AssignmentStatus>("Assigned");
-  const [editIsRoundTrip, setEditIsRoundTrip] = useState<boolean>(false);
-  const [editEstimatedDistance, setEditEstimatedDistance] =
-    useState<string>("");
-  const [editEstimatedDuration, setEditEstimatedDuration] =
-    useState<string>("");
+  const [editAssignmentStatus, setEditAssignmentStatus] = useState<AssignmentStatus>("Assigned");
 
-  const [tripAssignments, setTripAssignments] = useState(
-    mockTripData.assignments
-  );
+  // API Helper
+  const getAuthHeaders = useCallback((): Record<string, string> => {
+    const token = localStorage.getItem("authToken");
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return headers;
+  }, []);
 
-  const [selectedPreTrip, setSelectedPreTrip] = useState<
-    TripAssignment["preTrip"] | null
-  >(null);
-  const [isPreTripDialogOpen, setIsPreTripDialogOpen] = useState(false);
+  // Fetch Data
+  const fetchAssignments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const query = new URLSearchParams({
+        page: currentPage.toString(),
+        pageSize: pageSize.toString(),
+      });
+      if (searchTerm) query.set("search", searchTerm);
+      if (statusFilter !== "all") query.set("status", statusFilter);
 
-  const tripRequests = mockTripData.requests;
-  const requestMap = new Map(tripRequests.map((req) => [req.id, req]));
+      const res = await fetch(`/trip-assignments?${query}`, {
+        headers: getAuthHeaders(),
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch assignments");
+      
+      const data: AssignmentApiResponse = await res.json();
+      setTripAssignments(data.data);
+      setTotalAssignments(data.meta.total);
+      setTotalPages(data.meta.totalPages);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load assignments");
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, pageSize, searchTerm, statusFilter, getAuthHeaders]);
+
+  useEffect(() => {
+    fetchAssignments();
+  }, [fetchAssignments]);
+
+  // ── HANDLERS ─────────────────────────────────────────────────────────────
 
   const handleViewDetails = (assignment: TripAssignment) => {
-    try {
-      const request = requestMap.get(assignment.tripRequestId);
-      if (!request) {
-        toast.error(
-          `No request found for tripRequestId: ${assignment.tripRequestId}`
-        );
-        return;
-      }
-      setSelectedAssignment(assignment);
-      setSelectedRequest(request);
-      setIsDetailsDialogOpen(true);
-    } catch (error) {
-      console.error("Error in handleViewDetails:", error);
-      toast.error("Error in handleViewDetails:");
-    }
+    setSelectedAssignment(assignment);
+    setIsDetailsDialogOpen(true);
   };
 
   const handleEditAssignment = (assignment: TripAssignment) => {
-    try {
-      const request = requestMap.get(assignment.tripRequestId);
-      if (!request) {
-        toast.error(
-          `No request found for tripRequestId: ${assignment.tripRequestId}`
-        );
-        return;
-      }
+    setSelectedAssignment(assignment);
+    
+    // Populate form from assignment data
+    setEditVehicleId(assignment.assignedVehicle.id.toString());
+    setEditDriverId(assignment.assignedDriver.id.toString());
+    setEditNotes(assignment.assignmentNotes || "");
+    
+    // Vehicle Details
+    setEditMileage(assignment.assignedVehicle.mileage.toString());
+    setEditSeatingCapacity(assignment.assignedVehicle.seatingCapacity.toString());
+    setEditInsuranceExpiry(assignment.assignedVehicle.insuranceExpiry || "");
+    setEditLastService(assignment.assignedVehicle.lastService || "");
+    setEditNextService(assignment.assignedVehicle.nextService || "");
+    setEditStatus(assignment.assignedVehicle.status || "Active");
+    setEditCurrentDriver(assignment.assignedVehicle.currentDriver || "");
 
-      // 🔹 Get the latest vehicle and driver from mockTripData
-      const latestVehicle = mockTripData.vehicles.find(
-        (v) => v.id === assignment.assignedVehicle.id
-      );
-      const latestDriver = mockTripData.drivers.find(
-        (d) => d.id === assignment.assignedDriver.id
-      );
+    // Driver Details
+    setEditDriverLicenseExpiry(assignment.assignedDriver.licenseExpiryDate || "");
 
-      if (!latestVehicle || !latestDriver) {
-        toast.error("Vehicle or driver data not found");
-        return;
-      }
-
-      const today = new Date();
-      const defaultInsuranceExpiry = new Date(
-        today.setFullYear(today.getFullYear() + 1)
-      )
-        .toISOString()
-        .split("T")[0]; // Default to 1 year from now
-
-      setSelectedAssignment(assignment);
-      setSelectedRequest(request);
-
-      // Use latest vehicle & driver to populate edit form
-      setEditVehicleId(latestVehicle.id.toString());
-      setEditDriverId(latestDriver.id);
-      setEditNotes(assignment.assignmentNotes || "");
-      setEditInsuranceExpiry(
-        latestVehicle.insuranceExpiry &&
-          !isNaN(new Date(latestVehicle.insuranceExpiry).getTime())
-          ? latestVehicle.insuranceExpiry
-          : defaultInsuranceExpiry
-      );
-      setEditMileage(latestVehicle.mileage.toString());
-      setEditLastService(latestVehicle.lastService);
-      setEditNextService(latestVehicle.nextService);
-      setEditSeatingCapacity(latestVehicle.seatingCapacity.toString());
-      setEditStatus(latestVehicle.status);
-      setEditCurrentDriver(latestDriver.name);
-      setEditDriverLicenseExpiry(latestDriver.licenseExpiryDate);
-
-      setEditDepartureDate(request.tripDetails.departureDate);
-      setEditDepartureTime(request.tripDetails.departureTime);
-      setEditReturnDate(request.tripDetails.returnDate || "");
-      setEditReturnTime(request.tripDetails.returnTime || "");
-      setEditVehicleType(request.requirements.vehicleType);
-      setEditPassengerCount(request.requirements.passengerCount.toString());
-      setEditAssignmentStatus(assignment.assignmentStatus);
-      setEditIsRoundTrip(request.tripDetails.isRoundTrip);
-      setEditEstimatedDistance(
-        request.tripDetails.estimatedDistance.toString()
-      );
-      setEditEstimatedDuration(
-        request.tripDetails.estimatedDuration.toString()
-      );
-
-      setIsAssignDialogOpen(true);
-    } catch (error) {
-      console.error("Error in handleViewDetails:", error);
-      toast.error("Error in handleEditAssignment:");
+    // Trip Details (Dates)
+    if (assignment.scheduledDeparture) {
+       const d = new Date(assignment.scheduledDeparture);
+       setEditDepartureDate(d.toISOString().split("T")[0]);
+       setEditDepartureTime(d.toTimeString().substring(0,5));
     }
+    if (assignment.scheduledReturn) {
+       const d = new Date(assignment.scheduledReturn);
+       setEditReturnDate(d.toISOString().split("T")[0]);
+       setEditReturnTime(d.toTimeString().substring(0,5));
+    }
+
+    setEditAssignmentStatus(assignment.assignmentStatus);
+    setIsAssignDialogOpen(true);
   };
 
-  const handleUpdateAssignment = () => {
-    if (
-      !selectedAssignment ||
-      !selectedRequest ||
-      !editVehicleId ||
-      !editDriverId
-    ) {
-      toast.error("Missing required data for updating assignment");
+  const handleUpdateAssignment = async () => {
+    if (!selectedAssignment || !editVehicleId || !editDriverId) {
+      toast.error("Missing required data");
       return;
     }
 
     try {
-      const selectedVehicle = mockTripData.vehicles.find(
-        (v) => v.id === parseInt(editVehicleId)
-      );
-      const selectedDriver = mockTripData.drivers.find(
-        (d) => d.id === editDriverId
-      );
-
-      if (!selectedVehicle || !selectedDriver) {
-        toast.error("Selected vehicle or driver not found");
-        return;
-      }
-
-      if (!selectedDriver.isAvailable) {
-        toast.error("Selected driver is not available");
-        return;
-      }
-
-      // Convert string inputs to numbers
-      const mileage = parseFloat(editMileage);
-      const seatingCapacity = parseInt(editSeatingCapacity);
-      const passengerCount = parseInt(editPassengerCount);
-      const estimatedDistance = parseFloat(editEstimatedDistance);
-      const estimatedDuration = parseFloat(editEstimatedDuration);
-
-      // Validate required numbers
-      if (isNaN(mileage) || mileage < 0) {
-        toast.error("Invalid mileage");
-        return;
-      }
-      if (isNaN(seatingCapacity) || seatingCapacity < 1) {
-        toast.error("Invalid seating capacity");
-        return;
-      }
-      if (passengerCount > seatingCapacity) {
-        toast.error("Passenger count exceeds seating capacity");
-        return;
-      }
-      if (isNaN(estimatedDistance) || estimatedDistance <= 0) {
-        toast.error("Invalid estimated distance");
-        return;
-      }
-      if (isNaN(estimatedDuration) || estimatedDuration <= 0) {
-        toast.error("Invalid estimated duration");
-        return;
-      }
-
-      // Dates
-      const scheduledDeparture = parse(
-        `${editDepartureDate}T${editDepartureTime}:00Z`,
-        "yyyy-MM-dd'T'HH:mm:ss'Z'",
-        new Date()
-      );
-      const scheduledReturn =
-        editReturnDate && editReturnTime
-          ? parse(
-              `${editReturnDate}T${editReturnTime}:00Z`,
-              "yyyy-MM-dd'T'HH:mm:ss'Z'",
-              new Date()
-            )
-          : undefined;
-
-      if (
-        !isValid(scheduledDeparture) ||
-        !isAfter(scheduledDeparture, new Date())
-      ) {
-        toast.error("Scheduled departure must be a valid future date");
-        return;
-      }
-      if (
-        scheduledReturn &&
-        (!isValid(scheduledReturn) ||
-          !isAfter(scheduledReturn, scheduledDeparture))
-      ) {
-        toast.error("Scheduled return must be after departure");
-        return;
-      }
-
-      // Update vehicle in mock data
-      const updatedVehicles = mockTripData.vehicles.map((v) =>
-        v.id === selectedVehicle.id
-          ? {
-              ...v,
-              mileage,
-              seatingCapacity,
-              insuranceExpiry: editInsuranceExpiry,
-              lastService: editLastService,
-              nextService: editNextService,
-              status: editStatus,
-              currentDriver: selectedDriver.name,
-            }
-          : v
-      );
-      mockTripData.vehicles = updatedVehicles;
-
-      // Update driver in mock data
-      const updatedDrivers = mockTripData.drivers.map((d) =>
-        d.id === selectedDriver.id
-          ? { ...d, licenseExpiryDate: editDriverLicenseExpiry }
-          : d
-      );
-      mockTripData.drivers = updatedDrivers;
-
-      // Update assignment
-      const updatedAssignment: TripAssignment = {
-        ...selectedAssignment,
-        assignedVehicle: {
-          ...selectedVehicle,
-          mileage,
-          seatingCapacity,
+      const payload: AssignmentPayload = {
+        vehicleId: editVehicleId,
+        driverId: editDriverId,
+        assignmentStatus: editAssignmentStatus,
+        assignmentNotes: editNotes,
+        scheduledDeparture: `${editDepartureDate}T${editDepartureTime}:00Z`,
+        scheduledReturn: editReturnDate ? `${editReturnDate}T${editReturnTime}:00Z` : undefined,
+        vehicleDetails: {
+          mileage: editMileage,
+          seatingCapacity: editSeatingCapacity,
           insuranceExpiry: editInsuranceExpiry,
           lastService: editLastService,
           nextService: editNextService,
           status: editStatus,
-          currentDriver: selectedDriver.name,
         },
-        assignedDriver: {
-          ...selectedDriver,
+        driverDetails: {
           licenseExpiryDate: editDriverLicenseExpiry,
         },
-        assignmentNotes: editNotes,
-        scheduledDeparture: scheduledDeparture.toISOString(),
-        scheduledReturn: scheduledReturn
-          ? scheduledReturn.toISOString()
-          : undefined,
-        assignmentStatus: editAssignmentStatus,
-        updatedAt: new Date().toISOString(),
       };
 
-      // Update state
-      setTripAssignments((prev) =>
-        prev.map((a) => (a.id === updatedAssignment.id ? updatedAssignment : a))
-      );
+      const res = await fetch(`/trip-assignments/${selectedAssignment.id}`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
 
-      // Reset form
-      setIsAssignDialogOpen(false);
-      setEditVehicleId("");
-      setEditDriverId("");
-      setEditNotes("");
-      setEditMileage("");
-      setEditSeatingCapacity("");
-      setEditInsuranceExpiry("");
-      setEditLastService("");
-      setEditNextService("");
-      setEditStatus("");
-      setEditCurrentDriver("");
-      setEditDriverLicenseExpiry("");
-      setEditDepartureDate("");
-      setEditDepartureTime("");
-      setEditReturnDate("");
-      setEditReturnTime("");
-      setEditVehicleType("");
-      setEditPassengerCount("");
-      setEditAssignmentStatus("Assigned");
-      setEditIsRoundTrip(false);
-      setEditEstimatedDistance("");
-      setEditEstimatedDuration("");
-      setSelectedAssignment(null);
-      setSelectedRequest(null);
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(err.error || "Update failed");
+        return;
+      }
 
       toast.success("Assignment updated successfully!");
+      setIsAssignDialogOpen(false);
+      fetchAssignments(); // Refresh list
     } catch (error) {
-      console.error("Error in handleUpdateAssignment:", error);
-      toast.error("Error in handleUpdateAssignment");
+      console.error(error);
+      toast.error("Failed to update assignment");
     }
   };
 
-  const filteredAssignments = tripAssignments.filter((assignment) => {
-    const request = requestMap.get(assignment.tripRequestId);
-    if (!request) return false;
-
-    return (
-      (assignment.requestNumber
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-        assignment.assignedDriver.name
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        assignment.assignedVehicle.registrationNo
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        request.requestedBy.name
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase())) &&
-      (statusFilter === "all" ||
-        assignment.assignmentStatus.toLowerCase().replace(" ", "-") ===
-          statusFilter)
-    );
-  });
-
-  const stats = {
-    assigned: tripAssignments.filter((a) => a.assignmentStatus === "Assigned")
-      .length,
-    accepted: tripAssignments.filter((a) => a.assignmentStatus === "Accepted")
-      .length,
-    started: tripAssignments.filter((a) => a.assignmentStatus === "Started")
-      .length,
-    completed: tripAssignments.filter((a) => a.assignmentStatus === "Completed")
-      .length,
+  const handlePreTripChecklist = (assignment: TripAssignment) => {
+    setSelectedPreTrip(assignment.preTrip || null);
+    setIsPreTripDialogOpen(true);
   };
+
+  // ── HELPERS ─────────────────────────────────────────────────────────────
 
   const getStatusBadge = (status: string) => {
     const variants: Record<
@@ -475,44 +329,20 @@ export default function TripAssignments() {
     });
   };
 
-  const totalPages =
-    pageSize > 0 ? Math.ceil(filteredAssignments.length / pageSize) : 1;
-  const paginatedDocuments = filteredAssignments.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-
-  // const handleVehicleChange = (vehicleId: string) => {
-  //   const vehicle = mockTripData.vehicles.find(
-  //     (v) => v.id === parseInt(vehicleId)
-  //   );
-  //   if (!vehicle) {
-  //     toast.error("Selected vehicle not found");
-  //     return;
-  //   }
-
-  //   // Update form state with vehicle details
-  //   setEditVehicleId(vehicleId);
-  //   setEditMileage(vehicle.mileage.toString());
-  //   setEditSeatingCapacity(vehicle.seatingCapacity.toString());
-  //   setEditInsuranceExpiry(vehicle.insuranceExpiry || "");
-  //   setEditLastService(vehicle.lastService);
-  //   setEditNextService(vehicle.nextService);
-  //   setEditStatus(vehicle.status);
-  //   setEditCurrentDriver(vehicle.currentDriver || "");
-  // };
-
-  const handlePreTripChecklist = (assignment: TripAssignment) => {
-    setSelectedPreTrip(assignment.preTrip || null);
-    setIsPreTripDialogOpen(true);
+  // Stats
+  const stats = {
+    assigned: tripAssignments.filter((a) => a.assignmentStatus === "Assigned").length,
+    accepted: tripAssignments.filter((a) => a.assignmentStatus === "Accepted").length,
+    started: tripAssignments.filter((a) => a.assignmentStatus === "Started").length,
+    completed: tripAssignments.filter((a) => a.assignmentStatus === "Completed").length,
   };
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
+  // Pagination Logic
+  const paginatedDocuments = tripAssignments; // Assuming API returns paginated list
 
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between p-3">
         <div>
           <h1 className="text-2xl">TRIP ASSIGNMENTS</h1>
@@ -520,10 +350,6 @@ export default function TripAssignments() {
             Assign vehicles and drivers to approved trips
           </p>
         </div>
-        <Button>
-          <Users className="h-4 w-4 mr-2" />
-          Auto Assign
-        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -609,85 +435,152 @@ export default function TripAssignments() {
             </Select>
           </div>
 
-          {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Trip Details</TableHead>
-                  <TableHead>Assignment</TableHead>
-                  <TableHead>Schedule</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Pre-Trip</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedDocuments.map((assignment) => {
-                  const request = requestMap.get(assignment.tripRequestId);
-                  if (!request) return null;
-
-                  return (
-                    <TableRow key={assignment.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">
-                            {assignment.requestNumber}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1 flex items-center">
-                            <User className="h-3 w-3 mr-1" />
-                            {request.requestedBy.name}
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium flex items-center">
-                            <Car className="h-3 w-3 mr-1" />
-                            {assignment.assignedVehicle.registrationNo}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {assignment.assignedVehicle.make}{" "}
-                            {assignment.assignedVehicle.model}
-                          </div>
-                          <div className="font-medium flex items-center">
-                            <User className="h-3 w-3 mr-1" />
-                            {assignment.assignedVehicle.currentDriver}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            License: {assignment.assignedDriver.licenseNumber}
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="text-sm flex items-center">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            Scheduled:{" "}
-                            {formatDate(assignment.scheduledDeparture)}
-                          </div>
-                          {assignment.scheduledReturn && (
-                            <div className="text-sm text-muted-foreground">
-                              Return: {formatDate(assignment.scheduledReturn)}
+          {loading ? (
+             <div className="py-12 text-center text-muted-foreground">Loading assignments...</div>
+          ) : (
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Trip Details</TableHead>
+                      <TableHead>Assignment</TableHead>
+                      <TableHead>Schedule</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Pre-Trip</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedDocuments.map((assignment) => (
+                      <TableRow key={assignment.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">
+                              {assignment.requestNumber}
                             </div>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        {getStatusBadge(assignment.assignmentStatus)}
-                        {assignment.driverAcceptance && (
-                          <div className="text-xs text-green-600 mt-1">
-                            Driver {assignment.driverAcceptance.accepted}
+                            {/* FIX: requestedBy removed as it doesn't exist on TripAssignment type */}
                           </div>
-                        )}
-                      </TableCell>
+                        </TableCell>
 
-                      <TableCell>
-                        {assignment.preTrip &&
-                        assignment.preTrip.completedAt ? (
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium flex items-center">
+                              <Car className="h-3 w-3 mr-1" />
+                              {assignment.assignedVehicle.registrationNo}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {assignment.assignedVehicle.make}{" "}
+                              {assignment.assignedVehicle.model}
+                            </div>
+                            <div className="font-medium flex items-center">
+                              <User className="h-3 w-3 mr-1" />
+                              {assignment.assignedVehicle.currentDriver}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              License: {assignment.assignedDriver.licenseNumber}
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="text-sm flex items-center">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              Scheduled:{" "}
+                              {formatDate(assignment.scheduledDeparture)}
+                            </div>
+                            {assignment.scheduledReturn && (
+                              <div className="text-sm text-muted-foreground">
+                                Return: {formatDate(assignment.scheduledReturn)}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          {getStatusBadge(assignment.assignmentStatus)}
+                        </TableCell>
+
+                        <TableCell>
+                          {assignment.preTrip &&
+                          assignment.preTrip.completedAt ? (
+                            <Badge variant="default" className="text-xs">
+                              <CheckCircle className="h-3 w-3 mr-1" /> Completed
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              <Clock className="h-3 w-3 mr-1" /> Pending
+                            </Badge>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewDetails(assignment)}>
+                                <Eye className="h-4 w-4 mr-2" /> View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditAssignment(assignment)}>
+                                <Edit className="h-4 w-4 mr-2" /> Edit Assignment
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem onClick={() => handlePreTripChecklist(assignment)}>
+                                <FileText className="h-4 w-4 mr-2" /> Pre-Trip
+                                Checklist
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Card Layout */}
+              <div className="md:hidden space-y-4">
+                {paginatedDocuments.map((assignment) => (
+                  <div
+                    key={assignment.id}
+                    className="border rounded-lg p-4 shadow-sm bg-card text-card-foreground"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="font-semibold">
+                        {assignment.requestNumber}
+                      </div>
+                      <div>
+                        {getStatusBadge(assignment.assignmentStatus)}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 text-sm text-muted-foreground">
+                      <div className="font-medium flex items-center">
+                        <Car className="h-4 w-4 mr-1" />{" "}
+                        {assignment.assignedVehicle.registrationNo}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {assignment.assignedVehicle.make}{" "}
+                        {assignment.assignedVehicle.model}
+                      </div>
+                      <div className="flex items-center">
+                        <User className="h-4 w-4 mr-1" />{" "}
+                        {assignment.assignedVehicle.currentDriver}
+                      </div>
+                       <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-1" /> Scheduled:{" "}
+                        {formatDate(assignment.scheduledDeparture)}
+                      </div>
+
+                      <div>
+                        <span className="font-medium">Pre-Trip:</span>{" "}
+                        {assignment.preTrip && assignment.preTrip.completedAt ? (
                           <Badge variant="default" className="text-xs">
                             <CheckCircle className="h-3 w-3 mr-1" /> Completed
                           </Badge>
@@ -696,169 +589,32 @@ export default function TripAssignments() {
                             <Clock className="h-3 w-3 mr-1" /> Pending
                           </Badge>
                         )}
-                      </TableCell>
-
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleViewDetails(assignment)}
-                            >
-                              <Eye className="h-4 w-4 mr-2" /> View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleEditAssignment(assignment)}
-                            >
-                              <Edit className="h-4 w-4 mr-2" /> Edit Assignment
-                            </DropdownMenuItem>
-                            {assignment.assignmentStatus === "Assigned" && (
-                              <>
-                                <DropdownMenuItem>
-                                  <CheckCircle className="h-4 w-4 mr-2" />{" "}
-                                  Accept Assignment
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <XCircle className="h-4 w-4 mr-2" /> Reject
-                                  Assignment
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            <DropdownMenuItem
-                              onClick={() => handlePreTripChecklist(assignment)}
-                            >
-                              <FileText className="h-4 w-4 mr-2" /> Pre-Trip
-                              Checklist
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Mobile Card Layout */}
-          <div className="md:hidden space-y-4">
-            {paginatedDocuments.map((assignment) => {
-              const request = requestMap.get(assignment.tripRequestId);
-              if (!request) return null;
-
-              return (
-                <div
-                  key={assignment.id}
-                  className="border rounded-lg p-4 shadow-sm bg-card text-card-foreground"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="font-semibold">
-                      {assignment.requestNumber}
-                    </div>
-                    <div>
-                      {assignment.assignmentStatus &&
-                        getStatusBadge(assignment.assignmentStatus)}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 mr-1" />{" "}
-                      {request.requestedBy.name}
-                    </div>
-                    <div className="font-medium flex items-center">
-                      <Car className="h-4 w-4 mr-1" />{" "}
-                      {assignment.assignedVehicle.registrationNo}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {assignment.assignedVehicle.make}{" "}
-                      {assignment.assignedVehicle.model}
-                    </div>
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 mr-1" />{" "}
-                      {assignment.assignedVehicle.currentDriver}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      License: {assignment.assignedDriver.licenseNumber}
-                    </div>
-
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" /> Scheduled:{" "}
-                      {formatDate(assignment.scheduledDeparture)}
-                    </div>
-                    {assignment.scheduledReturn && (
-                      <div className="text-sm text-muted-foreground">
-                        Return: {formatDate(assignment.scheduledReturn)}
                       </div>
-                    )}
-
-                    <div>
-                      <span className="font-medium">Pre-Trip:</span>{" "}
-                      {assignment.preTrip && assignment.preTrip.completedAt ? (
-                        <Badge variant="default" className="text-xs">
-                          <CheckCircle className="h-3 w-3 mr-1" /> Completed
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">
-                          <Clock className="h-3 w-3 mr-1" /> Pending
-                        </Badge>
-                      )}
                     </div>
 
-                    {assignment.driverAcceptance && (
-                      <div className="text-xs text-green-600 mt-1">
-                        Driver {assignment.driverAcceptance.accepted}
-                      </div>
-                    )}
+                    <div className="flex justify-end mt-3">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                           <DropdownMenuItem onClick={() => handleViewDetails(assignment)}>
+                            <Eye className="h-4 w-4 mr-2" /> View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handlePreTripChecklist(assignment)}>
+                            <FileText className="h-4 w-4 mr-2" /> Pre-Trip
+                            Checklist
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-
-                  <div className="flex justify-end mt-3">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleViewDetails(assignment)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" /> View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleEditAssignment(assignment)}
-                        >
-                          <Edit className="h-4 w-4 mr-2" /> Edit Assignment
-                        </DropdownMenuItem>
-                        {assignment.assignmentStatus === "Assigned" && (
-                          <>
-                            <DropdownMenuItem>
-                              <CheckCircle className="h-4 w-4 mr-2" /> Accept
-                              Assignment
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <XCircle className="h-4 w-4 mr-2" /> Reject
-                              Assignment
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        <DropdownMenuItem
-                          onClick={() => handlePreTripChecklist(assignment)}
-                        >
-                          <FileText className="h-4 w-4 mr-2" /> Pre-Trip
-                          Checklist
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
@@ -883,7 +639,7 @@ export default function TripAssignments() {
                 </SelectContent>
               </Select>
               <span className="text-muted-foreground">
-                of {filteredAssignments.length} documents
+                of {totalAssignments} documents
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -929,9 +685,7 @@ export default function TripAssignments() {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
-                  }
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
                 >
                   Next
@@ -958,19 +712,18 @@ export default function TripAssignments() {
               Assignment Details
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              {selectedRequest && selectedAssignment && (
-                <>
+              {selectedAssignment && (
+                 <>
                   Assignment for{" "}
                   <span className="font-medium text-primary">
                     {selectedAssignment.requestNumber}
-                  </span>{" "}
-                  — {selectedRequest.requestedBy.name}
+                  </span>
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-8 py-6">
-            {selectedAssignment && selectedRequest && (
+            {selectedAssignment && (
               <>
                 <section className="rounded-xl border border-border bg-card p-5 shadow-sm transition hover:shadow-md">
                   <h4 className="font-semibold text-lg mb-3 flex items-center gap-2 text-primary">
@@ -978,53 +731,33 @@ export default function TripAssignments() {
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-muted-foreground">
                     <div>
-                      <span className="font-medium text-foreground">
-                        Departure:
-                      </span>{" "}
-                      {selectedRequest.tripDetails.departureDate} at{" "}
-                      {selectedRequest.tripDetails.departureTime}
+                      <span className="font-medium text-foreground">Departure:</span>{" "}
+                      {formatDate(selectedAssignment.scheduledDeparture || "")}
+                    </div>
+                    {/* Note: Request details like passengers might not be in Assignment object unless backend joins them */}
+                    <div>
+                      <span className="font-medium text-foreground">Passengers:</span> N/A
                     </div>
                     <div>
-                      <span className="font-medium text-foreground">
-                        Passengers:
-                      </span>{" "}
-                      {selectedRequest.requirements.passengerCount}
+                      <span className="font-medium text-foreground">Round Trip:</span> N/A
                     </div>
                     <div>
-                      <span className="font-medium text-foreground">
-                        Round Trip:
-                      </span>{" "}
-                      {selectedRequest.tripDetails.isRoundTrip ? "Yes" : "No"}
+                      <span className="font-medium text-foreground">Estimated Distance:</span> N/A
                     </div>
                     <div>
-                      <span className="font-medium text-foreground">
-                        Estimated Distance:
-                      </span>{" "}
-                      {selectedRequest.tripDetails.estimatedDistance} km
+                      <span className="font-medium text-foreground">Estimated Duration:</span> N/A
                     </div>
-                    <div>
-                      <span className="font-medium text-foreground">
-                        Estimated Duration:
-                      </span>{" "}
-                      {Math.floor(
-                        selectedRequest.tripDetails.estimatedDuration / 60
-                      )}
-                      h {selectedRequest.tripDetails.estimatedDuration % 60}m
-                    </div>
-                    {selectedRequest.tripDetails.returnDate && (
+                    {selectedAssignment.scheduledReturn && (
                       <div>
-                        <span className="font-medium text-foreground">
-                          Return:
-                        </span>{" "}
-                        {selectedRequest.tripDetails.returnDate} at{" "}
-                        {selectedRequest.tripDetails.returnTime}
+                        <span className="font-medium text-foreground">Return:</span>{" "}
+                        {formatDate(selectedAssignment.scheduledReturn)}
                       </div>
                     )}
                   </div>
                   <div className="text-sm text-muted-foreground mt-2">
                     <span className="font-medium text-foreground">Route:</span>{" "}
-                    {selectedRequest.tripDetails.fromLocation.address} →{" "}
-                    {selectedRequest.tripDetails.toLocation.address}
+                    {/* From/To locations usually in Request, not Assignment. Displaying placeholders if not embedded */}
+                    Unknown Location → Unknown Location
                   </div>
                 </section>
                 <section className="rounded-xl border border-border bg-card p-5 shadow-sm transition hover:shadow-md">
@@ -1033,15 +766,11 @@ export default function TripAssignments() {
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-muted-foreground">
                     <div>
-                      <span className="font-medium text-foreground">
-                        Vehicle:
-                      </span>{" "}
+                      <span className="font-medium text-foreground">Vehicle:</span>{" "}
                       {selectedAssignment.assignedVehicle.registrationNo}
                     </div>
                     <div>
-                      <span className="font-medium text-foreground">
-                        Model:
-                      </span>{" "}
+                      <span className="font-medium text-foreground">Model:</span>{" "}
                       {selectedAssignment.assignedVehicle.make}{" "}
                       {selectedAssignment.assignedVehicle.model}
                     </div>
@@ -1054,33 +783,23 @@ export default function TripAssignments() {
                       {selectedAssignment.assignedVehicle.fuelType}
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="font-medium text-foreground">
-                        Mileage:
-                      </span>{" "}
+                      <span className="font-medium text-foreground">Mileage:</span>{" "}
                       {selectedAssignment.assignedVehicle.mileage} km
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="font-medium text-foreground">
-                        Last Service:
-                      </span>{" "}
-                      {selectedAssignment.assignedVehicle.lastService}
+                      <span className="font-medium text-foreground">Last Service:</span>{" "}
+                      {selectedAssignment.assignedVehicle.lastService || "N/A"}
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="font-medium text-foreground">
-                        Next Service:
-                      </span>{" "}
-                      {selectedAssignment.assignedVehicle.nextService}
+                      <span className="font-medium text-foreground">Next Service:</span>{" "}
+                      {selectedAssignment.assignedVehicle.nextService || "N/A"}
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="font-medium text-foreground">
-                        Seating Capacity:
-                      </span>{" "}
+                      <span className="font-medium text-foreground">Seating Capacity:</span>{" "}
                       {selectedAssignment.assignedVehicle.seatingCapacity}
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="font-medium text-foreground">
-                        Status:
-                      </span>{" "}
+                      <span className="font-medium text-foreground">Status:</span>{" "}
                       {selectedAssignment.assignedVehicle.status}
                     </div>
                   </div>
@@ -1095,21 +814,15 @@ export default function TripAssignments() {
                       {selectedAssignment.assignedVehicle.currentDriver}
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="font-medium text-foreground">
-                        Phone:
-                      </span>{" "}
+                      <span className="font-medium text-foreground">Phone:</span>{" "}
                       {selectedAssignment.assignedDriver.phoneNumber}
                     </div>
                     <div>
-                      <span className="font-medium text-foreground">
-                        License:
-                      </span>{" "}
+                      <span className="font-medium text-foreground">License:</span>{" "}
                       {selectedAssignment.assignedDriver.licenseNumber}
                     </div>
                     <div>
-                      <span className="font-medium text-foreground">
-                        License Expiry:
-                      </span>{" "}
+                      <span className="font-medium text-foreground">License Expiry:</span>{" "}
                       {selectedAssignment.assignedDriver.licenseExpiryDate}
                     </div>
                   </div>
@@ -1122,23 +835,16 @@ export default function TripAssignments() {
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-muted-foreground">
                       <div>
-                        <span className="font-medium text-foreground">
-                          Fuel Level:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Fuel Level:</span>{" "}
                         {selectedAssignment.preTrip.checklist.fuelLevel}%
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Vehicle Condition:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Vehicle Condition:</span>{" "}
                         {selectedAssignment.preTrip.checklist.vehicleCondition}
                       </div>
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="font-medium text-foreground">
-                          Documents:
-                        </span>
-                        {selectedAssignment.preTrip.checklist
-                          .documentsVerified ? (
+                        <span className="font-medium text-foreground">Documents:</span>
+                        {selectedAssignment.preTrip.checklist.documentsVerified ? (
                           <span className="flex items-center gap-1 text-green-500 font-medium">
                             <ShieldCheck className="w-4 h-4" />
                             Verified
@@ -1150,11 +856,8 @@ export default function TripAssignments() {
                         )}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Emergency Kit:
-                        </span>{" "}
-                        {selectedAssignment.preTrip.checklist
-                          .emergencyKitPresent ? (
+                        <span className="font-medium text-foreground">Emergency Kit:</span>{" "}
+                        {selectedAssignment.preTrip.checklist.emergencyKitPresent ? (
                           <span className="text-green-500 font-medium">
                             ✓ Present
                           </span>
@@ -1165,9 +868,7 @@ export default function TripAssignments() {
                         )}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          GPS:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">GPS:</span>{" "}
                         {selectedAssignment.preTrip.checklist.gpsWorking ? (
                           <span className="text-green-500 font-medium">
                             ✓ Working
@@ -1179,16 +880,12 @@ export default function TripAssignments() {
                         )}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Completed By:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Completed By:</span>{" "}
                         {selectedAssignment.preTrip.completedBy}
                       </div>
                     </div>
                     <div className="text-sm text-muted-foreground mt-2">
-                      <span className="font-medium text-foreground">
-                        Completed At:
-                      </span>{" "}
+                      <span className="font-medium text-foreground">Completed At:</span>{" "}
                       {formatDate(selectedAssignment.preTrip.completedAt)}
                     </div>
                   </section>
@@ -1225,76 +922,24 @@ export default function TripAssignments() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Vehicle</Label>
-                  <Select
-                    value={editVehicleId}
-                    onValueChange={(vehicleId) => {
-                      setEditVehicleId(vehicleId); // Update selected vehicle ID
-
-                      // Find the selected vehicle in your mock data
-                      const vehicle = mockTripData.vehicles.find(
-                        (v) => v.id === parseInt(vehicleId)
-                      );
-                      if (!vehicle) return;
-
-                      // Update all related fields
-                      setEditMileage(vehicle.mileage.toString());
-                      setEditSeatingCapacity(
-                        vehicle.seatingCapacity.toString()
-                      );
-                      setEditInsuranceExpiry(vehicle.insuranceExpiry || "");
-                      setEditLastService(vehicle.lastService);
-                      setEditNextService(vehicle.nextService);
-                      setEditStatus(vehicle.status);
-                      setEditCurrentDriver(vehicle.currentDriver || "");
-                    }}
-                  >
+                  <Select value={editVehicleId} onValueChange={setEditVehicleId}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select vehicle" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockTripData.vehicles
-                        .filter((vehicle) => vehicle.status === "Available")
-                        .map((vehicle) => (
-                          <SelectItem
-                            key={vehicle.id}
-                            value={vehicle.id.toString()}
-                          >
-                            {vehicle.registrationNo} - {vehicle.make}{" "}
-                            {vehicle.model}
-                          </SelectItem>
-                        ))}
+                       <SelectItem value={editVehicleId}>{editVehicleId}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
                   <Label>Driver</Label>
-                  <Select
-                    value={editDriverId}
-                    onValueChange={(value) => {
-                      setEditDriverId(value);
-                      const selectedDriver = mockTripData.drivers.find(
-                        (d) => d.id === value
-                      );
-                      if (selectedDriver) {
-                        setEditCurrentDriver(selectedDriver.name);
-                        setEditDriverLicenseExpiry(
-                          selectedDriver.licenseExpiryDate
-                        );
-                      }
-                    }}
-                  >
+                  <Select value={editDriverId} onValueChange={setEditDriverId}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select driver" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockTripData.drivers
-                        .filter((driver) => driver.isAvailable)
-                        .map((driver) => (
-                          <SelectItem key={driver.id} value={driver.id}>
-                            {driver.name} - {driver.phoneNumber}
-                          </SelectItem>
-                        ))}
+                       <SelectItem value={editDriverId}>{editDriverId}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1338,8 +983,7 @@ export default function TripAssignments() {
                     type="date"
                     value={editInsuranceExpiry}
                     onChange={(e) => setEditInsuranceExpiry(e.target.value)}
-                    min={new Date().toISOString().split("T")[0]} // Prevent past dates
-                    required
+                    min={new Date().toISOString().split("T")[0]}
                   />
                 </div>
                 <div className="space-y-2">
@@ -1383,12 +1027,7 @@ export default function TripAssignments() {
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
-                      {[
-                        "Available",
-                        "On Trip",
-                        "Under Repair",
-                        "Maintenance",
-                      ].map((status) => (
+                      {["Available", "On Trip", "Under Repair", "Maintenance"].map((status) => (
                         <SelectItem key={status} value={status}>
                           {status}
                         </SelectItem>
@@ -1413,134 +1052,9 @@ export default function TripAssignments() {
                 />
               </div>
             </div>
-            <div className="space-y-4">
-              <h4 className="font-semibold text-lg">Trip Schedule</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Scheduled Departure Date</Label>
-                  <Input
-                    type="date"
-                    value={editDepartureDate}
-                    onChange={(e) => setEditDepartureDate(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Scheduled Departure Time</Label>
-                  <Input
-                    type="time"
-                    value={editDepartureTime}
-                    onChange={(e) => setEditDepartureTime(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Scheduled Return Date (Optional)</Label>
-                  <Input
-                    type="date"
-                    value={editReturnDate}
-                    onChange={(e) => setEditReturnDate(e.target.value)}
-                    disabled={!editIsRoundTrip}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Scheduled Return Time (Optional)</Label>
-                  <Input
-                    type="time"
-                    value={editReturnTime}
-                    onChange={(e) => setEditReturnTime(e.target.value)}
-                    disabled={!editIsRoundTrip}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Round Trip</Label>
-                  <input
-                    type="checkbox"
-                    checked={editIsRoundTrip}
-                    onChange={(e) => setEditIsRoundTrip(e.target.checked)}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <h4 className="font-semibold text-lg">Trip Requirements</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Vehicle Type</Label>
-                  <Select
-                    value={editVehicleType}
-                    onValueChange={setEditVehicleType}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select vehicle type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {["Sedan", "SUV", "Hatchback", "Van", "Truck"].map(
-                        (type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        )
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Passenger Count</Label>
-                  <Input
-                    type="number"
-                    value={editPassengerCount}
-                    onChange={(e) => setEditPassengerCount(e.target.value)}
-                    min="1"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Estimated Distance (km)</Label>
-                  <Input
-                    type="number"
-                    value={editEstimatedDistance}
-                    onChange={(e) => setEditEstimatedDistance(e.target.value)}
-                    min="1"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Estimated Duration (minutes)</Label>
-                  <Input
-                    type="number"
-                    value={editEstimatedDuration}
-                    onChange={(e) => setEditEstimatedDuration(e.target.value)}
-                    min="1"
-                  />
-                </div>
-              </div>
-            </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsAssignDialogOpen(false);
-                setEditVehicleId("");
-                setEditDriverId("");
-                setEditNotes("");
-                setEditInsuranceExpiry("");
-                setEditMileage("");
-                setEditLastService("");
-                setEditNextService("");
-                setEditSeatingCapacity("");
-                setEditStatus("");
-                setEditCurrentDriver("");
-                setEditDriverLicenseExpiry("");
-                setEditDepartureDate("");
-                setEditDepartureTime("");
-                setEditReturnDate("");
-                setEditReturnTime("");
-                setEditVehicleType("");
-                setEditPassengerCount("");
-                setEditAssignmentStatus("Assigned");
-                setEditIsRoundTrip(false);
-                setEditEstimatedDistance("");
-                setEditEstimatedDuration("");
-              }}
-            >
+            <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>
               Cancel
             </Button>
             <Button onClick={handleUpdateAssignment}>Update Assignment</Button>
@@ -1584,13 +1098,11 @@ export default function TripAssignments() {
               {/* Documents Verified */}
               <div className="p-3 rounded-lg border border-border bg-background shadow-sm flex justify-between items-center transition hover:shadow-md">
                 <span className="font-medium">Documents Verified</span>
-                <span
-                  className={`text-sm font-medium ${
+                <span className={`text-sm font-medium ${
                     selectedPreTrip.checklist.documentsVerified
                       ? "text-green-500"
                       : "text-red-500"
-                  }`}
-                >
+                  }`}>
                   {selectedPreTrip.checklist.documentsVerified ? "Yes" : "No"}
                 </span>
               </div>
@@ -1598,13 +1110,11 @@ export default function TripAssignments() {
               {/* Emergency Kit */}
               <div className="p-3 rounded-lg border border-border bg-background shadow-sm flex justify-between items-center transition hover:shadow-md">
                 <span className="font-medium">Emergency Kit Present</span>
-                <span
-                  className={`text-sm font-medium ${
+                <span className={`text-sm font-medium ${
                     selectedPreTrip.checklist.emergencyKitPresent
                       ? "text-green-500"
                       : "text-red-500"
-                  }`}
-                >
+                  }`}>
                   {selectedPreTrip.checklist.emergencyKitPresent ? "Yes" : "No"}
                 </span>
               </div>
@@ -1612,35 +1122,14 @@ export default function TripAssignments() {
               {/* GPS */}
               <div className="p-3 rounded-lg border border-border bg-background shadow-sm flex justify-between items-center transition hover:shadow-md">
                 <span className="font-medium">GPS Working</span>
-                <span
-                  className={`text-sm font-medium ${
+                <span className={`text-sm font-medium ${
                     selectedPreTrip.checklist.gpsWorking
                       ? "text-green-500"
                       : "text-red-500"
-                  }`}
-                >
+                  }`}>
                   {selectedPreTrip.checklist.gpsWorking ? "Yes" : "No"}
                 </span>
               </div>
-
-              {/* Photos */}
-              {selectedPreTrip.photos && selectedPreTrip.photos.length > 0 && (
-                <div className="mt-4">
-                  <span className="font-medium text-foreground">Photos</span>
-                  <div className="flex gap-3 mt-2 flex-wrap">
-                    {/* {selectedPreTrip.photos.map((url, idx) => (
-                      <Image
-                        key={idx}
-                        src={url}
-                        alt={`Pre-trip ${idx}`}
-                        width={20}
-                        height={20}
-                        className="object-cover rounded-lg border border-border shadow-sm"
-                      />
-                    ))} */}
-                  </div>
-                </div>
-              )}
             </div>
           ) : (
             <div className="py-6 text-center text-muted-foreground">
