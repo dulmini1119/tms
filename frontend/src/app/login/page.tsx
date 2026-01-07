@@ -32,11 +32,24 @@ const handleLogin = async (e: React.FormEvent) => {
     }
 
     // THIS IS THE ONLY PART YOU NEED
-    const position = (data.data?.user?.position || data.data?.position || "employee").toLowerCase();
+const rawPosition =
+  data.data?.user?.position || data.data?.position || "employee";
+
+const position = rawPosition
+  .toString()
+  .trim()
+  .replace(/\s+/g, "")   // remove spaces
+  .replace(/_/g, "")     // remove underscores
+  .replace(/-/g, "")     // remove dashes
+  .toLowerCase();
+
+  console.log("RAW POSITION:", rawPosition);
+console.log("NORMALIZED POSITION:", position);
+
 
     const redirectMap: Record<string, string> = {
       superadmin: "/admin/dashboard",
-      vehicleadmin: "/admin/dashboard",
+      vehicleadmin: "/vehicleadmin/dashboard",
       manager: "/manager/dashboard",
       hod: "/hod/dashboard",
       employee: "/employee/dashboard",

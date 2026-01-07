@@ -16,7 +16,7 @@ export default function LoginLayout({
           <div className=""><ModeToggle/></div>
         </div>
 
-        <div className="h-[1px] w-full dark:bg-gray-900 bg-gray-100" />
+        <div className="h-px w-full dark:bg-gray-900 bg-gray-100" />
       </div>
 
       <div className="pt-20">{children}</div>

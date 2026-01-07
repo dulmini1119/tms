@@ -1,6 +1,8 @@
 "use client";
-import React, { useState } from "react";
-import { Calendar, Plus, Clock, Eye, Edit, Trash2, Search } from "lucide-react";
+
+import React, { useState, useEffect, useCallback } from "react";
+import { Calendar, Plus, Clock, Eye, Edit, Trash2, Search, Loader2 } from "lucide-react";
+import { toast } from "sonner"; // ← install if missing: npm install sonner
 import {
   Dialog,
   DialogContent,
@@ -37,7 +39,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { TripApproval, TripRequest } from "@/types/trip-interfaces";
 
+// Reuse your existing interfaces (TripRequest, TripApproval, etc.)
+// ... (paste your interface definitions here)
 interface UserRole {
   id: string;
   name: string;
@@ -45,569 +50,27 @@ interface UserRole {
   department: string;
   businessUnit: string;
 }
-
-interface TripRequest {
-  id: string;
-  requestNumber: string;
-  requestedBy: {
-    id: string;
-    name: string;
-    email: string;
-    department: string;
-    employeeId: string;
-    phoneNumber: string;
-    designation: string;
-    managerName: string;
-    costCenter: string;
-  };
-  tripDetails: {
-    fromLocation: {
-      address: string;
-      coordinates?: { lat: number; lng: number };
-      landmark?: string;
-    };
-    toLocation: {
-      address: string;
-      coordinates?: { lat: number; lng: number };
-      landmark?: string;
-    };
-    departureDate: string;
-    departureTime: string;
-    returnDate?: string | undefined;
-    returnTime?: string | undefined;
-    isRoundTrip: boolean;
-    estimatedDistance: number;
-    estimatedDuration: number;
-  };
-  purpose: {
-    category: string;
-    description: string;
-    projectCode: string;
-    costCenter: string;
-    businessJustification: string;
-  };
-  requirements: {
-    vehicleType: string;
-    passengerCount: number;
-    specialRequirements?: string;
-    acRequired: boolean;
-    luggage: string;
-  };
-  priority: string;
-  status: "Pending" | "Approved" | "Rejected" | "Completed";
-  createdAt: string;
-  updatedAt: string;
-  approvalRequired: boolean;
-  estimatedCost: number;
-  currency: string;
-  passengers: {
-    name: string;
-    employeeId: string;
-    department: string;
-    phoneNumber: string;
-  }[];
-  approvalWorkflow: {
-    level: number;
-    approverRole: string;
-    approverName: string;
-    approverDepartment: string;
-    status: string;
-    approvedAt: string;
-    comments: string;
-  }[];
-  costBreakdown: {
-    baseFare: number;
-    distanceCharges: number;
-    timeCharges: number;
-    additionalCharges: number;
-    taxAmount: number;
-  };
-  billing: {
-    billingType: string;
-    costCenter: string;
-    projectCode: string;
-    budgetCode: string;
-    billToDepartment: string;
-    approverName: string;
-  };
-  attachments: {
-    fileName: string;
-    fileSize: string;
-  }[];
-  auditTrail: {
-    action: string;
-    performedBy: string;
-    timestamp: string;
-    comments: string;
-  }[];
-}
-
-interface TripApproval {
-  id: string;
-  tripRequestId: string;
-  requestNumber: string;
-  approvalWorkflow: {
-    level: number;
-    approverRole: string;
-    approverName: string;
-    approverId: string;
-    approverEmail: string;
-    department: string;
-  }[];
-  currentApprovalLevel: number;
-  approvalHistory: {
-    level: number;
-    approver: {
-      id: string;
-      name: string;
-      email: string;
-      role: string;
-    };
-    action: "Approved" | "Rejected" | "Pending";
-    comments?: string;
-    timestamp: string;
-    ipAddress?: string;
-  }[];
-  finalStatus: "Pending" | "Approved" | "Rejected";
-  autoApproval: boolean;
-  approvalRules: {
-    costThreshold: number;
-    departmentApprovalRequired: boolean;
-    managerApprovalRequired: boolean;
-    financeApprovalRequired: boolean;
-  };
-  createdAt: string;
-  updatedAt: string;
-  escalationDate?: string;
-  escalated: boolean;
-}
-
 interface EmployeeTripRequestsProps {
   user?: UserRole;
   viewMode?: "request" | "my-trips";
 }
 
-// Mock data
-const mockTrips: (TripRequest & { approval?: TripApproval })[] = [
-  {
-    id: "TR001",
-    requestNumber: "REQ001",
-    requestedBy: {
-      id: "EMP001",
-      name: "John Doe",
-      email: "john.doe@company.com",
-      department: "Sales",
-      employeeId: "E001",
-      phoneNumber: "+91 9876543210",
-      designation: "Sales Manager",
-      managerName: "Sarah Wilson",
-      costCenter: "CC001",
-    },
-    tripDetails: {
-      fromLocation: { address: "Home, Bangalore", landmark: "Near Park" },
-      toLocation: {
-        address: "Downtown Office, Bangalore",
-        landmark: "Office Tower",
-      },
-      departureDate: "2024-01-15",
-      departureTime: "09:00 AM",
-      returnDate: "2024-01-15",
-      returnTime: "06:00 PM",
-      isRoundTrip: true,
-      estimatedDistance: 20,
-      estimatedDuration: 45,
-    },
-    purpose: {
-      category: "Client Meeting",
-      description: "Meeting with key client",
-      projectCode: "PRJ001",
-      costCenter: "CC001",
-      businessJustification: "To finalize Q1 deal",
-    },
-    requirements: {
-      vehicleType: "Sedan",
-      passengerCount: 2,
-      specialRequirements: "None",
-      acRequired: true,
-      luggage: "Small bag",
-    },
-    priority: "High",
-    status: "Approved",
-    createdAt: "2024-01-10T10:00:00Z",
-    updatedAt: "2024-01-10T12:00:00Z",
-    approvalRequired: true,
-    estimatedCost: 1500,
-    currency: "INR",
-    passengers: [
-      {
-        name: "John Doe",
-        employeeId: "E001",
-        department: "Sales",
-        phoneNumber: "+91 9876543210",
-      },
-    ],
-    approvalWorkflow: [
-      {
-        level: 1,
-        approverRole: "Manager",
-        approverName: "Sarah Wilson",
-        approverDepartment: "Sales",
-        status: "Approved",
-        approvedAt: "2024-01-10T12:00:00Z",
-        comments: "Approved for client meeting",
-      },
-    ],
-    costBreakdown: {
-      baseFare: 500,
-      distanceCharges: 800,
-      timeCharges: 100,
-      additionalCharges: 0,
-      taxAmount: 100,
-    },
-    billing: {
-      billingType: "Corporate",
-      costCenter: "CC001",
-      projectCode: "PRJ001",
-      budgetCode: "BC001",
-      billToDepartment: "Sales",
-      approverName: "Sarah Wilson",
-    },
-    attachments: [],
-    auditTrail: [
-      {
-        action: "Created",
-        performedBy: "John Doe",
-        timestamp: "2024-01-10T10:00:00Z",
-        comments: "Trip request created",
-      },
-    ],
-    approval: {
-      id: "AP001",
-      tripRequestId: "TR001",
-      requestNumber: "REQ001",
-      approvalWorkflow: [
-        {
-          level: 1,
-          approverRole: "Manager",
-          approverName: "Sarah Wilson",
-          approverId: "MGR001",
-          approverEmail: "sarah.wilson@company.com",
-          department: "Sales",
-        },
-      ],
-      currentApprovalLevel: 1,
-      approvalHistory: [
-        {
-          level: 1,
-          approver: {
-            id: "MGR001",
-            name: "Sarah Wilson",
-            email: "sarah.wilson@company.com",
-            role: "Manager",
-          },
-          action: "Approved",
-          comments: "Approved for client meeting",
-          timestamp: "2024-01-10T12:00:00Z",
-        },
-      ],
-      finalStatus: "Approved",
-      autoApproval: false,
-      approvalRules: {
-        costThreshold: 5000,
-        departmentApprovalRequired: true,
-        managerApprovalRequired: true,
-        financeApprovalRequired: false,
-      },
-      createdAt: "2024-01-10T10:00:00Z",
-      updatedAt: "2024-01-10T12:00:00Z",
-      escalated: false,
-    },
-  },
-  {
-    id: "TR002",
-    requestNumber: "REQ002",
-    requestedBy: {
-      id: "EMP001",
-      name: "John Doe",
-      email: "john.doe@company.com",
-      department: "Sales",
-      employeeId: "E001",
-      phoneNumber: "+91 9876543210",
-      designation: "Sales Manager",
-      managerName: "Sarah Wilson",
-      costCenter: "CC001",
-    },
-    tripDetails: {
-      fromLocation: { address: "Office, Bangalore", landmark: "Tech Park" },
-      toLocation: { address: "Airport, Bangalore", landmark: "Terminal 1" },
-      departureDate: "2024-01-14",
-      departureTime: "02:30 PM",
-      returnDate: "2024-01-14",
-      returnTime: "08:00 PM",
-      isRoundTrip: true,
-      estimatedDistance: 40,
-      estimatedDuration: 60,
-    },
-    purpose: {
-      category: "Business Travel",
-      description: "Travel for conference",
-      projectCode: "PRJ002",
-      costCenter: "CC001",
-      businessJustification: "Attend industry conference",
-    },
-    requirements: {
-      vehicleType: "SUV",
-      passengerCount: 1,
-      specialRequirements: "Extra luggage space",
-      acRequired: true,
-      luggage: "Large suitcase",
-    },
-    priority: "Medium",
-    status: "Completed",
-    createdAt: "2024-01-09T09:00:00Z",
-    updatedAt: "2024-01-14T20:00:00Z",
-    approvalRequired: true,
-    estimatedCost: 2500,
-    currency: "INR",
-    passengers: [
-      {
-        name: "John Doe",
-        employeeId: "E001",
-        department: "Sales",
-        phoneNumber: "+91 9876543210",
-      },
-    ],
-    approvalWorkflow: [
-      {
-        level: 1,
-        approverRole: "Manager",
-        approverName: "Sarah Wilson",
-        approverDepartment: "Sales",
-        status: "Approved",
-        approvedAt: "2024-01-09T11:00:00Z",
-        comments: "Approved for conference",
-      },
-    ],
-    costBreakdown: {
-      baseFare: 700,
-      distanceCharges: 1200,
-      timeCharges: 300,
-      additionalCharges: 100,
-      taxAmount: 200,
-    },
-    billing: {
-      billingType: "Corporate",
-      costCenter: "CC001",
-      projectCode: "PRJ002",
-      budgetCode: "BC002",
-      billToDepartment: "Sales",
-      approverName: "Sarah Wilson",
-    },
-    attachments: [],
-    auditTrail: [
-      {
-        action: "Created",
-        performedBy: "John Doe",
-        timestamp: "2024-01-09T09:00:00Z",
-        comments: "Trip request created",
-      },
-    ],
-    approval: {
-      id: "AP002",
-      tripRequestId: "TR002",
-      requestNumber: "REQ002",
-      approvalWorkflow: [
-        {
-          level: 1,
-          approverRole: "Manager",
-          approverName: "Sarah Wilson",
-          approverId: "MGR001",
-          approverEmail: "sarah.wilson@company.com",
-          department: "Sales",
-        },
-      ],
-      currentApprovalLevel: 1,
-      approvalHistory: [
-        {
-          level: 1,
-          approver: {
-            id: "MGR001",
-            name: "Sarah Wilson",
-            email: "sarah.wilson@company.com",
-            role: "Manager",
-          },
-          action: "Approved",
-          comments: "Approved for conference",
-          timestamp: "2024-01-09T11:00:00Z",
-        },
-      ],
-      finalStatus: "Approved",
-      autoApproval: false,
-      approvalRules: {
-        costThreshold: 5000,
-        departmentApprovalRequired: true,
-        managerApprovalRequired: true,
-        financeApprovalRequired: false,
-      },
-      createdAt: "2024-01-09T09:00:00Z",
-      updatedAt: "2024-01-09T11:00:00Z",
-      escalated: false,
-    },
-  },
-  {
-    id: "TR003",
-    requestNumber: "REQ003",
-    requestedBy: {
-      id: "EMP001",
-      name: "John Doe",
-      email: "john.doe@company.com",
-      department: "Sales",
-      employeeId: "E001",
-      phoneNumber: "+91 9876543210",
-      designation: "Sales Manager",
-      managerName: "Sarah Wilson",
-      costCenter: "CC001",
-    },
-    tripDetails: {
-      fromLocation: { address: "Office, Bangalore", landmark: "Tech Park" },
-      toLocation: {
-        address: "Client Office, Koramangala",
-        landmark: "Business Center",
-      },
-      departureDate: "2024-01-16",
-      departureTime: "11:00 AM",
-      returnDate: "2024-01-16",
-      returnTime: "03:00 PM",
-      isRoundTrip: true,
-      estimatedDistance: 15,
-      estimatedDuration: 30,
-    },
-    purpose: {
-      category: "Project Discussion",
-      description: "Discuss project milestones",
-      projectCode: "PRJ003",
-      costCenter: "CC001",
-      businessJustification: "To align on Q2 deliverables",
-    },
-    requirements: {
-      vehicleType: "Sedan",
-      passengerCount: 3,
-      specialRequirements: "None",
-      acRequired: true,
-      luggage: "None",
-    },
-    priority: "High",
-    status: "Pending",
-    createdAt: "2024-01-12T08:00:00Z",
-    updatedAt: "2024-01-12T08:00:00Z",
-    approvalRequired: true,
-    estimatedCost: 1000,
-    currency: "INR",
-    passengers: [
-      {
-        name: "John Doe",
-        employeeId: "E001",
-        department: "Sales",
-        phoneNumber: "+91 9876543210",
-      },
-      {
-        name: "Jane Smith",
-        employeeId: "E002",
-        department: "Sales",
-        phoneNumber: "+91 9876543211",
-      },
-    ],
-    approvalWorkflow: [
-      {
-        level: 1,
-        approverRole: "Manager",
-        approverName: "Sarah Wilson",
-        approverDepartment: "Sales",
-        status: "Pending",
-        approvedAt: "",
-        comments: "",
-      },
-    ],
-    costBreakdown: {
-      baseFare: 300,
-      distanceCharges: 500,
-      timeCharges: 100,
-      additionalCharges: 0,
-      taxAmount: 100,
-    },
-    billing: {
-      billingType: "Corporate",
-      costCenter: "CC001",
-      projectCode: "PRJ003",
-      budgetCode: "BC003",
-      billToDepartment: "Sales",
-      approverName: "Sarah Wilson",
-    },
-    attachments: [],
-    auditTrail: [
-      {
-        action: "Created",
-        performedBy: "John Doe",
-        timestamp: "2024-01-12T08:00:00Z",
-        comments: "Trip request created",
-      },
-    ],
-    approval: {
-      id: "AP003",
-      tripRequestId: "TR003",
-      requestNumber: "REQ003",
-      approvalWorkflow: [
-        {
-          level: 1,
-          approverRole: "Manager",
-          approverName: "Sarah Wilson",
-          approverId: "MGR001",
-          approverEmail: "sarah.wilson@company.com",
-          department: "Sales",
-        },
-      ],
-      currentApprovalLevel: 1,
-      approvalHistory: [
-        {
-          level: 1,
-          approver: {
-            id: "MGR001",
-            name: "Sarah Wilson",
-            email: "sarah.wilson@company.com",
-            role: "Manager",
-          },
-          action: "Pending",
-          comments: "",
-          timestamp: "2024-01-12T08:00:00Z",
-        },
-      ],
-      finalStatus: "Pending",
-      autoApproval: false,
-      approvalRules: {
-        costThreshold: 5000,
-        departmentApprovalRequired: true,
-        managerApprovalRequired: true,
-        financeApprovalRequired: false,
-      },
-      createdAt: "2024-01-12T08:00:00Z",
-      updatedAt: "2024-01-12T08:00:00Z",
-      escalated: false,
-    },
-  },
-];
-
 export default function EmployeeTripRequests({
   user,
-  viewMode = "request",
+  viewMode = "my-trips", // default to my-trips for employee page
 }: EmployeeTripRequestsProps) {
+  const [trips, setTrips] = useState<(TripRequest & { approval?: TripApproval })[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
+  const [editingTrip, setEditingTrip] = useState<(TripRequest & { approval?: TripApproval }) | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedTrip, setSelectedTrip] = useState<
-    (TripRequest & { approval?: TripApproval }) | null
-  >(null);
+  const [selectedTrip, setSelectedTrip] = useState<(TripRequest & { approval?: TripApproval }) | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
+  // Form state – flattened for simplicity (you can nest later)
   const [formData, setFormData] = useState({
     fromLocation: "",
     toLocation: "",
@@ -615,40 +78,61 @@ export default function EmployeeTripRequests({
     departureTime: "",
     returnDate: "",
     returnTime: "",
-    purposeCategory: "",
+    purposeCategory: "Client Meeting",
     purposeDescription: "",
-    vehicleType: "",
+    vehicleType: "Sedan",
     passengerCount: 1,
     specialRequirements: "",
     acRequired: true,
-    luggage: "",
+    luggage: "Small bag",
+    priority: "Medium",
+    estimatedCost: 0,
   });
 
-  const filteredTrips = mockTrips.filter((trip) => {
-    const matchesSearch =
-      trip.tripDetails.toLocation.address
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      trip.purpose.description
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      trip.requestNumber.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || trip.status.toLowerCase() === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // Fetch user's trips
+  const fetchTrips = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (searchTerm) params.set("searchTerm", searchTerm);
+      if (statusFilter !== "all") params.set("status", statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1));
 
-  const handleInputChange = (
-    field: string,
-    value: string | number | boolean
-  ) => {
+      const res = await fetch(`/trip-requests?${params.toString()}`, {
+        method: "GET",
+        credentials: "include", // ← important: sends cookies (accessToken)
+      });
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          toast.error("Session expired. Please log in again.");
+          // Optional: redirect to login
+        }
+        throw new Error("Failed to fetch trips");
+      }
+
+      const data = await res.json();
+      // Assuming backend returns { data: TripRequest[], meta: {...} }
+      setTrips(data.data || []);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load your trip requests");
+      toast.error("Could not load trips");
+    } finally {
+      setLoading(false);
+    }
+  }, [searchTerm, statusFilter]);
+
+  useEffect(() => {
+    fetchTrips();
+  }, [fetchTrips]);
+
+  const handleInputChange = (field: string, value: string | number | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Trip request submitted:", formData);
-    setIsNewRequestOpen(false);
+  const resetForm = () => {
+    setEditingTrip(null);
     setFormData({
       fromLocation: "",
       toLocation: "",
@@ -656,30 +140,125 @@ export default function EmployeeTripRequests({
       departureTime: "",
       returnDate: "",
       returnTime: "",
-      purposeCategory: "",
+      purposeCategory: "Client Meeting",
       purposeDescription: "",
-      vehicleType: "",
+      vehicleType: "Sedan",
       passengerCount: 1,
       specialRequirements: "",
       acRequired: true,
-      luggage: "",
+      luggage: "Small bag",
+      priority: "Medium",
+      estimatedCost: 0,
     });
   };
 
-  const getStatusColor = (
-    status: TripRequest["status"]
-  ): "secondary" | "default" | "outline" | "destructive" => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const payload = {
+      tripDetails: {
+        fromLocation: { address: formData.fromLocation },
+        toLocation: { address: formData.toLocation },
+        departureDate: formData.departureDate,
+        departureTime: formData.departureTime,
+        returnDate: formData.returnDate || undefined,
+        returnTime: formData.returnTime || undefined,
+        isRoundTrip: !!formData.returnDate && !!formData.returnTime,
+        estimatedDistance: 0, // calculate or leave 0
+        estimatedDuration: 0,
+      },
+      purpose: {
+        category: formData.purposeCategory,
+        description: formData.purposeDescription,
+        projectCode: "",
+        costCenter: "",
+        businessJustification: "",
+      },
+      requirements: {
+        vehicleType: formData.vehicleType,
+        passengerCount: formData.passengerCount,
+        specialRequirements: formData.specialRequirements,
+        acRequired: formData.acRequired,
+        luggage: formData.luggage,
+      },
+      priority: formData.priority,
+      estimatedCost: formData.estimatedCost,
+      approvalRequired: true,
+    };
+
+    const url = editingTrip ? `/trip-requests/${editingTrip.id}` : "/api/trip-requests";
+    const method = editingTrip ? "PUT" : "POST";
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to save request");
+      }
+
+      toast.success(editingTrip ? "Request updated!" : "Trip request submitted!");
+      setIsNewRequestOpen(false);
+      resetForm();
+      fetchTrips(); // refresh list
+    } catch (err) {
+      setError((err as Error).message);
+      toast.error("Something went wrong");
+    }
+  };
+
+  const handleEdit = (trip: TripRequest & { approval?: TripApproval }) => {
+    setEditingTrip(trip);
+    setFormData({
+      fromLocation: trip.tripDetails.fromLocation.address,
+      toLocation: trip.tripDetails.toLocation.address,
+      departureDate: trip.tripDetails.departureDate,
+      departureTime: trip.tripDetails.departureTime,
+      returnDate: trip.tripDetails.returnDate || "",
+      returnTime: trip.tripDetails.returnTime || "",
+      purposeCategory: trip.purpose.category,
+      purposeDescription: trip.purpose.description,
+      vehicleType: trip.requirements.vehicleType,
+      passengerCount: trip.requirements.passengerCount,
+      specialRequirements: trip.requirements.specialRequirements || "",
+      acRequired: trip.requirements.acRequired,
+      luggage: trip.requirements.luggage,
+      priority: trip.priority,
+      estimatedCost: trip.estimatedCost,
+    });
+    setIsNewRequestOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this trip request?")) return;
+
+    try {
+      const res = await fetch(`/trip-requests/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!res.ok) throw new Error("Delete failed");
+
+      toast.success("Request deleted");
+      fetchTrips();
+    } catch (err) {
+      toast.error("Failed to delete request");
+    }
+  };
+
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case "Approved":
-        return "default";
-      case "Completed":
-        return "secondary";
-      case "Pending":
-        return "destructive";
-      case "Rejected":
-        return "outline";
-      default:
-        return "secondary";
+      case "Approved": return "default";
+      case "Completed": return "secondary";
+      case "Pending": return "destructive";
+      case "Rejected": return "outline";
+      default: return "secondary";
     }
   };
 
@@ -690,6 +269,7 @@ export default function EmployeeTripRequests({
 
   return (
     <div className="space-y-6 p-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">
@@ -701,275 +281,29 @@ export default function EmployeeTripRequests({
               : "Request new trips and track existing ones"}
           </p>
         </div>
-        <Dialog open={isNewRequestOpen} onOpenChange={setIsNewRequestOpen}>
-          <DialogTrigger asChild>
-            <Button
-              className="flex items-center gap-2"
-              aria-label="New trip request"
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              New Trip Request
-            </Button>
-          </DialogTrigger>
-
-          <DialogContent className="max-w-2xl w-full sm:w-[600px] p-6">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-semibold text-foreground">
-                Request New Trip
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground">
-                Fill in the details for your trip request. It will be sent to
-                your manager for approval.
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-              {/* Location Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col ">
-                  <Label htmlFor="fromLocation">From Location</Label>
-                  <Input
-                    id="fromLocation"
-                    value={formData.fromLocation}
-                    onChange={(e) =>
-                      handleInputChange("fromLocation", e.target.value)
-                    }
-                    placeholder="Enter pickup location"
-                    required
-                    className="w-full max-w-[280px] break-words whitespace-normal"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <Label htmlFor="toLocation">Destination</Label>
-                  <Input
-                    id="toLocation"
-                    value={formData.toLocation}
-                    onChange={(e) =>
-                      handleInputChange("toLocation", e.target.value)
-                    }
-                    placeholder="Enter destination"
-                    required
-                    className="w-full max-w-[280px]"
-                  />
-                </div>
-              </div>
-
-              {/* Date & Time */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col">
-                  <Label htmlFor="departureDate">Travel Date</Label>
-                  <Input
-                    id="departureDate"
-                    type="date"
-                    value={formData.departureDate}
-                    onChange={(e) =>
-                      handleInputChange("departureDate", e.target.value)
-                    }
-                    required
-                    className="w-full max-w-[280px]"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <Label htmlFor="departureTime">Departure Time</Label>
-                  <Input
-                    id="departureTime"
-                    type="time"
-                    value={formData.departureTime}
-                    onChange={(e) =>
-                      handleInputChange("departureTime", e.target.value)
-                    }
-                    required
-                    className="w-full max-w-[280px]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col">
-                  <Label htmlFor="returnDate">Return Date</Label>
-                  <Input
-                    id="returnDate"
-                    type="date"
-                    value={formData.returnDate}
-                    onChange={(e) =>
-                      handleInputChange("returnDate", e.target.value)
-                    }
-                    className="w-full max-w-[280px]"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <Label htmlFor="returnTime">Return Time</Label>
-                  <Input
-                    id="returnTime"
-                    type="time"
-                    value={formData.returnTime}
-                    onChange={(e) =>
-                      handleInputChange("returnTime", e.target.value)
-                    }
-                    className="w-full max-w-[280px]"
-                  />
-                </div>
-              </div>
-
-              {/* Purpose */}
-              <div className="flex flex-col">
-                <Label htmlFor="purposeCategory">Purpose</Label>
-                <Select
-                  onValueChange={(value) =>
-                    handleInputChange("purposeCategory", value)
-                  }
-                  value={formData.purposeCategory}
-                >
-                  <SelectTrigger className="w-full max-w-[280px]">
-                    <SelectValue placeholder="Select purpose" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Client Meeting">
-                      Client Meeting
-                    </SelectItem>
-                    <SelectItem value="Business Travel">
-                      Business Travel
-                    </SelectItem>
-                    <SelectItem value="Training">Training</SelectItem>
-                    <SelectItem value="Conference">Conference</SelectItem>
-                    <SelectItem value="Site Visit">Site Visit</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col">
-                <Label htmlFor="purposeDescription">Purpose Description</Label>
-                <Textarea
-                  id="purposeDescription"
-                  value={formData.purposeDescription}
-                  onChange={(e) =>
-                    handleInputChange("purposeDescription", e.target.value)
-                  }
-                  placeholder="Describe the purpose of the trip"
-                  required
-                  className="w-full max-w-[560px]"
-                />
-              </div>
-
-              {/* Vehicle & Passengers */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col">
-                  <Label htmlFor="vehicleType">Vehicle Type</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      handleInputChange("vehicleType", value)
-                    }
-                    value={formData.vehicleType}
-                  >
-                    <SelectTrigger className="w-full max-w-[280px]">
-                      <SelectValue placeholder="Select vehicle type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Sedan">Sedan</SelectItem>
-                      <SelectItem value="SUV">SUV</SelectItem>
-                      <SelectItem value="Van">Van</SelectItem>
-                      <SelectItem value="Luxury">Luxury</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col">
-                  <Label htmlFor="passengerCount">Passenger Count</Label>
-                  <Input
-                    id="passengerCount"
-                    type="number"
-                    value={formData.passengerCount}
-                    onChange={(e) =>
-                      handleInputChange(
-                        "passengerCount",
-                        parseInt(e.target.value)
-                      )
-                    }
-                    min="1"
-                    required
-                    className="w-full max-w-[280px]"
-                  />
-                </div>
-              </div>
-
-              {/* Special Requirements */}
-              <div className="flex flex-col">
-                <Label htmlFor="specialRequirements">
-                  Special Requirements
-                </Label>
-                <Textarea
-                  id="specialRequirements"
-                  value={formData.specialRequirements}
-                  onChange={(e) =>
-                    handleInputChange("specialRequirements", e.target.value)
-                  }
-                  placeholder="Any special requirements (e.g., extra luggage space)"
-                  className="w-full max-w-[560px]"
-                />
-              </div>
-
-              {/* AC Checkbox */}
-              <div className="flex items-center space-x-2">
-                <Input
-                  id="acRequired"
-                  type="checkbox"
-                  checked={formData.acRequired}
-                  onChange={(e) =>
-                    handleInputChange("acRequired", e.target.checked)
-                  }
-                />
-                <Label htmlFor="acRequired">AC Required</Label>
-              </div>
-
-              {/* Luggage */}
-              <div className="flex flex-col">
-                <Label htmlFor="luggage">Luggage Details</Label>
-                <Input
-                  id="luggage"
-                  value={formData.luggage}
-                  onChange={(e) => handleInputChange("luggage", e.target.value)}
-                  placeholder="Describe luggage (e.g., small bag, large suitcase)"
-                  className="w-full max-w-[560px]"
-                />
-              </div>
-
-              {/* Dialog Footer */}
-              <DialogFooter className="mt-4 flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsNewRequestOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit">Submit Request</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => { resetForm(); setIsNewRequestOpen(true); }}>
+          <Plus className="h-4 w-4 mr-2" /> New Trip Request
+        </Button>
       </div>
 
+      {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-4 items-center">
-            <div className="flex-1">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="flex-1 w-full sm:w-auto">
               <div className="relative">
-                <Search
-                  className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"
-                  aria-hidden="true"
-                />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search trips..."
+                  placeholder="Search by destination, purpose..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                  aria-label="Search trip requests"
+                  className="pl-10"
                 />
               </div>
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40" aria-label="Filter by status">
-                <SelectValue />
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
@@ -983,112 +317,137 @@ export default function EmployeeTripRequests({
         </CardContent>
       </Card>
 
+      {/* List */}
       <Card>
         <CardHeader>
-          <CardTitle>Trip Requests</CardTitle>
-          <CardDescription>{filteredTrips.length} trips found</CardDescription>
+          <CardTitle>Your Requests</CardTitle>
+          <CardDescription>
+            {loading ? "Loading..." : `${trips.length} trips found`}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Request Number</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead>Date & Time</TableHead>
-                <TableHead>Purpose</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Approver</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTrips.map((trip) => {
-                const latestApproval =
-                  trip.approval?.approvalHistory?.[
-                    trip.approval.approvalHistory.length - 1
-                  ];
-                return (
-                  <TableRow key={trip.id}>
-                    <TableCell className="font-medium">
-                      {trip.requestNumber}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">
-                          {trip.tripDetails.toLocation.address}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          From: {trip.tripDetails.fromLocation.address}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" aria-hidden="true" />
-                          {trip.tripDetails.departureDate}
-                        </div>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Clock className="h-3 w-3" aria-hidden="true" />
-                          {trip.tripDetails.departureTime}{" "}
-                          {trip.tripDetails.returnTime &&
-                            `- ${trip.tripDetails.returnTime}`}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{trip.purpose.category}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={getStatusColor(trip.status)}
-                        aria-label={`Trip status: ${trip.status}`}
-                      >
-                        {trip.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {latestApproval && latestApproval.action !== "Pending"
-                        ? `${latestApproval.approver.name} (${latestApproval.action})`
-                        : "Pending"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => viewTrip(trip)}
-                          aria-label={`View trip ${trip.requestNumber}`}
-                        >
-                          <Eye className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                        {trip.status === "Pending" && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              aria-label={`Edit trip ${trip.requestNumber}`}
-                            >
-                              <Edit className="h-4 w-4" aria-hidden="true" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              aria-label={`Delete trip ${trip.requestNumber}`}
-                            >
-                              <Trash2 className="h-4 w-4" aria-hidden="true" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : error ? (
+            <p className="text-center text-destructive">{error}</p>
+          ) : trips.length === 0 ? (
+            <p className="text-center text-muted-foreground py-12">
+              No trip requests yet. Create one to get started!
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Request #</TableHead>
+                    <TableHead>Destination</TableHead>
+                    <TableHead>Date & Time</TableHead>
+                    <TableHead>Purpose</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Approver</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {trips.map((trip) => {
+                    const latest = trip.approval?.approvalHistory?.[trip.approval.approvalHistory.length - 1];
+                    return (
+                      <TableRow key={trip.id}>
+                        <TableCell className="font-medium">{trip.requestNumber}</TableCell>
+                        <TableCell>{trip.tripDetails.toLocation.address}</TableCell>
+                        <TableCell>
+                          {trip.tripDetails.departureDate} at {trip.tripDetails.departureTime}
+                        </TableCell>
+                        <TableCell>{trip.purpose.category}</TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusColor(trip.status)}>{trip.status}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {latest && latest.action !== "Pending"
+                            ? `${latest.approver.name} (${latest.action})`
+                            : "Pending"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => viewTrip(trip)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {trip.status === "Pending" && (
+                              <>
+                                <Button variant="ghost" size="icon" onClick={() => handleEdit(trip)}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive"
+                                  onClick={() => handleDelete(trip.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+      {/* Create/Edit Dialog */}
+      <Dialog open={isNewRequestOpen} onOpenChange={setIsNewRequestOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingTrip ? "Edit Trip Request" : "New Trip Request"}</DialogTitle>
+            <DialogDescription>
+              {editingTrip
+                ? "Update your trip details. Changes are only allowed while Pending."
+                : "Fill in the details. Your request will be sent for approval."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* ... keep your existing form fields ... */}
+            {/* Example: add priority select if you want */}
+            <div>
+              <Label>Priority</Label>
+              <Select
+                value={formData.priority}
+                onValueChange={(v) => handleInputChange("priority", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Low">Low</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* ... rest of form (estimatedCost input, etc.) ... */}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsNewRequestOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">{editingTrip ? "Update" : "Submit"} Request</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Details Dialog – keep your existing one */}
+      {/* ... */}      <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
