@@ -2,127 +2,156 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// --- HELPER: Transform DB Flat -> Frontend Nested ---
-const mapDbToFrontend = (dbRecord: any) => {
-  const user = dbRecord.users_trip_requests_requested_by_user_idTousers;
-  const departmentRelation = user?.departments_users_department_idTodepartments;
-
-  return {
-    id: dbRecord.id,
-    requestNumber: dbRecord.request_number,
-    status: dbRecord.status,
-    priority: dbRecord.priority,
-    estimatedCost: Number(dbRecord.estimated_cost),
-    createdAt: dbRecord.created_at,
-    updatedAt: dbRecord.updated_at,
-    approvalRequired: dbRecord.approval_required,
-
-    requestedBy: {
-      id: dbRecord.requested_by_user_id,
-      name: user ? `${user.first_name} ${user.last_name}` : "Unknown", 
-      email: user?.email || "",
-      department: departmentRelation?.name || "Unassigned", 
-      employeeId: user?.employee_id || "",
-    },
-
-    tripDetails: {
-      fromLocation: {
-        address: dbRecord.from_location_address,
-        coordinates: dbRecord.from_location_latitude ? {
-          lat: Number(dbRecord.from_location_latitude),
-          lng: Number(dbRecord.from_location_longitude)
-        } : undefined,
-      },
-      toLocation: {
-        address: dbRecord.to_location_address,
-        coordinates: dbRecord.to_location_latitude ? {
-          lat: Number(dbRecord.to_location_latitude),
-          lng: Number(dbRecord.to_location_longitude)
-        } : undefined,
-      },
-      departureDate: dbRecord.departure_date.toISOString().split('T')[0],
-      departureTime: dbRecord.departure_time.toTimeString().substring(0, 5),
-      returnDate: dbRecord.return_date ? dbRecord.return_date.toISOString().split('T')[0] : null,
-      returnTime: dbRecord.return_time ? dbRecord.return_time.toTimeString().substring(0, 5) : null,
-      isRoundTrip: dbRecord.is_round_trip,
-      estimatedDistance: dbRecord.estimated_distance ? Number(dbRecord.estimated_distance) : 0,
-      estimatedDuration: dbRecord.estimated_duration || 0,
-    },
-
-    purpose: {
-      category: dbRecord.purpose_category,
-      description: dbRecord.purpose_description,
-      projectCode: dbRecord.project_code,
-      costCenter: dbRecord.cost_center,
-      businessJustification: dbRecord.business_justification,
-    },
-
-    requirements: {
-      vehicleType: dbRecord.vehicle_type_required,
-      passengerCount: dbRecord.passenger_count || 1,
-      luggage: dbRecord.luggage_type,
-      acRequired: dbRecord.ac_required,
-      specialRequirements: dbRecord.special_instructions,
-    },
-
-    passengers: [], 
-    approvalWorkflow: [],
-    attachments: [],
-  };
+const getFullName = (user: any) => {
+  if (!user) return "Unknown";
+  const first = user.first_name || "";
+  const last = user.last_name || "";
+  return `${first} ${last}`.trim() || user.employee_id || "Unknown";
 };
 
-// --- HELPER: Transform Frontend Nested -> DB Flat ---
-// This matches the structure sent by Frontend's 'mapFormToPayload'
-const mapInputToDb = (input: any) => {
+// Helper to map DB result to Frontend Interface
+const mapDbToFrontend = (request: any) => {
+  // 1. Determine Approver info from trip_approvals
+  const approvals = request.trip_approvals || [];
+  let latestApproval = approvals.find((a: any) => a.status !== "Pending");
+  if (!latestApproval && approvals.length > 0) {
+    latestApproval = approvals[0]; // Fallback to first step
+  }
+
+  // 2. Construct the 'approval' object required by Frontend
+  const approvalData = latestApproval ? {
+    id: latestApproval.id,
+    tripRequestId: request.id,
+    requestNumber: request.request_number,
+    
+    // Workflow mapping
+    approvalWorkflow: approvals.map((a: any) => ({
+      level: a.approval_level,
+      approverName: a.users ? getFullName(a.users) : "Pending",
+      approverRole: a.approver_role || "Approver",
+    })),
+    
+    currentApprovalLevel: latestApproval.approval_level,
+    
+    approvalHistory: approvals.map((a: any) => ({
+      level: a.approval_level,
+      approver: {
+        id: a.users?.id,
+        name: a.users ? getFullName(a.users) : "System",
+        email: a.users?.email || "N/A",
+        role: a.approver_role || "Approver",
+      },
+      action: a.status, // "Pending", "Approved", "Rejected"
+      comments: a.comments,
+      timestamp: a.approved_at || a.created_at,
+      ipAddress: "192.168.1.1", // Or from DB if available
+    })),
+    
+    finalStatus: (latestApproval.status === "Approved" || latestApproval.status === "Rejected") 
+      ? latestApproval.status 
+      : "Pending",
+    
+    autoApproval: false,
+    approvalRules: {
+      costThreshold: 50000,
+      departmentApprovalRequired: true,
+      managerApprovalRequired: true,
+      financeApprovalRequired: false,
+    },
+    createdAt: request.created_at,
+    updatedAt: request.updated_at,
+  } : null;
+
   return {
-    request_number: input.requestNumber, 
-    requested_by_user_id: input.requestedBy.id,
+    id: request.id,
+    requestNumber: request.request_number,
+    requestedBy: {
+      id: request.users_trip_requests_requested_by_user_idTousers?.id,
+      name: getFullName(request.users_trip_requests_requested_by_user_idTousers),
+      email: request.users_trip_requests_requested_by_user_idTousers?.email,
+      department: request.users_trip_requests_requested_by_user_idTousers?.departments_users_department_idTodepartments?.name,
+      employeeId: request.users_trip_requests_requested_by_user_idTousers?.employee_id,
+      phoneNumber: request.users_trip_requests_requested_by_user_idTousers?.phone || "N/A",
+      designation: "N/A", // Map if available in user schema
+      managerName: "N/A", // Map if available in user schema
+      costCenter: request.cost_center,
+    },
+    tripDetails: {
+      fromLocation: {
+        address: request.from_location_address,
+        coordinates: request.from_location_latitude 
+          ? { lat: Number(request.from_location_latitude), lng: Number(request.from_location_longitude) }
+          : undefined,
+        landmark: request.from_location_landmark,
+      },
+      toLocation: {
+        address: request.to_location_address,
+        coordinates: request.to_location_latitude 
+          ? { lat: Number(request.to_location_latitude), lng: Number(request.to_location_longitude) }
+          : undefined,
+        landmark: request.to_location_landmark,
+      },
+      departureDate: request.departure_date,
+      departureTime: request.departure_time ? request.departure_time.toTimeString().substring(0,5) : "",
+      returnDate: request.return_date,
+      returnTime: request.return_time ? request.return_time.toTimeString().substring(0,5) : "",
+      isRoundTrip: request.is_round_trip || false,
+      estimatedDistance: Number(request.estimated_distance) || 0,
+      estimatedDuration: request.estimated_duration || 0,
+    },
+    purpose: {
+      category: request.purpose_category || "General",
+      description: request.purpose_description,
+      projectCode: request.project_code,
+      costCenter: request.cost_center,
+      businessJustification: request.business_justification,
+    },
+    requirements: {
+      vehicleType: request.vehicle_type_required || "Any",
+      passengerCount: request.passenger_count || 1,
+      specialRequirements: request.luggage_requirements,
+      acRequired: request.ac_required !== undefined ? request.ac_required : true,
+      luggage: request.luggage_type || "Small bag",
+    },
+    priority: request.priority || "Medium",
+    status: request.status || "Pending",
+    createdAt: request.created_at,
+    updatedAt: request.updated_at,
+    approvalRequired: request.approval_required !== undefined ? request.approval_required : true,
+    estimatedCost: Number(request.estimated_cost) || 0,
+    currency: request.currency || "INR",
     
-    // Locations
-    // Frontend uses input.tripDetails.fromLocation.coordinates.lat
-    from_location_address: input.tripDetails.fromLocation.address,
-    from_location_latitude: input.tripDetails.fromLocation.coordinates?.lat || null,
-    from_location_longitude: input.tripDetails.fromLocation.coordinates?.lng || null,
-    
-    to_location_address: input.tripDetails.toLocation.address,
-    to_location_latitude: input.tripDetails.toLocation.coordinates?.lat || null,
-    to_location_longitude: input.tripDetails.toLocation.coordinates?.lng || null,
-    
-    // Dates & Times
-    departure_date: new Date(input.tripDetails.departureDate),
-    departure_time: new Date(`1970-01-01T${input.tripDetails.departureTime}:00Z`),
-    
-    return_date: input.tripDetails.returnDate ? new Date(input.tripDetails.returnDate) : null,
-    return_time: input.tripDetails.returnTime ? new Date(`1970-01-01T${input.tripDetails.returnTime}:00Z`) : null,
-    
-    is_round_trip: input.tripDetails.isRoundTrip,
-    estimated_distance: input.tripDetails.estimatedDistance || 0,
-    estimated_duration: input.tripDetails.estimatedDuration || 0,
+    // Passengers (Simplified for frontend - mapping from trip_passengers if needed)
+    passengers: [], 
 
-    // Purpose
-    purpose_category: input.purpose.category,
-    purpose_description: input.purpose.description,
-    project_code: input.purpose.projectCode,
-    cost_center: input.purpose.costCenter,
-    business_justification: input.purpose.businessJustification,
+    // Approval Object (Populated from relation)
+    approval: approvalData,
 
-    // Requirements
-    vehicle_type_required: input.requirements.vehicleType,
-    passenger_count: input.requirements.passengerCount,
-    luggage_type: input.requirements.luggage,
-    ac_required: input.requirements.acRequired,
-    special_instructions: input.requirements.specialRequirements,
-
-    // Meta
-    priority: input.priority,
-    status: input.status,
-    estimated_cost: input.estimatedCost,
-    approval_required: input.approvalRequired,
+    // Mocking other fields expected by interface if not in DB
+    costBreakdown: {
+      baseFare: 0,
+      distanceCharges: 0,
+      timeCharges: 0,
+      additionalCharges: 0,
+      taxAmount: 0
+    },
+    billing: {
+      billingType: "Corporate",
+      costCenter: "CC001",
+      projectCode: "PRJ001",
+      budgetCode: "BC001",
+      billToDepartment: "Sales",
+      approverName: "Manager"
+    },
+    attachments: [],
+    auditTrail: []
   };
 };
 
 export const getAllTripRequests = async (filters: any) => {
   const { searchTerm, status, department, priority, page, pageSize } = filters;
+  
+  // FIX: Explicitly initialize variables to avoid TS2321/TS18004
   const skip = (parseInt(page) - 1) * parseInt(pageSize);
   const take = parseInt(pageSize);
   const where: any = {};
@@ -133,23 +162,19 @@ export const getAllTripRequests = async (filters: any) => {
       { from_location_address: { contains: searchTerm, mode: "insensitive" } },
       { to_location_address: { contains: searchTerm, mode: "insensitive" } },
       { users_trip_requests_requested_by_user_idTousers: { 
-          OR: [
-             { first_name: { contains: searchTerm, mode: "insensitive" } },
-             { last_name: { contains: searchTerm, mode: "insensitive" } }
-          ]
-        } 
-      }
+        OR: [
+          { first_name: { contains: searchTerm, mode: "insensitive" } }, 
+          { last_name: { contains: searchTerm, mode: "insensitive" } }
+        ] 
+      }}
     ];
   }
 
   if (status && status !== "all-status") where.status = status;
   if (priority && priority !== "all-priorities") where.priority = priority;
-  
   if (department && department !== "all-departments") {
-    where.users_trip_requests_requested_by_user_idTousers = {
-      departments_users_department_idTodepartments: {
-        name: department
-      }
+    where.users_trip_requests_requested_by_user_idTousers = { 
+      departments_users_department_idTodepartments: { name: department } 
     };
   }
 
@@ -161,30 +186,21 @@ export const getAllTripRequests = async (filters: any) => {
       orderBy: { created_at: "desc" },
       include: {
         users_trip_requests_requested_by_user_idTousers: {
-          select: {
-            id: true,
-            first_name: true,
-            last_name: true,
-            email: true,
-            employee_id: true,
-            departments_users_department_idTodepartments: {
-              select: { name: true }
-            }
-          }
+          select: { id: true, first_name: true, last_name: true, email: true, employee_id: true, departments_users_department_idTodepartments: { select: { name: true } }, phone: true },
+        },
+        // FIX: Corrected relation name to 'trip_approvals'
+        trip_approvals: {
+          include: { users: { select: { first_name: true, last_name: true } } },
+          orderBy: { approval_level: 'asc' }
         }
-      }
+      },
     }),
-    prisma.trip_requests.count({ where })
+    prisma.trip_requests.count({ where }),
   ]);
 
   return {
     data: requests.map(mapDbToFrontend),
-    meta: {
-      total: totalCount,
-      page: parseInt(page),
-      pageSize: parseInt(pageSize),
-      totalPages: Math.ceil(totalCount / parseInt(pageSize))
-    }
+    meta: { total: totalCount, page: parseInt(page), pageSize: parseInt(pageSize), totalPages: Math.ceil(totalCount / parseInt(pageSize)) },
   };
 };
 
@@ -192,85 +208,60 @@ export const getTripRequestById = async (id: string) => {
   const request = await prisma.trip_requests.findUnique({
     where: { id },
     include: {
-      users_trip_requests_requested_by_user_idTousers: {
-        select: {
-          id: true,
-          first_name: true,
-          last_name: true,
-          email: true,
-          employee_id: true,
-          departments_users_department_idTodepartments: {
-            select: { name: true }
-          }
-        }
+      users_trip_requests_requested_by_user_idTousers: { 
+        select: { id: true, first_name: true, last_name: true, email: true, employee_id: true, departments_users_department_idTodepartments: { select: { name: true } }, phone: true },
       },
-      trip_passengers: true,
-      trip_approvals: true
-    }
+      // FIX: Corrected relation name
+      trip_approvals: {
+        include: { users: { select: { first_name: true, last_name: true } } },
+        orderBy: { approval_level: 'asc' }
+      }
+    },
   });
 
   if (!request) throw new Error("Trip Request not found");
   return mapDbToFrontend(request);
 };
 
-export const createTripRequest = async (input: any) => {
-  if (!input.requestNumber) {
-    const timestamp = Date.now().toString().slice(-6);
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    input.requestNumber = `REQ-${timestamp}-${random}`;
-  }
-
-  const data = mapInputToDb(input);
+export const createTripRequest = async (data: any) => {
+  const { requestedByUserId, ...rest } = data; // requestedByUserId injected by controller
   
   const newRequest = await prisma.trip_requests.create({
-    data,
+    data: {
+      ...rest,
+      requested_by_user_id: requestedByUserId,
+      status: "Pending",
+      created_at: new Date(),
+    },
     include: {
-      users_trip_requests_requested_by_user_idTousers: {
-        select: {
-          id: true,
-          first_name: true,
-          last_name: true,
-          email: true,
-          employee_id: true,
-          departments_users_department_idTodepartments: {
-            select: { name: true }
-          }
-        }
-      }
-    }
+      users_trip_requests_requested_by_user_idTousers: { select: { first_name: true, last_name: true, email: true } },
+      trip_approvals: { include: { users: { select: { first_name: true, last_name: true } } } }
+    },
   });
 
   return mapDbToFrontend(newRequest);
 };
 
-export const updateTripRequest = async (id: string, input: any) => {
-  const data = mapInputToDb(input);
-
+export const updateTripRequest = async (id: string, data: any) => {
   const updatedRequest = await prisma.trip_requests.update({
     where: { id },
     data,
     include: {
-      users_trip_requests_requested_by_user_idTousers: {
-        select: {
-          id: true,
-          first_name: true,
-          last_name: true,
-          email: true,
-          employee_id: true,
-          departments_users_department_idTodepartments: {
-            select: { name: true }
-          }
+      users_trip_requests_requested_by_user_idTousers: { select: { first_name: true, last_name: true, email: true } },
+      // FIX: Corrected relation name
+      trip_approvals: { include: 
+        { users: 
+          { select: 
+            { first_name: true, last_name: true } 
+          } 
         }
-      }
-    }
+      },
+  },
   });
-
   return mapDbToFrontend(updatedRequest);
 };
 
 export const deleteTripRequest = async (id: string) => {
-  await prisma.trip_requests.delete({
-    where: { id }
-  });
+  await prisma.trip_requests.delete({ where: { id } });
   return { success: true };
 };
