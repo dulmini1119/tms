@@ -1,28 +1,24 @@
 "use client";
-import React, { useState } from "react";
+
+import React, { useEffect, useState, useCallback } from "react";
 import {
-  FileText,
-  Navigation,
-  Download,
-  Search,
   MoreHorizontal,
   Eye,
+  Search,
   MapPin,
-  Clock,
-  AlertTriangle,
-  Car,
-  User,
-  Route,
-  Star,
+  Users,
   Activity,
-  Timer,
   CheckCircle,
+  Route,
+  Clock,
+  Download,
+  ChevronLast,
+  ChevronFirst,
+  ChevronLeft,
+  ChevronRight,
+  Navigation,
 } from "lucide-react";
-import { TripAssignment, TripLog, TripRequest } from "@/types/trip-interfaces";
-import { mockTripData } from "@/data/mock-trip-data";
-import { VariantProps } from "class-variance-authority";
-import { Badge, badgeVariants } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+// import { TripLog } from "@/types/trip-interfaces"; // Assuming you have this, else defined below
 import {
   Card,
   CardContent,
@@ -46,12 +42,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -62,94 +60,225 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
+// ── TYPES (Strict) ────────────────────────────────────────────────────────
+
+// Interface matching the JSON structure returned by your Backend API
+interface TripLogDb {
+  id: string;
+  trip_number: string;
+  trip_status: string;
+  trip_date: string;
+  from_location: string | null;
+  to_location: string | null;
+  actual_distance: number | null;
+  total_duration: number | null;
+  passenger_name: string | null;
+  driver_name: string | null;
+  vehicle_registration: string | null;
+  created_at: string;
+  total_cost: number | null;
+  // Relations
+  trip_requests: {
+    id: string;
+    purpose: string; // Assuming 'purpose' is a string in DB, adjust if object
+  } | null;
+  trip_assignments: {
+    id: string;
+    driver: { name: string } | null;
+    vehicle: { registration_no: string; make: string; model: string } | null;
+  } | null;
+}
+
+// Interface matching the API Response wrapper
+interface ApiResponse {
+  data: TripLogDb[];
+  meta: {
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
+}
+
+// Interface for the Stats calculated in frontend
+interface LogStats {
+  notStarted: number;
+  inProgress: number;
+  completed: number;
+  totalDistance: number;
+}
+
+// ── MAIN COMPONENT ───────────────────────────────────────────────────────
+
 export default function TripLogs() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [selectedLog, setSelectedLog] = useState<TripLog | null>(null);
-  const [selectedRequest, setSelectedRequest] = useState<TripRequest | null>(
-    null
-  );
-  const [selectedAssignment, setSelectedAssignment] =
-    useState<TripAssignment | null>(null);
+  const [tripLogs, setTripLogs] = useState<TripLogDb[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalDocs, setTotalDocs] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
-  // Get trip logs and related data
-  const tripLogs = mockTripData.logs;
-  const tripRequests = mockTripData.requests;
-  const tripAssignments = mockTripData.assignments;
+  // Filters
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  // Create maps for quick lookup
-  const requestMap = new Map(tripRequests.map((req) => [req.id, req]));
-  const assignmentMap = new Map(
-    tripAssignments.map((assign) => [assign.id, assign])
-  );
+  // Modals
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<TripLogDb | null>(null);
 
-  const filteredLogs = tripLogs.filter((log) => {
-    const request = requestMap.get(log.tripRequestId);
-    const assignment = assignmentMap.get(log.tripAssignmentId);
-    if (!request || !assignment) return false;
-
-    return (
-      (log.requestNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        assignment.assignedDriver.name
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        assignment.assignedVehicle.registrationNo
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        request.requestedBy.name
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase())) &&
-      (statusFilter === "all" ||
-        log.tripStatus.toLowerCase().replace(" ", "-") === statusFilter)
-    );
+  // Stats State
+  const [stats, setStats] = useState<LogStats>({
+    notStarted: 0,
+    inProgress: 0,
+    completed: 0,
+    totalDistance: 0,
   });
 
-  // Calculate stats
-  const stats = {
-    notStarted: tripLogs.filter((l) => l.tripStatus === "Not Started").length,
-    inProgress: tripLogs.filter((l) =>
-      [
-        "Started",
-        "In Transit",
-        "Arrived",
-        "Waiting",
-        "Return Journey",
-      ].includes(l.tripStatus)
-    ).length,
-    completed: tripLogs.filter((l) => l.tripStatus === "Completed").length,
-    totalDistance: tripLogs.reduce(
-      (sum, log) => sum + (log.actualRoute.totalDistance || 0),
-      0
-    ),
+  // ── EFFECTS ──────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, statusFilter]);
+
+  const getAuthHeaders = useCallback((): Record<string, string> => {
+    const token = localStorage.getItem("authToken");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return headers;
+  }, []);
+
+  // Fetch Trip Logs
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const query = new URLSearchParams({
+        page: currentPage.toString(),
+        pageSize: pageSize.toString(),
+      });
+      if (debouncedSearch) query.set("searchTerm", debouncedSearch);
+      if (statusFilter !== "all") query.set("status", statusFilter);
+
+      // URL matching your previous backend setup
+      const res = await fetch(`/trip-logs?${query}`, {
+        headers: getAuthHeaders(),
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch trip logs");
+      
+      const data: ApiResponse = await res.json();
+
+      setTripLogs(data.data || []);
+      setTotalDocs(data.meta?.total || 0);
+      setTotalPages(data.meta?.totalPages || 1);
+
+      // Calculate Stats
+      const notStarted = data.data.filter((l) => l.trip_status === "Not Started").length;
+      const inProgress = data.data.filter((l) =>
+        ["Started", "In Transit", "Arrived", "Waiting", "Return Journey"].includes(l.trip_status)
+      ).length;
+      const completed = data.data.filter((l) => l.trip_status === "Completed").length;
+      const totalDistance = data.data.reduce(
+        (sum, log) => sum + (log.actual_distance || 0),
+        0
+      );
+
+      setStats({ notStarted, inProgress, completed, totalDistance });
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load trip logs");
+      setTripLogs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    currentPage,
+    pageSize,
+    debouncedSearch,
+    statusFilter,
+    getAuthHeaders,
+  ]);
+
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+
+  // ── HELPERS ──────────────────────────────────────────────────────────────
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
-  // Handlers for actions and buttons
-  const handleExportLogs = () => {
-    const exportPromise = new Promise((resolve) => {
+  const formatDuration = (minutes: number | null | undefined) => {
+    if (!minutes) return "N/A";
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
+  };
+
+  const getStatusBadgeVariant = (
+    status: string
+  ): "default" | "destructive" | "outline" | "secondary" => {
+    switch (status) {
+      case "Completed":
+        return "default";
+      case "Cancelled":
+        return "destructive";
+      case "In Transit":
+      case "Arrived":
+        return "secondary";
+      case "Not Started":
+        return "outline";
+      default:
+        return "outline";
+    }
+  };
+
+  // ── HANDLERS ─────────────────────────────────────────────────────────────
+
+  const handleViewDetails = (log: TripLogDb) => {
+    setSelectedLog(log);
+    setIsDetailsDialogOpen(true);
+  };
+
+  const handleTrackLive = (log: TripLogDb) => {
+    toast.info(`Initiating live tracking for ${log.trip_number}`);
+    // Implement routing logic here
+  };
+
+  const handleExportLogs = async () => {
+    const exportPromise = new Promise<void>((resolve, reject) => {
       try {
+        // Note: You might want to fetch ALL logs for export, not just paginated
         const csvContent = [
-          [
-            "Request Number",
-            "Status",
-            "Driver",
-            "Vehicle",
-            "Distance (km)",
-            "Duration",
-          ],
-          ...filteredLogs.map((log) => {
-            const assignment = assignmentMap.get(log.tripAssignmentId);
-            return [
-              log.requestNumber,
-              log.tripStatus,
-              assignment?.assignedDriver.name || "N/A",
-              assignment?.assignedVehicle.registrationNo || "N/A",
-              log.actualRoute.totalDistance || 0,
-              formatDuration(log.actualRoute.totalDuration || 0),
-            ];
-          }),
+          ["Request Number", "Status", "Driver", "Vehicle", "Distance (km)", "Duration"],
+          ...tripLogs.map((log) => [
+            log.trip_number,
+            log.trip_status,
+            log.driver_name || "N/A",
+            log.vehicle_registration || "N/A",
+            log.actual_distance || 0,
+            formatDuration(log.total_duration),
+          ]),
         ]
           .map((row) => row.join(","))
           .join("\n");
@@ -161,186 +290,29 @@ export default function TripLogs() {
         a.download = "trip_logs.csv";
         a.click();
         window.URL.revokeObjectURL(url);
-
-        resolve("Downloaded successfully!");
-      } catch (error) {
-        console.error("Error in handleViewDetails:", error);
-        toast.error("Failed to export logs");
-      }
-    });
-
-    toast.promise(exportPromise, {
-      loading: "Exporting all trip logs...",
-      success: "Trip logs downloaded successfully!",
-      error: "Failed to export trip logs.",
-    });
-  };
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-  };
-
-  const handleStatusFilterChange = (value: string) => {
-    setStatusFilter(value);
-  };
-
-  const handleViewDetails = (log: TripLog) => {
-    const request = requestMap.get(log.tripRequestId);
-    const assignment = assignmentMap.get(log.tripAssignmentId);
-    if (!request || !assignment) {
-      console.error("Request or assignment not found for log:", log.id);
-      return;
-    }
-
-    setSelectedLog(log);
-    setSelectedRequest(request);
-    setSelectedAssignment(assignment);
-    setIsDetailsDialogOpen(true);
-  };
-
-  const handleTrackLive = (log: TripLog) => {
-    // Logic to initiate live tracking for the selected trip
-    console.log("Initiating live tracking for trip:", log.requestNumber);
-    // Example: Redirect to a live tracking page or open a map view
-    // window.location.href = `/live-tracking/${log.gpsTracking.trackingId}`;
-    // Alternatively, open a modal with a map component
-  };
-
-  const handleExportLog = (log: TripLog) => {
-    const exportPromiseLog = new Promise<void>((resolve, reject) => {
-      try {
-        const request = requestMap.get(log.tripRequestId);
-        const assignment = assignmentMap.get(log.tripAssignmentId);
-        if (!request || !assignment) {
-          reject("Missing request or assignment data.");
-          return;
-        }
-
-        const csvContent = [
-          ["Field", "Value"],
-          ["Request Number", log.requestNumber],
-          ["Status", log.tripStatus],
-          ["Driver", assignment.assignedDriver.name],
-          [
-            "Vehicle",
-            `${assignment.assignedVehicle.make} ${assignment.assignedVehicle.model}`,
-          ],
-          ["Distance", `${log.actualRoute.totalDistance || 0} km`],
-          ["Duration", formatDuration(log.actualRoute.totalDuration || 0)],
-          ["Start Location", log.actualRoute.startLocation.address],
-          ["End Location", log.actualRoute.endLocation.address],
-        ]
-          .map((row) => row.join(","))
-          .join("\n");
-
-        const blob = new Blob([csvContent], { type: "text/csv" });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `trip_log_${log.requestNumber}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-
         resolve();
       } catch (error) {
         reject(error);
       }
     });
 
-    toast.promise(exportPromiseLog, {
-      loading: "Exporting trip log...",
-      success: `Trip log ${log.requestNumber} downloaded successfully!`,
-      error: "Failed to export trip log.",
+    toast.promise(exportPromise, {
+      loading: "Exporting logs...",
+      success: "Downloaded successfully!",
+      error: "Failed to export logs",
     });
   };
 
-  const handleGenerateReport = (log: TripLog) => {
-    // Logic to generate a detailed report for the trip
-    console.log("Generating report for trip:", log.requestNumber);
-    // Example: Call an API to generate a PDF report or display a report preview
-    // try {
-    //   const response = await fetch(`/api/reports/trip/${log.id}`);
-    //   const reportUrl = await response.json();
-    //   window.open(reportUrl, '_blank');
-    // } catch (error) {
-    //   console.error('Failed to generate report:', error);
-    // }
+  const handleGenerateReport = (log: TripLogDb) => {
+    toast.info(`Generating report for ${log.trip_number}`);
+    // Implement report generation logic
   };
 
-  const handleCloseDetailsDialog = () => {
-    setIsDetailsDialogOpen(false);
-    setSelectedLog(null);
-    setSelectedRequest(null);
-    setSelectedAssignment(null);
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<
-      string,
-      {
-        variant: VariantProps<typeof badgeVariants>["variant"];
-        icon: React.ReactNode;
-      }
-    > = {
-      "Not Started": {
-        variant: "outline",
-        icon: <Clock className="h-3 w-3" />,
-      },
-      Started: { variant: "default", icon: <Navigation className="h-3 w-3" /> },
-      "In Transit": {
-        variant: "default",
-        icon: <Activity className="h-3 w-3" />,
-      },
-      Arrived: { variant: "secondary", icon: <MapPin className="h-3 w-3" /> },
-      Waiting: { variant: "secondary", icon: <Timer className="h-3 w-3" /> },
-      "Return Journey": {
-        variant: "default",
-        icon: <Route className="h-3 w-3" />,
-      },
-      Completed: {
-        variant: "default",
-        icon: <CheckCircle className="h-3 w-3" />,
-      },
-      Cancelled: {
-        variant: "destructive",
-        icon: <AlertTriangle className="h-3 w-3" />,
-      },
-    };
-    const config = variants[status] || variants["Not Started"];
-    return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
-        {config.icon}
-        {status}
-      </Badge>
-    );
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
-  };
-
-  const totalPages =
-    pageSize > 0 ? Math.ceil(filteredLogs.length / pageSize) : 1;
-  const paginatedDocuments = filteredLogs.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  // ── RENDER ───────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
+      {/* Header + Export Button */}
       <div className="flex items-center justify-between">
         <div className="p-3">
           <h1 className="text-2xl">TRIP LOGS</h1>
@@ -404,7 +376,7 @@ export default function TripLogs() {
         </Card>
       </div>
 
-      {/* Trip Logs Table */}
+      {/* Main Content Card */}
       <Card>
         <CardHeader>
           <CardTitle>Trip Execution Data</CardTitle>
@@ -420,279 +392,193 @@ export default function TripLogs() {
               <Input
                 placeholder="Search trip logs..."
                 value={searchTerm}
-                onChange={handleSearchChange}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-8"
               />
             </div>
-            <Select
-              value={statusFilter}
-              onValueChange={handleStatusFilterChange}
-            >
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="not-started">Not Started</SelectItem>
-                <SelectItem value="started">Started</SelectItem>
-                <SelectItem value="in-transit">In Transit</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="Not Started">Not Started</SelectItem>
+                <SelectItem value="In Transit">In Transit</SelectItem>
+                <SelectItem value="Completed">Completed</SelectItem>
+                <SelectItem value="Cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Trip Logs Table */}
-          <div className="hidden md:block overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Trip Details</TableHead>
-                  <TableHead>Vehicle & Driver</TableHead>
-                  <TableHead>Route & Timing</TableHead>
-                  <TableHead>GPS & Tracking</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedDocuments.map((log) => {
-                  const request = requestMap.get(log.tripRequestId);
-                  const assignment = assignmentMap.get(log.tripAssignmentId);
-                  if (!request || !assignment) return null;
-
-                  return (
-                    <TableRow key={log.id}>
-                      {/* Trip Details */}
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{log.requestNumber}</div>
-                          <div className="text-sm text-muted-foreground mt-1">
-                            {request.purpose.description}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1 flex items-center">
-                            <User className="h-3 w-3 mr-1" />{" "}
-                            {request.requestedBy.name}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Created: {formatDate(log.createdAt)}
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      {/* Vehicle & Driver */}
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium flex items-center">
-                            <Car className="h-3 w-3 mr-1" />
-                            {assignment.assignedVehicle.registrationNo}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {assignment.assignedVehicle.make}{" "}
-                            {assignment.assignedVehicle.model}
-                          </div>
-                          <div className="text-sm flex items-center">
-                            <User className="h-3 w-3 mr-1" />{" "}
-                            {assignment.assignedDriver.name}
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      {/* Route & Timing */}
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="text-sm flex items-start">
-                            <MapPin className="h-3 w-3 mr-1 mt-0.5 text-green-500" />
-                            <span className="text-xs">
-                              {log.actualRoute.startLocation.address}
-                            </span>
-                          </div>
-                          <div className="text-sm flex items-start">
-                            <MapPin className="h-3 w-3 mr-1 mt-0.5 text-red-500" />
-                            <span className="text-xs">
-                              {log.actualRoute.endLocation.address}
-                            </span>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Distance: {log.actualRoute.totalDistance || 0} km
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Duration:{" "}
-                            {formatDuration(log.actualRoute.totalDuration || 0)}
-                          </div>
-                          {log.timing.delays.length > 0 && (
-                            <div className="text-xs text-orange-600">
-                              {log.timing.delays.length} delay(s)
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      {/* GPS & Tracking */}
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="text-sm flex items-center">
-                            <Navigation className="h-3 w-3 mr-1" />
-                            GPS:{" "}
-                            {log.gpsTracking.enabled ? "Active" : "Inactive"}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Speed Alerts: {log.gpsTracking.speedAlerts}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Geo Violations: {log.gpsTracking.geoFenceViolations}
-                          </div>
-                          {log.gpsTracking.currentLocation && (
-                            <Badge variant="secondary" className="text-xs">
-                              Live Tracking
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      {/* Status */}
-                      <TableCell>
-                        {getStatusBadge(log.tripStatus)}
-                        {log.timing.waitingTime > 0 && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Wait: {log.timing.waitingTime} min
-                          </div>
-                        )}
-                      </TableCell>
-
-                      {/* Actions */}
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleViewDetails(log)}
-                            >
-                              <Eye className="h-4 w-4 mr-2" /> View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleTrackLive(log)}
-                            >
-                              <Navigation className="h-4 w-4 mr-2" /> Track Live
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleExportLog(log)}
-                            >
-                              <Download className="h-4 w-4 mr-2" /> Export Log
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleGenerateReport(log)}
-                            >
-                              <FileText className="h-4 w-4 mr-2" /> Generate
-                              Report
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+          {loading ? (
+            <div className="py-12 text-center text-muted-foreground">
+              Loading logs...
+            </div>
+          ) : tripLogs.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              No logs found
+            </div>
+          ) : (
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Trip Details</TableHead>
+                      <TableHead>Vehicle & Driver</TableHead>
+                      <TableHead>Route & Timing</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {tripLogs.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{log.trip_number}</div>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {log.trip_requests?.purpose || "General Trip"}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Passenger: {log.passenger_name || "N/A"}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Created: {formatDate(log.created_at)}
+                            </div>
+                          </div>
+                        </TableCell>
 
-          <div className="md:hidden space-y-4">
-            {paginatedDocuments.map((log) => {
-              const request = requestMap.get(log.tripRequestId);
-              const assignment = assignmentMap.get(log.tripAssignmentId);
-              if (!request || !assignment) return null;
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium">
+                              {log.vehicle_registration || "Unassigned"}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {log.trip_assignments?.vehicle?.make}{" "}
+                              {log.trip_assignments?.vehicle?.model}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {log.driver_name || "Unassigned"}
+                            </div>
+                          </div>
+                        </TableCell>
 
-              return (
-                <div
-                  key={log.id}
-                  className="border rounded-lg p-4 shadow-sm bg-card text-card-foreground"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="font-semibold">{log.requestNumber}</div>
-                    {getStatusBadge(log.tripStatus)}
-                  </div>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="text-sm flex items-start">
+                              <MapPin className="h-3 w-3 mr-1 mt-0.5 text-green-500" />
+                              <span className="text-xs">
+                                {log.from_location || "N/A"}
+                              </span>
+                            </div>
+                            <div className="text-sm flex items-start">
+                              <MapPin className="h-3 w-3 mr-1 mt-0.5 text-red-500" />
+                              <span className="text-xs">
+                                {log.to_location || "N/A"}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Distance: {log.actual_distance || 0} km
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Duration: {formatDuration(log.total_duration)}
+                            </div>
+                          </div>
+                        </TableCell>
 
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <div>{request.purpose.description}</div>
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 mr-1" />{" "}
-                      {request.requestedBy.name}
-                    </div>
+                        <TableCell>
+                          <Badge variant={getStatusBadgeVariant(log.trip_status)}>
+                            {log.trip_status}
+                          </Badge>
+                        </TableCell>
 
-                    <div className="font-medium flex items-center">
-                      <Car className="h-4 w-4 mr-1" />{" "}
-                      {assignment.assignedVehicle.registrationNo}
-                    </div>
-                    <div>
-                      {assignment.assignedVehicle.make}{" "}
-                      {assignment.assignedVehicle.model}
-                    </div>
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 mr-1" />{" "}
-                      {assignment.assignedDriver.name}
-                    </div>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewDetails(log)}>
+                                <Eye className="h-4 w-4 mr-2" /> View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleTrackLive(log)}>
+                                <Navigation className="h-4 w-4 mr-2" /> Track Live
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleGenerateReport(log)}>
+                                <Activity className="h-4 w-4 mr-2" /> Generate Report
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
-                    <div className="text-xs text-muted-foreground">
-                      Route: {log.actualRoute.startLocation.address} →{" "}
-                      {log.actualRoute.endLocation.address}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Distance: {log.actualRoute.totalDistance || 0} km,
-                      Duration:{" "}
-                      {formatDuration(log.actualRoute.totalDuration || 0)}
-                    </div>
-                    {log.timing.delays.length > 0 && (
-                      <div className="text-xs text-orange-600">
-                        {log.timing.delays.length} delay(s)
-                      </div>
-                    )}
-
-                    <div className="flex items-center">
-                      <Navigation className="h-4 w-4 mr-1" /> GPS:{" "}
-                      {log.gpsTracking.enabled ? "Active" : "Inactive"}
-                    </div>
-                    {log.gpsTracking.currentLocation && (
-                      <Badge variant="secondary" className="text-xs">
-                        Live Tracking
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {tripLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="border rounded-lg p-4 shadow-sm bg-card text-card-foreground"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="font-semibold">{log.trip_number}</div>
+                      <Badge variant={getStatusBadgeVariant(log.trip_status)}>
+                        {log.trip_status}
                       </Badge>
-                    )}
-                  </div>
+                    </div>
 
-                  <div className="flex justify-end mt-3">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleViewDetails(log)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" /> View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleTrackLive(log)}>
-                          <Navigation className="h-4 w-4 mr-2" /> Track Live
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleExportLog(log)}>
-                          <Download className="h-4 w-4 mr-2" /> Export Log
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleGenerateReport(log)}
-                        >
-                          <FileText className="h-4 w-4 mr-2" /> Generate Report
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="space-y-1 text-sm text-muted-foreground">
+                      <div>{log.trip_requests?.purpose || "General Trip"}</div>
+                      <div>Passenger: {log.passenger_name || "N/A"}</div>
+                      <div className="font-medium">
+                        {log.vehicle_registration || "Unassigned"}
+                      </div>
+                      <div>
+                        {log.trip_assignments?.vehicle?.make}{" "}
+                        {log.trip_assignments?.vehicle?.model}
+                      </div>
+                      <div className="flex items-center">
+                        <MapPin className="h-4 w-4 mr-1" />
+                        {log.from_location} → {log.to_location}
+                      </div>
+                      <div>
+                        Dist: {log.actual_distance} km, Dur:{" "}
+                        {formatDuration(log.total_duration)}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end mt-3">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewDetails(log)}>
+                            <Eye className="h-4 w-4 mr-2" /> View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleTrackLive(log)}>
+                            <Navigation className="h-4 w-4 mr-2" /> Track Live
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleGenerateReport(log)}>
+                            <Activity className="h-4 w-4 mr-2" /> Generate Report
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
@@ -717,7 +603,7 @@ export default function TripLogs() {
                 </SelectContent>
               </Select>
               <span className="text-muted-foreground">
-                of {filteredLogs.length} documents
+                of {totalDocs} documents
               </span>
             </div>
 
@@ -733,7 +619,7 @@ export default function TripLogs() {
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
                 >
-                  First
+                  <ChevronFirst className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
@@ -741,38 +627,20 @@ export default function TripLogs() {
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                 >
-                  Prev
+                  <ChevronLeft className="h-4 w-4" />
                 </Button>
 
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let num;
-                  if (totalPages <= 5) num = i + 1;
-                  else if (currentPage <= 3) num = i + 1;
-                  else if (currentPage >= totalPages - 2)
-                    num = totalPages - 4 + i;
-                  else num = currentPage - 2 + i;
-                  return num;
-                }).map((num) => (
-                  <Button
-                    key={num}
-                    variant={currentPage === num ? "default" : "outline"}
-                    size="icon"
-                    onClick={() => setCurrentPage(num)}
-                    className="w-9 h-9"
-                  >
-                    {num}
-                  </Button>
-                ))}
+                <Button variant="outline" size="icon" disabled>
+                  {currentPage}
+                </Button>
 
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
-                  }
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
                 >
-                  Next
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
@@ -780,7 +648,7 @@ export default function TripLogs() {
                   onClick={() => setCurrentPage(totalPages)}
                   disabled={currentPage === totalPages}
                 >
-                  Last
+                  <ChevronLast className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -796,351 +664,76 @@ export default function TripLogs() {
               Trip Log Details
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              {selectedRequest && selectedLog && (
-                <>
-                  Detailed trip execution data for{" "}
-                  <span className="font-medium">
-                    {selectedLog.requestNumber}
-                  </span>
-                </>
+              {selectedLog && (
+                <>Detailed trip execution data for {selectedLog.trip_number}</>
               )}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            {selectedLog && selectedRequest && selectedAssignment && (
+            {selectedLog && (
               <>
-                {/* Section Wrapper */}
-                <div className="space-y-5">
-                  {/* Trip Overview */}
-                  <div className="rounded-lg border border-border bg-muted/30 p-4 shadow-sm">
-                    <h4 className="font-semibold text-foreground mb-3">
-                      Trip Overview
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Status:
-                        </span>{" "}
-                        {selectedLog.tripStatus}
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Distance:
-                        </span>{" "}
-                        {selectedLog.actualRoute.totalDistance || 0} km
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Duration:
-                        </span>{" "}
-                        {formatDuration(
-                          selectedLog.actualRoute.totalDuration || 0
-                        )}
-                      </div>
+                {/* Trip Overview */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 shadow-sm">
+                  <h4 className="font-semibold text-foreground mb-3">
+                    Trip Overview
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <span className="font-medium text-muted-foreground">
+                        Status:
+                      </span>{" "}
+                      {selectedLog.trip_status}
+                    </div>
+                    <div>
+                      <span className="font-medium text-muted-foreground">
+                        Distance:
+                      </span>{" "}
+                      {selectedLog.actual_distance || 0} km
+                    </div>
+                    <div>
+                      <span className="font-medium text-muted-foreground">
+                        Duration:
+                      </span>{" "}
+                      {formatDuration(selectedLog.total_duration)}
                     </div>
                   </div>
+                </div>
 
-                  {/* Timing Information */}
-                  <div className="rounded-lg border border-border bg-muted/30 p-4 shadow-sm">
-                    <h4 className="font-semibold mb-3 text-foreground">
-                      Timing Information
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Scheduled Start:
-                        </span>{" "}
-                        {formatDate(selectedLog.timing.scheduledStart)}
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Actual Start:
-                        </span>{" "}
-                        {formatDate(selectedLog.timing.actualStart || "")}
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Scheduled End:
-                        </span>{" "}
-                        {formatDate(selectedLog.timing.scheduledEnd)}
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Actual End:
-                        </span>{" "}
-                        {formatDate(selectedLog.timing.actualEnd || "")}
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Waiting Time:
-                        </span>{" "}
-                        {selectedLog.timing.waitingTime} mins
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Delays:
-                        </span>{" "}
-                        {selectedLog.timing.delays.length}
-                      </div>
+                {/* Route Details */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 shadow-sm">
+                  <h4 className="font-semibold mb-3 text-foreground">
+                    Route Details
+                  </h4>
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <span className="font-medium text-muted-foreground">
+                        Start:
+                      </span>{" "}
+                      {selectedLog.from_location}
+                    </div>
+                    <div>
+                      <span className="font-medium text-muted-foreground">
+                        End:
+                      </span>{" "}
+                      {selectedLog.to_location}
                     </div>
                   </div>
+                </div>
 
-                  {/* Route Details */}
-                  <div className="rounded-lg border border-border bg-muted/30 p-4 shadow-sm">
-                    <h4 className="font-semibold mb-3 text-foreground">
-                      Route Details
-                    </h4>
-                    <div className="space-y-3 text-sm">
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Start:
-                        </span>{" "}
-                        {selectedLog.actualRoute.startLocation.address}
-                        <div className="text-xs text-muted-foreground">
-                          Started at:{" "}
-                          {formatDate(
-                            selectedLog.actualRoute.startLocation.timestamp
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          End:
-                        </span>{" "}
-                        {selectedLog.actualRoute.endLocation.address}
-                        {selectedLog.actualRoute.endLocation.timestamp && (
-                          <div className="text-xs text-muted-foreground">
-                            Arrived at:{" "}
-                            {formatDate(
-                              selectedLog.actualRoute.endLocation.timestamp
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Waypoints:
-                        </span>{" "}
-                        {selectedLog.actualRoute.waypoints.length} stops
-                      </div>
+                {/* Cost Information */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 shadow-sm">
+                  <h4 className="font-semibold mb-3 text-foreground">
+                    Cost Information
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                     <div>
+                      <span className="font-medium text-muted-foreground">
+                        Total Cost:
+                      </span>{" "}
+                      Rs. {selectedLog.total_cost?.toLocaleString() || "0"}
                     </div>
                   </div>
-
-                  {/* GPS Tracking */}
-                  <div className="rounded-lg border border-border bg-muted/30 p-4 shadow-sm">
-                    <h4 className="font-semibold mb-3 text-foreground">
-                      GPS Tracking
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Tracking ID:
-                        </span>{" "}
-                        {selectedLog.gpsTracking.trackingId}
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Status:
-                        </span>{" "}
-                        {selectedLog.gpsTracking.enabled
-                          ? "Active"
-                          : "Inactive"}
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Last Ping:
-                        </span>{" "}
-                        {formatDate(selectedLog.gpsTracking.lastPing)}
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Speed Alerts:
-                        </span>{" "}
-                        {selectedLog.gpsTracking.speedAlerts}
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Geo Violations:
-                        </span>{" "}
-                        {selectedLog.gpsTracking.geoFenceViolations}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Fuel Consumption */}
-                  <div className="rounded-lg border border-border bg-muted/30 p-4 shadow-sm">
-                    <h4 className="font-semibold mb-3 text-foreground">
-                      Fuel Consumption
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Start Reading:
-                        </span>{" "}
-                        {selectedLog.fuelConsumption.startReading} km
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          End Reading:
-                        </span>{" "}
-                        {selectedLog.fuelConsumption.endReading || "N/A"} km
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Fuel Used:
-                        </span>{" "}
-                        {selectedLog.fuelConsumption.fuelUsed || 0} L
-                      </div>
-                      <div>
-                        <span className="font-medium text-muted-foreground">
-                          Fuel Cost/L:
-                        </span>{" "}
-                        ₹{selectedLog.fuelConsumption.fuelCostPerLiter}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Incidents */}
-                  {selectedLog.incidents.length > 0 && (
-                    <div className="rounded-lg border border-border bg-destructive/5 p-4 shadow-sm">
-                      <h4 className="font-semibold mb-3 text-destructive">
-                        Incidents
-                      </h4>
-                      {selectedLog.incidents.map((incident, index) => (
-                        <div
-                          key={index}
-                          className="border rounded-lg p-3 space-y-1 bg-background/50"
-                        >
-                          <div className="flex items-center justify-between">
-                            <Badge variant="destructive">{incident.type}</Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDate(incident.timestamp)}
-                            </span>
-                          </div>
-                          <div className="text-sm">{incident.description}</div>
-                          <div className="text-xs text-muted-foreground">
-                            Location: {incident.location.address}
-                          </div>
-                          <div className="text-xs">
-                            Severity: {incident.severity} • Resolved:{" "}
-                            {incident.resolved ? "Yes" : "No"}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Passenger Feedback */}
-                  {selectedLog.passengerFeedback && (
-                    <div className="rounded-lg border border-border bg-muted/30 p-4 shadow-sm">
-                      <h4 className="font-semibold mb-3 text-foreground">
-                        Passenger Feedback
-                      </h4>
-                      <div className="border rounded-lg p-3 space-y-2 bg-background/50">
-                        <div className="flex items-center space-x-2">
-                          <Star className="h-4 w-4 text-yellow-500" />
-                          <span className="font-medium">
-                            {selectedLog.passengerFeedback.rating}/5
-                          </span>
-                          <span className="text-sm text-muted-foreground">
-                            {formatDate(
-                              selectedLog.passengerFeedback.timestamp
-                            )}
-                          </span>
-                        </div>
-                        <div className="text-sm">
-                          {selectedLog.passengerFeedback.comments}
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
-                          <div>
-                            Driver Behavior:{" "}
-                            {
-                              selectedLog.passengerFeedback.categories
-                                .driverBehavior
-                            }
-                            /5
-                          </div>
-                          <div>
-                            Vehicle Condition:{" "}
-                            {
-                              selectedLog.passengerFeedback.categories
-                                .vehicleCondition
-                            }
-                            /5
-                          </div>
-                          <div>
-                            Punctuality:{" "}
-                            {
-                              selectedLog.passengerFeedback.categories
-                                .punctuality
-                            }
-                            /5
-                          </div>
-                          <div>
-                            Route Optimization:{" "}
-                            {
-                              selectedLog.passengerFeedback.categories
-                                .routeOptimization
-                            }
-                            /5
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Post-Trip Inspection */}
-                  {selectedLog.postTrip.completedAt && (
-                    <div className="rounded-lg border border-border bg-muted/30 p-4 shadow-sm">
-                      <h4 className="font-semibold mb-3 text-foreground">
-                        Post-Trip Inspection
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="font-medium text-muted-foreground">
-                            Vehicle Condition:
-                          </span>{" "}
-                          {selectedLog.postTrip.vehicleCondition}
-                        </div>
-                        <div>
-                          <span className="font-medium text-muted-foreground">
-                            Final Mileage:
-                          </span>{" "}
-                          {selectedLog.postTrip.mileageEnd} km
-                        </div>
-                        <div>
-                          <span className="font-medium text-muted-foreground">
-                            Fuel Level:
-                          </span>{" "}
-                          {selectedLog.postTrip.fuelLevel}%
-                        </div>
-                        <div>
-                          <span className="font-medium text-muted-foreground">
-                            Maintenance Required:
-                          </span>{" "}
-                          {selectedLog.postTrip.maintenanceRequired
-                            ? "Yes"
-                            : "No"}
-                        </div>
-                        <div className="col-span-2">
-                          <span className="font-medium text-muted-foreground">
-                            Completed By:
-                          </span>{" "}
-                          {selectedLog.postTrip.completedBy} on{" "}
-                          {formatDate(selectedLog.postTrip.completedAt)}
-                        </div>
-                      </div>
-                      {selectedLog.postTrip.damageReport && (
-                        <div className="text-sm mt-2">
-                          <span className="font-medium text-muted-foreground">
-                            Damage Report:
-                          </span>{" "}
-                          {selectedLog.postTrip.damageReport}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               </>
             )}
@@ -1148,7 +741,7 @@ export default function TripLogs() {
 
           <DialogFooter className="border-t border-border mt-4 pt-3 bottom-0 bg-background/90 backdrop-blur-md">
             <Button
-              onClick={handleCloseDetailsDialog}
+              onClick={() => setIsDetailsDialogOpen(false)}
               variant="secondary"
               className="w-full sm:w-auto"
             >

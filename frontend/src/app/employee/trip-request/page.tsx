@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Calendar, Plus, Clock, Eye, Edit, Trash2, Search, Loader2 } from "lucide-react";
+import { Plus, Eye, Edit, Trash2, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner"; // ← install if missing: npm install sonner
 import {
   Dialog,
@@ -10,7 +10,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -69,7 +68,8 @@ export default function EmployeeTripRequests({
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedTrip, setSelectedTrip] = useState<(TripRequest & { approval?: TripApproval }) | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-
+  const isEdit = Boolean(editingTrip);
+  const isReadOnly = isEdit && editingTrip?.status !== "Pending";
   // Form state – flattened for simplicity (you can nest later)
   const [formData, setFormData] = useState({
     fromLocation: "",
@@ -98,7 +98,7 @@ export default function EmployeeTripRequests({
       if (searchTerm) params.set("searchTerm", searchTerm);
       if (statusFilter !== "all") params.set("status", statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1));
 
-      const res = await fetch(`/trip-requests?${params.toString()}`, {
+      const res = await fetch(`/api/trip-requests?${params.toString()}`, {
         method: "GET",
         credentials: "include", // ← important: sends cookies (accessToken)
       });
@@ -186,7 +186,7 @@ export default function EmployeeTripRequests({
       approvalRequired: true,
     };
 
-    const url = editingTrip ? `/trip-requests/${editingTrip.id}` : "/api/trip-requests";
+    const url = editingTrip ? `/api/trip-requests/${editingTrip.id}` : "/api/trip-requests";
     const method = editingTrip ? "PUT" : "POST";
 
     try {
@@ -238,7 +238,7 @@ export default function EmployeeTripRequests({
     if (!confirm("Delete this trip request?")) return;
 
     try {
-      const res = await fetch(`/trip-requests/${id}`, {
+      const res = await fetch(`/api/trip-requests/${id}`, {
         method: "DELETE",
         credentials: "include",
       });
@@ -249,6 +249,7 @@ export default function EmployeeTripRequests({
       fetchTrips();
     } catch (err) {
       toast.error("Failed to delete request");
+      console.error(err);
     }
   };
 
@@ -402,52 +403,231 @@ export default function EmployeeTripRequests({
       </Card>
 
       {/* Create/Edit Dialog */}
-      <Dialog open={isNewRequestOpen} onOpenChange={setIsNewRequestOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingTrip ? "Edit Trip Request" : "New Trip Request"}</DialogTitle>
-            <DialogDescription>
-              {editingTrip
-                ? "Update your trip details. Changes are only allowed while Pending."
-                : "Fill in the details. Your request will be sent for approval."}
-            </DialogDescription>
-          </DialogHeader>
+<Dialog open={isNewRequestOpen} onOpenChange={setIsNewRequestOpen}>
+  <DialogContent className="w-11/12 max-w-2xl mx-auto max-h-[88vh] sm:max-h[85vh] overflow-y-auto bg-white dark:bg-black rounded-2xl shadow-lg p-6 sm:p-8">
+    <DialogHeader className="mb-6">
+      <DialogTitle className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+        {editingTrip ? "Edit Trip Request" : "New Trip Request"}
+      </DialogTitle>
+      <DialogDescription className="mt-1 text-gray-500 dark:text-gray-400 text-sm">
+        {editingTrip
+          ? "Update your trip details. Changes are only allowed while Pending."
+          : "Fill in the details. Your request will be sent for approval."}
+      </DialogDescription>
+    </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* ... keep your existing form fields ... */}
-            {/* Example: add priority select if you want */}
-            <div>
-              <Label>Priority</Label>
-              <Select
-                value={formData.priority}
-                onValueChange={(v) => handleInputChange("priority", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Low">Low</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Urgent">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* FROM & TO */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="fromLocation">From Location</Label>
+          <Input
+            id="fromLocation"
+            placeholder="Enter pickup location"
+            value={formData.fromLocation}
+            disabled={isReadOnly}
+            onChange={(e) => handleInputChange("fromLocation", e.target.value)}
+          />
+        </div>
 
-            {/* ... rest of form (estimatedCost input, etc.) ... */}
+        <div>
+          <Label htmlFor="toLocation">Destination</Label>
+          <Input
+            id="toLocation"
+            placeholder="Enter destination"
+            value={formData.toLocation}
+            disabled={isReadOnly}
+            onChange={(e) => handleInputChange("toLocation", e.target.value)}
+          />
+        </div>
+      </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsNewRequestOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">{editingTrip ? "Update" : "Submit"} Request</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* DATE & TIME */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div>
+          <Label htmlFor="departureDate">Departure Date</Label>
+          <Input
+            id="departureDate"
+            type="date"
+            value={formData.departureDate}
+            disabled={isReadOnly}
+            onChange={(e) => handleInputChange("departureDate", e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="departureTime">Departure Time</Label>
+          <Input
+            id="departureTime"
+            type="time"
+            value={formData.departureTime}
+            disabled={isReadOnly}
+            onChange={(e) => handleInputChange("departureTime", e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="returnDate">Return Date</Label>
+          <Input
+            id="returnDate"
+            type="date"
+            value={formData.returnDate}
+            disabled={isReadOnly}
+            onChange={(e) => handleInputChange("returnDate", e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="returnTime">Return Time</Label>
+          <Input
+            id="returnTime"
+            type="time"
+            value={formData.returnTime}
+            disabled={isReadOnly}
+            onChange={(e) => handleInputChange("returnTime", e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* PURPOSE */}
+      <div>
+        <Label htmlFor="purposeCategory">Purpose Category</Label>
+        <Select
+          value={formData.purposeCategory}
+          disabled={isReadOnly}
+          onValueChange={(v) => handleInputChange("purposeCategory", v)}
+        >
+          <SelectTrigger id="purposeCategory">
+            <SelectValue placeholder="Select purpose" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Client Meeting">Client Meeting</SelectItem>
+            <SelectItem value="Office Work">Office Work</SelectItem>
+            <SelectItem value="Training">Training</SelectItem>
+            <SelectItem value="Other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label htmlFor="purposeDescription">Purpose Description</Label>
+        <Textarea
+          id="purposeDescription"
+          placeholder="Explain the reason for travel"
+          value={formData.purposeDescription}
+          disabled={isReadOnly}
+          onChange={(e) => handleInputChange("purposeDescription", e.target.value)}
+        />
+      </div>
+
+      {/* REQUIREMENTS */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <Label htmlFor="vehicleType">Vehicle Type</Label>
+          <Select
+            value={formData.vehicleType}
+            disabled={isReadOnly}
+            onValueChange={(v) => handleInputChange("vehicleType", v)}
+          >
+            <SelectTrigger id="vehicleType">
+              <SelectValue placeholder="Select vehicle" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Any">Any</SelectItem>
+              <SelectItem value="Car">Car</SelectItem>
+              <SelectItem value="Van">Van</SelectItem>
+              <SelectItem value="Bus">Bus</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="passengerCount">Passengers</Label>
+          <Input
+            id="passengerCount"
+            type="number"
+            min={1}
+            value={formData.passengerCount}
+            disabled={isReadOnly}
+            onChange={(e) => handleInputChange("passengerCount", Number(e.target.value))}
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="acRequired">AC Required</Label>
+          <Select
+            value={formData.acRequired ? "yes" : "no"}
+            disabled={isReadOnly}
+            onValueChange={(v) => handleInputChange("acRequired", v === "yes")}
+          >
+            <SelectTrigger id="acRequired">
+              <SelectValue placeholder="AC required?" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="yes">Yes</SelectItem>
+              <SelectItem value="no">No</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* PRIORITY & COST */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="priority">Priority</Label>
+          <Select
+            value={formData.priority}
+            disabled={isReadOnly}
+            onValueChange={(v) => handleInputChange("priority", v)}
+          >
+            <SelectTrigger id="priority">
+              <SelectValue placeholder="Select priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Low">Low</SelectItem>
+              <SelectItem value="Medium">Medium</SelectItem>
+              <SelectItem value="High">High</SelectItem>
+              <SelectItem value="Urgent">Urgent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="estimatedCost">Estimated Cost</Label>
+          <Input
+            id="estimatedCost"
+            type="number"
+            value={formData.estimatedCost}
+            disabled={isReadOnly}
+            onChange={(e) => handleInputChange("estimatedCost", Number(e.target.value))}
+          />
+        </div>
+      </div>
+
+      {/* FOOTER */}
+      <DialogFooter className="pt-6 flex flex-col sm:flex-row sm:justify-end gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setIsNewRequestOpen(false)}
+        >
+          Cancel
+        </Button>
+
+        {!isReadOnly && (
+          <Button type="submit">
+            {isEdit ? "Update Request" : "Submit Request"}
+          </Button>
+        )}
+      </DialogFooter>
+    </form>
+  </DialogContent>
+</Dialog>
+
+
 
       {/* View Details Dialog – keep your existing one */}
-      {/* ... */}      <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+  <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
