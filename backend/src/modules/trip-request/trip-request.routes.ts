@@ -21,6 +21,6 @@ router.put(
   tripController.updateTripRequest
 );
 
-router.delete('/:id', authenticate, tripController.deleteTripRequest);
+router.delete('/:id', authenticate, requireOwnershipOrAdmin, tripController.deleteTripRequest);
 
 export default router;

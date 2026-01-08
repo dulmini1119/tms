@@ -156,6 +156,15 @@ export const getAllTripRequests = async (filters: any) => {
   const take = parseInt(pageSize);
   const where: any = {};
 
+  // if(filters.users?.role === 'EMPLOYEE') {
+  //   where.requested_by_user_id = filters.users.id;
+  // }
+
+  if (!["ADMIN", "SUPERADMIN"].includes(filters.user?.role)) {
+  where.requested_by_user_id = filters.user.id;
+}
+console.log("Loggeed User", filters.user);
+
   if (searchTerm) {
     where.OR = [
       { request_number: { contains: searchTerm, mode: "insensitive" } },
@@ -223,43 +232,154 @@ export const getTripRequestById = async (id: string) => {
   return mapDbToFrontend(request);
 };
 
+
 export const createTripRequest = async (data: any) => {
-  const { requestedByUserId, ...rest } = data; // requestedByUserId injected by controller
-  
+  const { requestedByUserId, tripDetails, purpose, requirements, ...rest } = data;
+
+  // Convert time strings to Date objects (Prisma expects DateTime for @db.Time)
+  const departureTime = tripDetails.departureTime
+    ? new Date(`1970-01-01T${tripDetails.departureTime}:00`)
+    : new Date("1970-01-01T00:00:00");
+
+  const returnTime = tripDetails.returnTime
+    ? new Date(`1970-01-01T${tripDetails.returnTime}:00`)
+    : undefined;
+
   const newRequest = await prisma.trip_requests.create({
     data: {
-      ...rest,
-      requested_by_user_id: requestedByUserId,
-      status: "Pending",
+      // Relation: connect existing user
+      users_trip_requests_requested_by_user_idTousers: {
+        connect: { id: requestedByUserId },
+      },
+
+      status: rest.status || "Pending",
       created_at: new Date(),
+
+      // Trip details
+      from_location_address: tripDetails.fromLocation.address,
+      from_location_latitude: tripDetails.fromLocation.coordinates?.lat,
+      from_location_longitude: tripDetails.fromLocation.coordinates?.lng,
+      from_location_landmark: tripDetails.fromLocation.landmark,
+      to_location_address: tripDetails.toLocation.address,
+      to_location_latitude: tripDetails.toLocation.coordinates?.lat,
+      to_location_longitude: tripDetails.toLocation.coordinates?.lng,
+      to_location_landmark: tripDetails.toLocation.landmark,
+      departure_date: tripDetails.departureDate ? new Date(tripDetails.departureDate) : new Date(),
+      departure_time: departureTime,
+      return_date: tripDetails.returnDate ? new Date(tripDetails.returnDate) : undefined,
+      return_time: returnTime,
+      is_round_trip: false, // removed round trip logic
+      estimated_distance: tripDetails.estimatedDistance || 0,
+      estimated_duration: tripDetails.estimatedDuration || 0,
+
+      // Purpose
+      purpose_category: purpose.category,
+      purpose_description: purpose.description,
+      project_code: purpose.projectCode || "",
+      cost_center: purpose.costCenter || "",
+      business_justification: purpose.businessJustification || "",
+
+      // Requirements
+      vehicle_type_required: requirements.vehicleType || "",
+      passenger_count: requirements.passengerCount || 1,
+      ac_required: requirements.acRequired !== undefined ? requirements.acRequired : true,
+      luggage_type: requirements.luggage || "",
+      luggage_requirements: requirements.specialRequirements || "",
+
+      // Other fields
+      priority: rest.priority || "Medium",
+      estimated_cost: rest.estimatedCost || 0,
+      approval_required: rest.approvalRequired !== undefined ? rest.approvalRequired : true,
+      request_number: rest.requestNumber || `REQ-${Date.now()}`,
     },
     include: {
-      users_trip_requests_requested_by_user_idTousers: { select: { first_name: true, last_name: true, email: true } },
-      trip_approvals: { include: { users: { select: { first_name: true, last_name: true } } } }
+      users_trip_requests_requested_by_user_idTousers: {
+        select: { first_name: true, last_name: true, email: true },
+      },
+      trip_approvals: {
+        include: {
+          users: {
+            select: { first_name: true, last_name: true },
+          },
+        },
+      },
     },
   });
 
-  return mapDbToFrontend(newRequest);
+  return newRequest;
 };
+
+
+
 
 export const updateTripRequest = async (id: string, data: any) => {
+  const { tripDetails, purpose, requirements, ...rest } = data;
+
+  // Convert time strings to Date objects
+  const departureTime = tripDetails?.departureTime
+    ? new Date(`1970-01-01T${tripDetails.departureTime}:00`)
+    : new Date("1970-01-01T00:00:00");
+
+  const returnTime = tripDetails?.returnTime
+    ? new Date(`1970-01-01T${tripDetails.returnTime}:00`)
+    : null;
+
+  const returnDate = tripDetails?.returnDate
+    ? new Date(tripDetails.returnDate)
+    : null;
+
+  const departureDate = tripDetails?.departureDate
+    ? new Date(tripDetails.departureDate)
+    : new Date();
+
   const updatedRequest = await prisma.trip_requests.update({
     where: { id },
-    data,
+    data: {
+      from_location_address: tripDetails?.fromLocation?.address ?? undefined,
+      from_location_latitude: tripDetails?.fromLocation?.coordinates?.lat ?? undefined,
+      from_location_longitude: tripDetails?.fromLocation?.coordinates?.lng ?? undefined,
+      from_location_landmark: tripDetails?.fromLocation?.landmark ?? undefined,
+      to_location_address: tripDetails?.toLocation?.address ?? undefined,
+      to_location_latitude: tripDetails?.toLocation?.coordinates?.lat ?? undefined,
+      to_location_longitude: tripDetails?.toLocation?.coordinates?.lng ?? undefined,
+      to_location_landmark: tripDetails?.toLocation?.landmark ?? undefined,
+      departure_date: departureDate,
+      departure_time: departureTime,
+      return_date: returnDate,
+      return_time: returnTime,
+      is_round_trip: tripDetails?.isRoundTrip ?? false,
+      estimated_distance: tripDetails?.estimatedDistance ?? undefined,
+      estimated_duration: tripDetails?.estimatedDuration ?? undefined,
+
+      purpose_category: purpose?.category ?? undefined,
+      purpose_description: purpose?.description ?? undefined,
+      project_code: purpose?.projectCode ?? undefined,
+      cost_center: purpose?.costCenter ?? undefined,
+      business_justification: purpose?.businessJustification ?? undefined,
+
+      vehicle_type_required: requirements?.vehicleType ?? undefined,
+      passenger_count: requirements?.passengerCount ?? undefined,
+      ac_required: requirements?.acRequired ?? undefined,
+      luggage_type: requirements?.luggage ?? undefined,
+      luggage_requirements: requirements?.specialRequirements ?? undefined,
+
+      priority: rest.priority ?? undefined,
+      estimated_cost: rest.estimatedCost ?? undefined,
+      approval_required: rest.approvalRequired ?? undefined,
+    },
     include: {
-      users_trip_requests_requested_by_user_idTousers: { select: { first_name: true, last_name: true, email: true } },
-      // FIX: Corrected relation name
-      trip_approvals: { include: 
-        { users: 
-          { select: 
-            { first_name: true, last_name: true } 
-          } 
-        }
+      users_trip_requests_requested_by_user_idTousers: {
+        select: { first_name: true, last_name: true, email: true },
       },
-  },
+      trip_approvals: {
+        include: { users: { select: { first_name: true, last_name: true } } },
+      },
+    },
   });
+
   return mapDbToFrontend(updatedRequest);
 };
+
 
 export const deleteTripRequest = async (id: string) => {
   await prisma.trip_requests.delete({ where: { id } });
