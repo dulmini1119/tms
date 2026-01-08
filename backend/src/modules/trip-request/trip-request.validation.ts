@@ -49,7 +49,6 @@ const requirementsSchema = Joi.object({
 // So the Schema matches the Frontend's Input Object (Nested).
 export const createTripRequestSchema = Joi.object({
   requestNumber: Joi.string().optional(),
-  requestedBy: userSchema,
   tripDetails: tripDetailsSchema,
   purpose: purposeSchema,
   requirements: requirementsSchema,
@@ -62,7 +61,6 @@ export const createTripRequestSchema = Joi.object({
 // Update Schema - All fields optional
 export const updateTripRequestSchema = Joi.object({
   requestNumber: Joi.string().optional(),
-  requestedBy: userSchema.optional(),
   tripDetails: tripDetailsSchema.optional(),
   purpose: purposeSchema.optional(),
   requirements: requirementsSchema.optional(),

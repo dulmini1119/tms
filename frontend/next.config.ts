@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: "/trip-logs",
+        destination: "http://localhost:3001/trip-logs",
+      },
+      {
+        source: "/trip-logs/:path*",
+        destination: "http://localhost:3001/trip-logs/:path*",
+      },
+      {
         source: "/trip-assignments",
         destination: "http://localhost:3001/trip-assignments",
       },
