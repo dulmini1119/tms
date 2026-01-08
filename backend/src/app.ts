@@ -23,6 +23,8 @@ import vehicledocumentsRoutes from './modules/vehicle-documents/vehicle-document
 import tripRequestRoutes from './modules/trip-request/trip-request.routes.js';
 import tripApprovalRoutes from './modules/trip-approvals/trip-approvals.routes.js';
 import tripAssignmentRoutes from './modules/trip-assignments/trip-assignments.routes.js';
+import employeeDashboardRoutes from './modules/employee-dashboard/employee-dashboard.routes.js';
+import tripLogRoutes  from './modules/trip-logs/trip-logs.routes.js';
 // ADD THIS LINE — CRITICAL!
 import { authenticate } from './middleware/auth.js';
 
@@ -77,7 +79,8 @@ app.use('/vehicle-documents', authenticate,vehicledocumentsRoutes);
 app.use('/trip-requests', authenticate, tripRequestRoutes);
 app.use('/trip-approvals', authenticate, tripApprovalRoutes)
 app.use('/trip-assignments', authenticate, tripAssignmentRoutes)
-
+app.use('/employee/dashboard', authenticate, employeeDashboardRoutes);
+app.use('/trip-logs', authenticate,  tripLogRoutes); // PROTECTED
 // 404 & Error handlers
 app.use(notFoundHandler);
 app.use(errorHandler);
