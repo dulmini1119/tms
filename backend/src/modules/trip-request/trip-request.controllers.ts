@@ -7,7 +7,7 @@ export const getAllTripRequests = async (req: AuthRequest, res: Response) => {
   try {
     const { searchTerm = "", status = "all-status", department = "all-departments", priority = "all-priorities", page = "1", pageSize = "10" } = req.query;
     
-    const result = await tripService.getAllTripRequests({ searchTerm, status, department, priority, page, pageSize });
+    const result = await tripService.getAllTripRequests({ searchTerm, status, department, priority, page, pageSize, user: req.user });
     res.json(result);
   } catch (error: any) {
     console.error("Controller Error:", error);
