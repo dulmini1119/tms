@@ -756,6 +756,7 @@ model trip_assignments {
   trip_request_id            String        @db.Uuid
   vehicle_id                 String        @db.Uuid
   driver_id                  String        @db.Uuid
+  assignment_notes           String?       @db.Text
   assignment_status          String?       @default("Assigned") @db.VarChar(50)
   assigned_by                String?       @db.Uuid
   assigned_at                DateTime?     @default(now()) @db.Timestamp(6)
