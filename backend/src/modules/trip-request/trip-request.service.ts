@@ -44,7 +44,7 @@ const mapDbToFrontend = (request: any) => {
       action: a.status, // "Pending", "Approved", "Rejected"
       comments: a.comments,
       timestamp: a.approved_at || a.created_at,
-      ipAddress: "192.168.1.1", // Or from DB if available
+      ipAddress: "192.168.1.1", 
     })),
     
     finalStatus: (latestApproval.status === "Approved" || latestApproval.status === "Rejected") 
