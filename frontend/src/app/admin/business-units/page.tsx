@@ -228,10 +228,10 @@ const fetchBusinessUnits = useCallback(async () => {
     return <div className="flex justify-center py-10">Loading...</div>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">BUSINESS UNITS</h1>
+        <div className="p-4">
+          <h1 className="text-2xl">BUSINESS UNITS MANAGEMENT</h1>
           <p className="text-muted-foreground text-sm">
             Manage organizational business units
           </p>

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Calendar,
   FileSpreadsheet,
@@ -17,9 +17,6 @@ import {
   AlertCircle,
   Truck,
 } from "lucide-react";
-import { TripCost } from "@/types/trip-interfaces";
-import { mockTripCosts } from "@/data/mock-trip-data";
-import { VariantProps } from "class-variance-authority";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,23 +58,41 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { VariantProps } from "class-variance-authority";
 
-// Mock request data (assumed structure)
-const mockTripData = {
-  requests: [
-    { id: "req-001", requestedBy: { name: "John Smith" } },
-    { id: "req-002", requestedBy: { name: "Sarah Johnson" } },
-    { id: "req-003", requestedBy: { name: "Alex Brown" } },
-  ],
-};
+// --- INTERFACES ---
 
-// Define cab service names and trips outside the component
-const cabServiceNames = ["City Cabs Ltd", "Swift Transport Co"];
-const tripsWithCabService = mockTripCosts.map((cost, index) => ({
-  ...cost,
-  cabServiceName: cabServiceNames[index % cabServiceNames.length],
-  cabServiceId: `cab-${(index % cabServiceNames.length) + 1}`,
-}));
+// Assuming this matches the backend response structure
+interface TripCost {
+  id: string;
+  tripRequestId: string;
+  requestNumber: string;
+  cabServiceName: string;
+  cabServiceId: string;
+  status: "Draft" | "Pending" | "Paid" | "Overdue";
+  createdAt: string;
+  totalCost: number;
+  costBreakdown: {
+    driverCharges: { total: number };
+    vehicleCosts: { total: number };
+    totalAdditionalCosts: number;
+  };
+  billing: {
+    billToDepartment: string;
+    taxAmount: number;
+  };
+  payment: {
+    status: string;
+    method: string;
+    paidDate: string;
+    invoiceNumber: string;
+  };
+  requestedBy: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
 
 interface CabServiceInvoice {
   cabServiceId: string;
@@ -90,12 +105,9 @@ interface CabServiceInvoice {
   dueDate: string;
   paidDate?: string;
   invoiceNumber?: string;
-  trips: (TripCost & { cabServiceName: string; cabServiceId: string })[];
-  paymentMethod?: string;
-  transactionId?: string;
+  trips: TripCost[];
   generatedDate?: string;
   generatedBy?: string;
-  notes?: string;
 }
 
 interface MonthlyInvoice {
@@ -110,85 +122,84 @@ interface MonthlyInvoice {
 type ViewMode = "by-vendor" | "by-month";
 const validViewModes = ["by-vendor", "by-month"] as const;
 
-// Group trips by cab service and month
-function groupByCabServiceAndMonth(): CabServiceInvoice[] {
-  const grouped = new Map<
-    string,
-    (TripCost & { cabServiceName: string; cabServiceId: string })[]
-  >();
+// --- API HELPERS (Included in this file) ---
 
-  tripsWithCabService.forEach((trip) => {
-    const date = new Date(trip.createdAt);
-    const monthKey = `${date.getFullYear()}-${String(
-      date.getMonth() + 1
-    ).padStart(2, "0")}`;
-    const key = `${trip.cabServiceId}-${monthKey}`;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(trip);
+const API_BASE = "/trip-costs";
+
+// Generic request handler
+async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+    ...options,
   });
 
-  const invoices: CabServiceInvoice[] = [];
-  grouped.forEach((trips, key) => {
-    const [cabServiceId, monthKey] = key.split("-").reduce(
-      (acc, part, i) => {
-        if (i < 2) acc[0] = acc[0] ? `${acc[0]}-${part}` : part;
-        else acc[1] = acc[1] ? `${acc[1]}-${part}` : part;
-        return acc;
-      },
-      ["", ""]
-    );
+  if (!response.ok) {
+    let errorData : {message? : string} = {};
+    try{
+      errorData = await response.json();
+    }catch{}
+    throw new Error(errorData.message || `Error: ${response.statusText}`);
+  }
 
-    const [year, month] = monthKey.split("-");
-    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-    const displayMonth = date.toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
-    });
-    const totalAmount = trips.reduce((sum, trip) => sum + trip.totalCost, 0);
-    const dueDate = new Date(parseInt(year), parseInt(month), 30);
-
-    let status: CabServiceInvoice["status"] = "Draft";
-    const allPaid = trips.every((t) => t.payment.status === "Paid");
-    const anyPaid = trips.some((t) => t.payment.status === "Paid");
-    if (allPaid) status = "Paid";
-    else if (new Date() > dueDate && !allPaid) status = "Overdue";
-    else if (anyPaid || trips.some((t) => t.payment.status === "Invoiced"))
-      status = "Pending";
-
-    const paidDate = trips
-      .filter((t) => t.payment.paidDate)
-      .map((t) => t.payment.paidDate!)
-      .sort()
-      .reverse()[0];
-
-    invoices.push({
-      cabServiceId,
-      cabServiceName: trips[0].cabServiceName,
-      month: monthKey,
-      displayMonth,
-      tripCount: trips.length,
-      totalAmount,
-      status,
-      dueDate: dueDate.toISOString(),
-      paidDate,
-      invoiceNumber:
-        status !== "Draft"
-          ? `INV-${cabServiceId.split("-")[1]}-${monthKey.replace("-", "")}`
-          : undefined,
-      trips,
-      generatedDate: status !== "Draft" ? trips[0]?.createdAt : undefined,
-      generatedBy: status !== "Draft" ? "System" : undefined,
-    });
-  });
-
-  return invoices.sort((a, b) => {
-    const dateCompare = b.month.localeCompare(a.month);
-    if (dateCompare !== 0) return dateCompare;
-    return a.cabServiceName.localeCompare(b.cabServiceName);
-  });
+  return response.json() as Promise<T>;;
 }
 
+const api = {
+  getAll: async (params: Record<string, string | undefined>): Promise<{ data: TripCost[] }> => {
+    const query = new URLSearchParams(
+      Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== undefined)
+      ) as Record<string, string>
+    ).toString();
+
+    return request<{ data: TripCost[] }>(`${API_BASE}?${query}`);
+  },
+generateInvoice: async (id: string, data: { due_date: string; notes?: string; invoice_number?: string }) => {
+    return request<{ success: boolean; invoice?: {
+      id: string;
+      invoiceNumber: string;
+      generatedDate: string;
+      dueDate: string;
+      status: "Pending" | "Paid" | "Overdue" | "Draft";
+      // add other fields you actually return/need
+      totalAmount?: number;
+      cabServiceId?: string;
+      month?: string;
+    } }>( // ← adjust return type if backend known
+      `${API_BASE}/${id}/generate-invoice`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  },
+recordPayment: async (
+    id: string,
+    data: {
+      amount: number;
+      paid_at: string;
+      payment_method: string;
+      transaction_id?: string;
+      notes?: string;
+    }
+  ) => {
+    return request<{ success: boolean }>(
+      `${API_BASE}/${id}/record-payment`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  },
+};
+
+// --- COMPONENT LOGIC ---
+
 export default function TripCosts() {
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("all");
@@ -202,15 +213,108 @@ export default function TripCosts() {
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(
     new Set()
   );
-  const [invoices, setInvoices] = useState<CabServiceInvoice[]>(
-    groupByCabServiceAndMonth()
-  );
 
-  // Create maps for quick lookup
-  const requestMap = new Map(mockTripData.requests.map((req) => [req.id, req]));
+  // State for data
+  const [invoices, setInvoices] = useState<CabServiceInvoice[]>([]);
 
-  // Apply filters
-  const cabServiceInvoices = invoices; // Use state directly
+  // Fetch Data Function
+  const fetchInvoices = async () => {
+    try {
+      setLoading(true);
+      const response = await api.getAll({
+        page: "1",
+        pageSize: "100", // Load enough to group locally
+        status: statusFilter === "all" ? undefined : statusFilter,
+      });
+
+      if (response?.data) {
+        const processed = processCostData(response.data);
+        setInvoices(processed);
+      }
+    } catch (error) {
+      console.error("Error fetching invoices", error);
+      toast.error( "Failed to load invoices");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
+
+  // Process raw API data into Invoice Groups
+  const processCostData = (apiData: TripCost[]): CabServiceInvoice[] => {
+    const grouped = new Map<string, TripCost[]>();
+
+    apiData.forEach((trip) => {
+      const date = new Date(trip.createdAt);
+      const monthKey = `${date.getFullYear()}-${String(
+        date.getMonth() + 1
+      ).padStart(2, "0")}`;
+      const key = `${trip.cabServiceId}-${monthKey}`;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(trip);
+    });
+
+    const processedInvoices: CabServiceInvoice[] = [];
+    grouped.forEach((trips, key) => {
+      const [cabServiceId, monthKey] = key.split("-");
+      const [year, month] = monthKey.split("-");
+      const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const displayMonth = date.toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      });
+      const totalAmount = trips.reduce((sum, t) => sum + t.totalCost, 0);
+      const dueDate = new Date(parseInt(year), parseInt(month), 30);
+
+      let status: CabServiceInvoice["status"] = "Draft";
+      const allPaid = trips.every((t) => t.payment.status === "Paid");
+      const anyPaid = trips.some((t) => t.payment.status === "Paid");
+      if (allPaid) status = "Paid";
+      else if (new Date() > dueDate && !allPaid) status = "Overdue";
+      else if (anyPaid || trips.some((t) => t.payment.status === "Invoiced"))
+        status = "Pending";
+
+      const paidDate = trips
+        .filter((t) => t.payment.paidDate)
+        .map((t) => t.payment.paidDate)
+        .sort()
+        .reverse()[0];
+
+      processedInvoices.push({
+        cabServiceId,
+        cabServiceName: trips[0].cabServiceName,
+        month: monthKey,
+        displayMonth,
+        tripCount: trips.length,
+        totalAmount,
+        status,
+        dueDate: dueDate.toISOString(),
+        paidDate,
+        invoiceNumber:
+          status !== "Draft"
+            ? `INV-${cabServiceId.split("-")[1] || "GEN"}-${monthKey.replace(
+                "-",
+                ""
+              )}`
+            : undefined,
+        trips,
+        generatedDate: status !== "Draft" ? trips[0]?.createdAt : undefined,
+        generatedBy: status !== "Draft" ? "System" : undefined,
+      });
+    });
+
+    return processedInvoices.sort((a, b) => {
+      const dateCompare = b.month.localeCompare(a.month);
+      if (dateCompare !== 0) return dateCompare;
+      return a.cabServiceName.localeCompare(b.cabServiceName);
+    });
+  };
+
+  // Filtering logic
+  const cabServiceInvoices = invoices;
   const monthlyInvoices = groupByMonth();
 
   const filteredCabServiceInvoices = cabServiceInvoices.filter((invoice) => {
@@ -249,7 +353,6 @@ export default function TripCosts() {
     return matchesSearch && matchesMonth && cabServices.length > 0;
   });
 
-  // Calculate stats
   const stats = {
     totalOutstanding: cabServiceInvoices
       .filter((inv) => inv.status !== "Paid")
@@ -282,13 +385,12 @@ export default function TripCosts() {
       try {
         let csvContent: string;
 
-        // Type-safe CSV escape function (no `any`)
         const escapeCSV = (
           value: string | number | boolean | null | undefined
         ): string => {
           if (value == null) return '""';
-          const stringValue = String(value).replace(/"/g, '""'); // escape internal quotes
-          return `"${stringValue}"`; // wrap with quotes
+          const stringValue = String(value).replace(/"/g, '""');
+          return `"${stringValue}"`;
         };
 
         if (viewMode === "by-vendor") {
@@ -337,7 +439,6 @@ export default function TripCosts() {
             .join("\n");
         }
 
-        // Create CSV blob and download
         const blob = new Blob([csvContent], {
           type: "text/csv;charset=utf-8;",
         });
@@ -363,24 +464,23 @@ export default function TripCosts() {
     });
   };
 
-  const handleGenerateInvoices = () => {
-    const exportPromise = new Promise<void>((resolve, reject) => {
+  const handleGenerateInvoices = async () => {
+    const exportPromise = new Promise<void>(async (resolve, reject) => {
       try {
-        setInvoices((prev) =>
-          prev.map((invoice) => {
-            if (invoice.status !== "Draft") return invoice;
-            const invoiceNumber = `INV-${
-              invoice.cabServiceId.split("-")[1]
-            }-${invoice.month.replace("-", "")}`;
-            return {
-              ...invoice,
-              status: "Pending" as const,
-              invoiceNumber,
-              generatedDate: new Date().toISOString(),
-              generatedBy: "System",
-            };
-          })
-        );
+        const drafts = invoices.filter((inv) => inv.status === "Draft");
+        
+        // Generate for all drafts sequentially
+        for (const inv of drafts) {
+           if(inv.trips.length > 0) {
+             // Assuming we use the first trip's ID to trigger generation for the group
+             await api.generateInvoice(inv.trips[0].id, {
+               due_date: inv.dueDate,
+             });
+           }
+        }
+
+        // Refresh Data
+        await fetchInvoices();
         resolve();
       } catch (error) {
         reject(error);
@@ -394,38 +494,26 @@ export default function TripCosts() {
     });
   };
 
-  const handleConfirmGenerateInvoice = (
+  const handleConfirmGenerateInvoice = async (
     invoiceNumber: string,
     dueDate: string,
     notes: string
   ) => {
-    const exportPromise = new Promise<void>((resolve, reject) => {
+    if (!selectedInvoice || selectedInvoice.trips.length === 0) return;
+
+    const exportPromise = new Promise<void>(async (resolve, reject) => {
       try {
-        if (!selectedInvoice) {
-          reject("No invoice selected");
-          return;
-        }
-        setInvoices((prev) =>
-          prev.map((inv) => {
-            if (
-              inv.cabServiceId === selectedInvoice.cabServiceId &&
-              inv.month === selectedInvoice.month
-            ) {
-              return {
-                ...inv,
-                status: "Pending" as const,
-                invoiceNumber,
-                generatedDate: new Date().toISOString(),
-                generatedBy: "System",
-                dueDate,
-                notes,
-              };
-            }
-            return inv;
-          })
-        );
+        await api.generateInvoice(selectedInvoice.trips[0].id, {
+          due_date: dueDate,
+          notes: notes,
+          invoice_number: invoiceNumber,
+        });
+
         setIsGenerateInvoiceOpen(false);
         setSelectedInvoice(null);
+        
+        // Refresh Data
+        await fetchInvoices();
         resolve();
       } catch (error) {
         reject(error);
@@ -479,12 +567,11 @@ export default function TripCosts() {
           ["", "Trip Details"],
           ["Trip Number", "Date", "Requester", "Department", "Amount"],
           ...invoice.trips.map((trip) => {
-            const request = requestMap.get(trip.tripRequestId);
             return [
               trip.requestNumber,
               formatDate(trip.createdAt),
-              request?.requestedBy.name || "N/A",
-              trip.billing.billToDepartment,
+              trip.requestedBy?.name || "N/A",
+              trip.billing?.billToDepartment || "N/A",
               formatCurrency(trip.totalCost),
             ];
           }),
@@ -538,12 +625,11 @@ export default function TripCosts() {
             "Total Amount",
           ],
           ...invoice.trips.map((trip) => {
-            const request = requestMap.get(trip.tripRequestId);
             return [
               trip.requestNumber,
               formatDate(trip.createdAt),
-              request?.requestedBy.name || "N/A",
-              trip.billing.billToDepartment,
+              trip.requestedBy?.name || "N/A",
+              trip.billing?.billToDepartment || "N/A",
               formatCurrency(trip.costBreakdown.driverCharges.total),
               formatCurrency(trip.costBreakdown.vehicleCosts.total),
               formatCurrency(trip.costBreakdown.totalAdditionalCosts),
@@ -590,39 +676,30 @@ export default function TripCosts() {
     setIsPaymentDialogOpen(true);
   };
 
-  const handleConfirmMarkAsPaid = (
+  const handleConfirmMarkAsPaid = async (
     amount: number,
     paymentDate: string,
     paymentMethod: string,
     transactionId: string,
     notes: string
   ) => {
-    const exportPromise = new Promise<void>((resolve, reject) => {
+    if (!selectedInvoice || selectedInvoice.trips.length === 0) return;
+
+    const exportPromise = new Promise<void>(async (resolve, reject) => {
       try {
-        if (!selectedInvoice) {
-          reject("No invoice selected");
-          return;
-        }
-        setInvoices((prev) =>
-          prev.map((inv) => {
-            if (
-              inv.cabServiceId === selectedInvoice.cabServiceId &&
-              inv.month === selectedInvoice.month
-            ) {
-              return {
-                ...inv,
-                status: "Paid" as const,
-                paidDate: paymentDate,
-                paymentMethod,
-                transactionId,
-                notes,
-              };
-            }
-            return inv;
-          })
-        );
+        await api.recordPayment(selectedInvoice.trips[0].id, {
+          amount,
+          paid_at: paymentDate,
+          payment_method: paymentMethod,
+          transaction_id: transactionId,
+          notes,
+        });
+
         setIsPaymentDialogOpen(false);
         setSelectedInvoice(null);
+
+        // Refresh Data
+        await fetchInvoices();
         resolve();
       } catch (error) {
         reject(error);
@@ -650,7 +727,7 @@ export default function TripCosts() {
     const variants: Record<
       CabServiceInvoice["status"],
       {
-        variant: VariantProps<typeof badgeVariants>["variant"];
+        variant: VariantProps<typeof badgeVariants>["variant"]; // VariantProps<typeof badgeVariants>["variant"];
         icon: React.ReactNode;
         className?: string;
       }
@@ -734,7 +811,7 @@ export default function TripCosts() {
       monthlyMap.get(invoice.month)!.push(invoice);
     });
 
-    const monthlyInvoices: MonthlyInvoice[] = [];
+    const monthlyInvoicesList: MonthlyInvoice[] = [];
     monthlyMap.forEach((cabServices, monthKey) => {
       const [year, month] = monthKey.split("-");
       const date = new Date(parseInt(year), parseInt(month) - 1, 1);
@@ -743,7 +820,7 @@ export default function TripCosts() {
         year: "numeric",
       });
 
-      monthlyInvoices.push({
+      monthlyInvoicesList.push({
         id: monthKey,
         month: monthKey,
         displayMonth,
@@ -753,8 +830,12 @@ export default function TripCosts() {
       });
     });
 
-    return monthlyInvoices.sort((a, b) => b.month.localeCompare(a.month));
+    return monthlyInvoicesList.sort((a, b) => b.month.localeCompare(a.month));
   }
+
+  // --- RENDER ---
+
+  if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
     <div className="space-y-4">
@@ -1056,9 +1137,7 @@ export default function TripCosts() {
                               </TableHeader>
                               <TableBody>
                                 {invoice.trips.map((trip) => {
-                                  const request = requestMap.get(
-                                    trip.tripRequestId
-                                  );
+                                  // Using requestedBy directly from trip object
                                   return (
                                     <TableRow key={trip.id}>
                                       <TableCell className="font-medium">
@@ -1068,10 +1147,10 @@ export default function TripCosts() {
                                         {formatDate(trip.createdAt)}
                                       </TableCell>
                                       <TableCell>
-                                        {request?.requestedBy.name || "N/A"}
+                                        {trip.requestedBy?.name || "N/A"}
                                       </TableCell>
                                       <TableCell>
-                                        {trip.billing.billToDepartment}
+                                        {trip.billing?.billToDepartment || "N/A"}
                                       </TableCell>
                                       <TableCell className="text-right">
                                         {formatCurrency(trip.totalCost)}
@@ -1085,7 +1164,6 @@ export default function TripCosts() {
                         )}
                       </div>
 
-                      {/* Card for small screens */}
                       {/* Card for small screens */}
                       <div className="sm:hidden space-y-2">
                         <div className="flex flex-col gap-2 border rounded-md p-3">
@@ -1182,9 +1260,7 @@ export default function TripCosts() {
                                       Download Invoice
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                      onClick={() =>
-                                        handleExportDetails(invoice)
-                                      }
+                                      onClick={() => handleExportDetails(invoice)}
                                     >
                                       <FileSpreadsheet className="h-4 w-4 mr-2" />{" "}
                                       Export Details
@@ -1198,9 +1274,6 @@ export default function TripCosts() {
                           {isExpanded && (
                             <div className="mt-2 space-y-1">
                               {invoice.trips.map((trip) => {
-                                const request = requestMap.get(
-                                  trip.tripRequestId
-                                );
                                 return (
                                   <div
                                     key={trip.id}
@@ -1220,13 +1293,13 @@ export default function TripCosts() {
                                       <span className="font-medium">
                                         Requester:
                                       </span>{" "}
-                                      {request?.requestedBy.name || "N/A"}
+                                      {trip.requestedBy?.name || "N/A"}
                                     </div>
                                     <div>
                                       <span className="font-medium">
                                         Department:
                                       </span>{" "}
-                                      {trip.billing.billToDepartment}
+                                      {trip.billing?.billToDepartment || "N/A"}
                                     </div>
                                     <div>
                                       <span className="font-medium">
@@ -1395,7 +1468,6 @@ export default function TripCosts() {
                     </TableHeader>
                     <TableBody>
                       {selectedInvoice.trips.map((trip) => {
-                        const request = requestMap.get(trip.tripRequestId);
                         return (
                           <TableRow key={trip.id}>
                             <TableCell className="font-medium">
@@ -1403,10 +1475,10 @@ export default function TripCosts() {
                             </TableCell>
                             <TableCell>{formatDate(trip.createdAt)}</TableCell>
                             <TableCell>
-                              {request?.requestedBy.name || "N/A"}
+                              {trip.requestedBy?.name || "N/A"}
                             </TableCell>
                             <TableCell>
-                              {trip.billing.billToDepartment}
+                              {trip.billing?.billToDepartment || "N/A"}
                             </TableCell>
                             <TableCell className="text-right font-medium">
                               {formatCurrency(trip.totalCost)}
@@ -1421,7 +1493,6 @@ export default function TripCosts() {
                 {/* Mobile Card View */}
                 <div className="sm:hidden space-y-2">
                   {selectedInvoice.trips.map((trip) => {
-                    const request = requestMap.get(trip.tripRequestId);
                     return (
                       <div
                         key={trip.id}
@@ -1437,11 +1508,11 @@ export default function TripCosts() {
                         </div>
                         <div>
                           <span className="font-medium">Requester:</span>{" "}
-                          {request?.requestedBy.name || "N/A"}
+                          {trip.requestedBy?.name || "N/A"}
                         </div>
                         <div>
                           <span className="font-medium">Department:</span>{" "}
-                          {trip.billing.billToDepartment}
+                          {trip.billing?.billToDepartment || "N/A"}
                         </div>
                         <div>
                           <span className="font-medium">Amount:</span>{" "}
