@@ -26,6 +26,7 @@ import tripAssignmentRoutes from './modules/trip-assignments/trip-assignments.ro
 import employeeDashboardRoutes from './modules/employee-dashboard/employee-dashboard.routes.js';
 import tripLogRoutes  from './modules/trip-logs/trip-logs.routes.js';
 import tripCostRoutes  from './modules/trip-costs/trip-costs.routes.js';
+import invoiceRoutes from './modules/invoice/invoice.routes.js';
 // ADD THIS LINE — CRITICAL!
 import { authenticate } from './middleware/auth.js';
 
@@ -73,7 +74,7 @@ app.use('/roles', authenticate, rolesRoutes);                    // PROTECTED
 app.use('/permissions', authenticate, permissionRoutes); 
 app.use('/departments', authenticate, departmentRoutes);  
 app.use('/business-units',authenticate,businessUnitsRoute)
-app.use('/cab-services', cabServiceRoutes); // PROTECTED
+app.use('/cab-services', authenticate, cabServiceRoutes); // PROTECTED
 app.use('/cab-agreements', authenticate, cabAgreementsRoutes); 
 app.use('/vehicles', authenticate,vehicleRoutes)
 app.use('/vehicle-documents', authenticate,vehicledocumentsRoutes);
@@ -82,7 +83,8 @@ app.use('/trip-approvals', authenticate, tripApprovalRoutes)
 app.use('/trip-assignments', authenticate, tripAssignmentRoutes)
 app.use('/employee/dashboard', authenticate, employeeDashboardRoutes);
 app.use('/trip-logs', authenticate,  tripLogRoutes); // PROTECTED
-app.use('/trip-costs', authenticate,  tripCostRoutes); // PROTECTED
+app.use('/trip-costs', authenticate,  tripCostRoutes); 
+app.use('/invoices', authenticate, invoiceRoutes); // PROTECTED
 // 404 & Error handlers
 app.use(notFoundHandler);
 app.use(errorHandler);

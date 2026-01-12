@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { AuthRequest } from "../../middleware/auth.js"; // Ensure this path matches your project structure
 
 const prisma = new PrismaClient();
 
@@ -61,17 +62,15 @@ const mapDbToFrontend = (cost: any) => {
   const request = assignment?.trip_requests;
   
   // 3. Extract Requester User (Relation from trip_requests)
-  // Matches Schema: users_trip_requests_requested_by_user_idTousers
   const requester = request?.users_trip_requests_requested_by_user_idTousers;
   
   // 4. Extract Department (Relation from users)
-  // Matches Schema: departments_users_department_idTodepartments
   const department = requester?.departments_users_department_idTodepartments;
   
   // 5. Extract Vehicle (Relation from trip_assignments)
   const vehicle = assignment?.vehicles;
   
-  // 6. Extract Cab Service (Relation from vehicle, based on your vehicles schema)
+  // 6. Extract Cab Service (Relation from vehicle)
   const vendor = vehicle?.cab_services;
 
   const costBreakdown = {
@@ -135,8 +134,6 @@ const mapDbToFrontend = (cost: any) => {
       invoiceNumber: cost.invoice_number,
     },
     
-    // Extra info useful for frontend list views
-    tripCount: 1,
     requestedBy: requester ? {
       id: requester.id,
       name: getFullName(requester),
@@ -145,6 +142,9 @@ const mapDbToFrontend = (cost: any) => {
   };
 };
 
+/**
+ * Get all trip costs with optional filtering and RBAC
+ */
 export const getAllTripCosts = async (filters: any) => {
   const { status, vendor_id, start_date, end_date, page, pageSize, user } = filters;
 
@@ -166,6 +166,9 @@ export const getAllTripCosts = async (filters: any) => {
 
   // 2. Filter by Status
   if (status && status !== "all-status") {
+    // Note: DB stores 'Pending', 'Paid', etc. Frontend sends 'Draft', 'Pending', etc.
+    // We might need a mapper here if frontend 'Draft' maps to DB 'Draft' or null logic.
+    // Assuming direct mapping for now based on controller.
     where.payment_status = status;
   }
 
@@ -198,22 +201,18 @@ export const getAllTripCosts = async (filters: any) => {
       include: {
         trip_assignments: {
           include: {
-            // Relation to Trip Request table
             trip_requests: {
               include: {
-                // Relation to User who requested
                 users_trip_requests_requested_by_user_idTousers: {
                    include: { departments_users_department_idTodepartments: { select: { name: true } } }
                 }
               }
             },
-            // Relation to Vehicle (needed to get Vendor)
             vehicles: {
               include: {
                 cab_services: true
               }
             },
-            // Include Driver details
             drivers: true
           },
         },
@@ -233,6 +232,9 @@ export const getAllTripCosts = async (filters: any) => {
   };
 };
 
+/**
+ * Get a specific trip cost by ID
+ */
 export const getTripCostById = async (id: string) => {
   const cost = await prisma.trip_costs.findUnique({
     where: { id },
@@ -261,6 +263,9 @@ export const getTripCostById = async (id: string) => {
   return mapDbToFrontend(cost);
 };
 
+/**
+ * Create a new trip cost entry
+ */
 export const createTripCost = async (data: any) => {
   const { createdByUserId, trip_assignment_id, ...costFields } = data;
   const financials = calculateTotals(costFields);
@@ -270,7 +275,7 @@ export const createTripCost = async (data: any) => {
       trip_assignment_id,
       ...costFields,
       ...financials,
-      payment_status: "Draft",
+      payment_status: "Draft", // Default status
       created_by: createdByUserId,
       created_at: new Date(),
     },
@@ -293,6 +298,9 @@ export const createTripCost = async (data: any) => {
   return mapDbToFrontend(newCost);
 };
 
+/**
+ * Update trip cost details
+ */
 export const updateTripCost = async (id: string, data: any) => {
   const { updatedByUserId, ...costFields } = data;
   const financials = calculateTotals(costFields);
@@ -324,23 +332,43 @@ export const updateTripCost = async (id: string, data: any) => {
   return mapDbToFrontend(updatedCost);
 };
 
+/**
+ * Delete a trip cost entry
+ */
 export const deleteTripCost = async (id: string) => {
   await prisma.trip_costs.delete({ where: { id } });
   return { success: true };
 };
 
+/**
+ * Generate Invoice for a specific trip cost
+ */
 export const generateInvoice = async (id: string, data: any) => {
   const { generatedByUserId, due_date, notes } = data;
+
+  // 1. Fetch current record first to get existing details
+  const currentCost = await prisma.trip_costs.findUnique({
+    where: { id },
+    select: { cost_breakdown_details: true }
+  });
+
+  if (!currentCost) {
+    throw new Error("Trip Cost not found");
+  }
+
+  // 2. Cast to 'any' (or 'Record<string, any>') to satisfy the spread operator check
+  const existingDetails = (currentCost.cost_breakdown_details as any) || {};
 
   const updatedCost = await prisma.trip_costs.update({
     where: { id },
     data: {
-      invoice_number: `INV-${Date.now()}`,
+      invoice_number: `INV-${Date.now()}`, // Simple generation logic
       invoice_date: new Date(),
       payment_status: "Pending",
       updated_by: generatedByUserId,
       updated_at: new Date(),
       cost_breakdown_details: {
+        ...existingDetails, // Now safe because we cast it to 'any'
         notes,
         due_date,
       },
@@ -364,8 +392,15 @@ export const generateInvoice = async (id: string, data: any) => {
   return mapDbToFrontend(updatedCost);
 };
 
+/**
+ * Record Payment for a trip cost
+ */
 export const recordPayment = async (id: string, data: any) => {
   const { paymentRecordedByUserId, payment_method, paid_at, transaction_id, notes } = data;
+
+  const cost = await prisma.trip_costs.findUnique({ where: { id } });
+
+  if (!cost) throw new Error("Trip Cost not found");
 
   const updatedCost = await prisma.trip_costs.update({
     where: { id },
@@ -376,6 +411,7 @@ export const recordPayment = async (id: string, data: any) => {
       updated_by: paymentRecordedByUserId,
       updated_at: new Date(),
       cost_breakdown_details: {
+        ...(cost.cost_breakdown_details as object || {}),
         transaction_id,
         payment_notes: notes,
       },
