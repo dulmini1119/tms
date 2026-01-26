@@ -1,23 +1,17 @@
-import { Router } from 'express';
-import { authenticate } from '../../middleware/auth.js';
-// Adjust the import path to match where you saved the controller
-import * as invoiceController from './invoice.controller.js';
+import { Router } from "express";
+import { authenticate } from "../../middleware/auth.js";
+import * as invoiceController from "./invoice.controller.js";
 
 const router = Router();
 
-// Apply authentication to all invoice routes
 router.use(authenticate);
 
-// 1. Preview Invoice (Check what trips will be billed)
-// GET /api/invoices/preview?cab_service_id=...&month=...
-router.get('/preview', invoiceController.previewInvoice);
+// Add this route to fix 404
+router.get("/", invoiceController.getAllInvoices);
 
-// 2. Generate Monthly Invoice
-// POST /api/invoices/generate
-router.post('/generate', invoiceController.generateInvoice);
-
-// 3. Pay Monthly Invoice
-// POST /api/invoices/:id/pay
-router.post('/:id/pay', invoiceController.recordPayment);
+// Existing routes
+router.get("/preview", invoiceController.previewInvoice);
+router.post("/generate", invoiceController.generateInvoice);
+router.post("/:id/pay", invoiceController.recordPayment);
 
 export default router;
