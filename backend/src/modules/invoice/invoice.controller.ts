@@ -1,60 +1,93 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import * as invoiceService from "./invoice.service.js";
-import { AuthRequest } from "../../middleware/auth.js"; 
-// Assuming you are using CommonJS or have configured module resolution for .js files
-
-// Import Validation Schemas
-const { previewInvoiceSchema, generateInvoiceSchema, recordPaymentSchema } = require("./invoice.validation.js");
+import { AuthRequest } from "../../middleware/auth.js";
+import {
+  generateInvoiceSchema,
+  recordPaymentSchema,
+} from "./invoice.validation.js";
 
 // Helper function to run Joi validation
-const validate = (schema: any, source: 'body' | 'query' = 'body') => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const dataToValidate = source === 'body' ? req.body : req.query;
-    const { error, value } = schema.validate(dataToValidate, { abortEarly: false });
-
+const validate = (schema: any) => {
+  return (req: Request, res: Response, next: Function) => {
+    const { error, value } = schema.validate(req.body);
     if (error) {
-      const errors = error.details.map((detail: any) => detail.message);
-      return res.status(400).json({ 
-        error: "Validation Error", 
-        details: errors 
-      });
+      return res.status(400).json({ error: error.details[0].message });
     }
-
-    // If validation passes, replace the request data with the clean values
-    if (source === 'body') req.body = value;
-    if (source === 'query') req.query = value;
-    
+    req.body = value;
     next();
   };
 };
 
-// 1. GET /api/invoices/preview?cab_service_id=...&month=...
-export const previewInvoice = [
-  validate(previewInvoiceSchema, 'query'),
-  async (req: Request, res: Response) => {
-    try {
-      const { cab_service_id, month } = req.query;
-      
-      const data = await invoiceService.getDraftInvoiceDetails(
-        cab_service_id as string, 
-        month as string
-      );
+/**
+ * GET ALL INVOICES (Mapped to Frontend Interface)
+ * Changed: Now uses service.getInvoices and maps 'billing_month' to 'displayMonth'
+ */
 
-      if (!data) {
-        return res.status(404).json({ message: "No trips found for this period" });
+
+export const getAllInvoices = async (req: Request, res: Response) => {
+  try {
+    const filters = req.query;
+    const invoices = await invoiceService.getInvoices(filters);
+
+    const formattedInvoices = invoices.map((inv: any) => {
+      // 1. Get the RAW database string (e.g., "2024-01")
+      const rawMonth = inv.billing_month; 
+      
+      // 2. Create the pretty string ONLY for displayMonth
+      let displayMonth = "N/A";
+      
+      if (rawMonth) {
+        const [year, month] = rawMonth.split("-");
+        displayMonth = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString("en-US", {
+          month: "long",
+          year: "numeric",
+        });
       }
 
-      res.json(data);
-    } catch (error: any) {
-      console.error(error);
-      res.status(500).json({ error: error.message || "Internal Server Error" });
-    }
-  }
-];
+      return {
+        id: inv.id,
+        cabServiceId: inv.cab_service_id,
+        cabServiceName: inv.cab_service?.name || "Unknown Vendor",
+        
+        billingMonth: rawMonth, 
+        
+        displayMonth: displayMonth, 
+        
+        tripCount: inv.trip_costs?.length || 0,
+        totalAmount: Number(inv.total_amount),
+        status: inv.status,
+        dueDate: inv.due_date,
+        paidDate: inv.paid_date,
+        invoiceNumber: inv.invoice_number,
+        trips: inv.trip_costs || [] 
+      };
+    });
 
-// 2. POST /api/invoices/generate
+    res.json({ data: formattedInvoices });
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ error: error.message || "Failed to fetch invoices" });
+  }
+};
+
+/**
+ * GET INVOICE BY ID (For Details Dialog)
+ */
+export const getInvoiceById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const invoice = await invoiceService.getInvoiceById(id);
+    res.json(invoice);
+  } catch (error: any) {
+    res.status(404).json({ error: error.message || "Invoice not found" });
+  }
+};
+
+/**
+ * GENERATE INVOICE
+ */
 export const generateInvoice = [
-  validate(generateInvoiceSchema, 'body'),
+  validate(generateInvoiceSchema),
   async (req: AuthRequest, res: Response) => {
     try {
       const { cabServiceId, month, dueDate, notes } = req.body;
@@ -65,7 +98,7 @@ export const generateInvoice = [
         month,
         dueDate,
         notes,
-        userId
+        userId,
       });
 
       res.status(201).json(result);
@@ -73,12 +106,14 @@ export const generateInvoice = [
       console.error(error);
       res.status(500).json({ error: error.message || "Failed to generate invoice" });
     }
-  }
+  },
 ];
 
-// 3. POST /api/invoices/:id/pay
+/**
+ * RECORD PAYMENT
+ */
 export const recordPayment = [
-  validate(recordPaymentSchema, 'body'),
+  validate(recordPaymentSchema),
   async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
@@ -87,7 +122,7 @@ export const recordPayment = [
       const result = await invoiceService.payInvoice(id, {
         paid_at,
         transaction_id,
-        notes
+        notes,
       });
 
       res.json(result);
@@ -95,5 +130,22 @@ export const recordPayment = [
       console.error(error);
       res.status(500).json({ error: error.message || "Failed to record payment" });
     }
-  }
+  },
 ];
+
+/**
+ * PREVIEW INVOICE (Optional Helper)
+ */
+export const previewInvoice = async (req: Request, res: Response) => {
+  try {
+    const { cab_service_id, month } = req.query;
+    const data = await invoiceService.getDraftInvoiceDetails(
+      cab_service_id as string,
+      month as string
+    );
+    if (!data) return res.status(404).json({ message: "No trips found" });
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
