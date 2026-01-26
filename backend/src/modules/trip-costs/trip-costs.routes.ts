@@ -16,6 +16,7 @@ import { authenticate } from '../../middleware/auth.js';
 
 const router = Router();
 
+
 // Apply authentication to all routes in this file
 router.use(authenticate);
 
@@ -25,9 +26,6 @@ router.get('/:id', getTripCostById);
 
 router.post('/', createTripCost);
 
-// Actions
-router.post('/:id/generate-invoice', generateInvoice);
-router.post('/:id/record-payment', recordPayment);
 
 // ✅ Added restrictEditIfFinalized middleware to protect updates
 router.put(
