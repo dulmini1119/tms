@@ -1,8 +1,12 @@
 import { PrismaClient } from "@prisma/client";
-import { AuthRequest } from "../../middleware/auth.js"; // Ensure this path matches your project structure
 
 const prisma = new PrismaClient();
 
+// --- RBAC HELPER: Check if user has permission to view financials ---
+const hasFinancialAccess = (userRole: string) => {
+  // Only Super Admin and Finance Manager can see this
+  return ["SUPERADMIN", "FINANCE_MANAGER"].includes(userRole);
+};
 // --- Helper: Financial Calculations ---
 const calculateTotals = (data: any) => {
   const {
@@ -113,40 +117,53 @@ const mapDbToFrontend = (cost: any) => {
     cabServiceId: vendor?.id || "",
     
     // Mapping Status to Frontend expected types (Draft, Pending, Paid, Overdue)
-    status: cost.payment_status === "Paid" ? "Paid" : 
-            cost.invoice_number ? "Pending" : 
-            new Date(cost.created_at) < new Date(new Date().setDate(new Date().getDate() - 30)) ? "Overdue"
-            : "Draft",
+    status: cost.invoice_number ? (cost.payment_status === "Paid" ? "Paid" : 
+            cost.payment_status === "Pending" ? "Pending" :"Overdue"): "Draft",
             
     createdAt: cost.created_at,
     totalCost: Number(cost.total_cost) || 0,
     costBreakdown: costBreakdown,
     
     billing: {
-      billToDepartment: department?.name || request?.cost_center || "General",
+      billToDepartment: 
+      department?.name || 
+      request?.cost_center || 
+      requester?.department_name || "Unassigned",
       taxAmount: Number(cost.tax_amount) || 0,
     },
 
     payment: {
-      status: cost.payment_status,
-      method: cost.payment_method,
-      paidDate: cost.paid_at,
-      invoiceNumber: cost.invoice_number,
+      status: cost.payment_status || "Draft",
+      method: cost.payment_method || "N/A",
+      paidDate: cost.paid_at || null,
+      invoiceNumber: cost.invoice_number || "N/A",
     },
     
     requestedBy: requester ? {
       id: requester.id,
       name: getFullName(requester),
       email: requester.email,
-    } : null,
+    } : {
+      id: "N/A",
+      name: "Unknown",
+      email: "N/A",
+    },
   };
 };
 
 /**
  * Get all trip costs with optional filtering and RBAC
  */
+/**
+ * Get all trip costs with Strict RBAC
+ */
 export const getAllTripCosts = async (filters: any) => {
   const { status, vendor_id, start_date, end_date, page, pageSize, user } = filters;
+
+  // --- 1. SECURITY GATE ---
+  if (!hasFinancialAccess(user?.role)) {
+    throw new Error("FORBIDDEN: You do not have permission to view financial data.");
+  }
 
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(pageSize) || 10;
@@ -155,43 +172,56 @@ export const getAllTripCosts = async (filters: any) => {
   // Initialize where object
   const where: any = {};
 
-  // 1. RBAC: Restrict to own requests if not Admin/Accountant
-  if (!["ADMIN", "SUPERADMIN", "ACCOUNTANT"].includes(user?.role)) {
-     where.trip_assignments = {
-       trip_requests: {
-         requested_by_user_id: user.id
-       }
-     };
-  }
-
-  // 2. Filter by Status
-  if (status && status !== "all-status") {
-    // Note: DB stores 'Pending', 'Paid', etc. Frontend sends 'Draft', 'Pending', etc.
-    // We might need a mapper here if frontend 'Draft' maps to DB 'Draft' or null logic.
-    // Assuming direct mapping for now based on controller.
+  // --- 2. FILTER: Status (Mapping Frontend to DB) ---
+  if (status && status !== "all") {
+    // Frontend sends "Draft", "Pending", "Paid", "Overdue"
+    // DB stores: "Draft", "Pending", "Paid", "Overdue" (Assuming your map logic works)
+    // We use the direct value for now.
     where.payment_status = status;
   }
 
-  // 3. Filter by Vendor (Cab Service)
-  // ⚠️ FIX: Use SPREAD (...) to keep RBAC conditions!
-  if (vendor_id && vendor_id !== "all-vendors") {
+  // --- 3. FILTER: Vendor (Nested Relation - FIXED) ---
+  // Note: We use a specific object for trip_assignments to avoid conflicts
+  if (vendor_id && vendor_id !== "all") {
     where.trip_assignments = {
-      ...where.trip_assignments, // Keep existing conditions (RBAC)
       vehicles: {
         cab_service_id: vendor_id
       }
     };
   }
+// --- ADD MONTH FILTER FOR INVOICE DETAILS ---
+if (filters.month) {
+  const [year, monthNum] = filters.month.split("-");
+  if (year && monthNum) {
+    const start = new Date(Number(year), Number(monthNum) - 1, 1);
+    const end = new Date(Number(year), Number(monthNum), 1);
 
-  // 4. Filter by Date Range
+    where.created_at = {
+      gte: start,
+      lt: end,
+    };
+  }
+}
+
+// --- ADD VENDOR FILTER (already there but make sure) ---
+if (filters.vendor_id && filters.vendor_id !== "all") {
+  where.trip_assignments = {
+    ...(where.trip_assignments || {}),
+    vehicles: {
+      cab_service_id: filters.vendor_id,
+    },
+  };
+}
+  // --- 4. FILTER: Date Range ---
   if (start_date || end_date) {
     where.created_at = {};
     if (start_date) where.created_at.gte = new Date(start_date);
     if (end_date) where.created_at.lte = new Date(end_date);
   }
 
-  console.log("Fetching trip costs with filters:", filters);
-
+  console.log("Executing Trip Cost Query with where:", JSON.stringify(where));
+  
+  // --- 5. EXECUTE QUERY ---
   const [costs, totalCount] = await Promise.all([
     prisma.trip_costs.findMany({
       where,
@@ -220,6 +250,10 @@ export const getAllTripCosts = async (filters: any) => {
     }),
     prisma.trip_costs.count({ where }),
   ]);
+  console.log(`Fetched ${costs.length} trips for vendor ${filters.vendor_id || 'all'} in month ${filters.month || 'any'}`);
+if (costs.length > 0) {
+  console.log("First trip full data:", JSON.stringify(costs[0], null, 2));
+}
 
   return {
     data: costs.map(mapDbToFrontend),
@@ -302,9 +336,12 @@ export const createTripCost = async (data: any) => {
  * Update trip cost details
  */
 export const updateTripCost = async (id: string, data: any) => {
-  const { updatedByUserId, ...costFields } = data;
+  const { updatedByUserId, userRole, ...costFields } = data;
+  
+  if (userRole !== "SUPERADMIN"){
+    throw new Error("FORBIDDEN: You do not have permission to update trip costs.");
+  }
   const financials = calculateTotals(costFields);
-
   const updatedCost = await prisma.trip_costs.update({
     where: { id },
     data: {
