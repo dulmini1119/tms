@@ -1,5 +1,4 @@
 import { NextFunction, Response } from "express";
-// FIX 1: Added .js extension (Required by ES Modules)
 import { AuthRequest } from "../../middleware/auth.js";
 import * as costService from "./trip-costs.service.js";
 import prisma from "../../config/database.js";
@@ -76,6 +75,7 @@ export const updateTripCost = async (req: AuthRequest, res: Response) => {
     const payload = {
       ...req.body,
       updatedByUserId: req.user!.id,
+      
     };
 
     const updatedCost = await costService.updateTripCost(id, payload);
@@ -148,6 +148,9 @@ export const recordPayment = async (req: AuthRequest, res: Response) => {
   }
 };
 
+/**
+ * Middleware: Restrict editing costs if invoice is generated or paid
+ */
 /**
  * Middleware: Restrict editing costs if invoice is generated or paid
  */
