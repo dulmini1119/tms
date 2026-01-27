@@ -2,11 +2,6 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// --- RBAC HELPER: Check if user has permission to view financials ---
-const hasFinancialAccess = (userRole: string) => {
-  // Only Super Admin and Finance Manager can see this
-  return ["SUPERADMIN", "FINANCE_MANAGER"].includes(userRole);
-};
 // --- Helper: Financial Calculations ---
 const calculateTotals = (data: any) => {
   const {
@@ -59,22 +54,20 @@ const getFullName = (user: any) => {
 
 // --- Helper: Map DB Result to Frontend Interface ---
 const mapDbToFrontend = (cost: any) => {
-  // 1. Extract Assignment (Direct relation from trip_costs)
   const assignment = cost.trip_assignments;
-  
-  // 2. Extract Trip Request (Relation from trip_assignments)
   const request = assignment?.trip_requests;
-  
-  // 3. Extract Requester User (Relation from trip_requests)
   const requester = request?.users_trip_requests_requested_by_user_idTousers;
-  
-  // 4. Extract Department (Relation from users)
   const department = requester?.departments_users_department_idTodepartments;
-  
-  // 5. Extract Vehicle (Relation from trip_assignments)
   const vehicle = assignment?.vehicles;
-  
-  // 6. Extract Cab Service (Relation from vehicle)
+  const vendor = vehicle?.cab_services;
+
+// --- Helper: Map DB Result to Frontend Interface ---
+const mapDbToFrontend = (cost: any) => {
+  const assignment = cost.trip_assignments;
+  const request = assignment?.trip_requests;
+  const requester = request?.users_trip_requests_requested_by_user_idTousers;
+  const department = requester?.departments_users_department_idTodepartments;
+  const vehicle = assignment?.vehicles;
   const vendor = vehicle?.cab_services;
 
   const costBreakdown = {
@@ -116,12 +109,14 @@ const mapDbToFrontend = (cost: any) => {
     cabServiceName: vendor?.name || "Unassigned",
     cabServiceId: vendor?.id || "",
     
-    // Mapping Status to Frontend expected types (Draft, Pending, Paid, Overdue)
-    status: cost.invoice_number ? (cost.payment_status === "Paid" ? "Paid" : 
-            cost.payment_status === "Pending" ? "Pending" :"Overdue"): "Draft",
+    status: cost.payment_status || "Draft",
             
     createdAt: cost.created_at,
-    totalCost: Number(cost.total_cost) || 0,
+    // FIX: Ensure Total is always the Sum of breakdown, not the DB field
+    totalCost: costBreakdown.driverCharges.total + 
+               costBreakdown.vehicleCosts.total + 
+               costBreakdown.additionalCosts.total + 
+               costBreakdown.taxAmount,
     costBreakdown: costBreakdown,
     
     billing: {
@@ -151,77 +146,110 @@ const mapDbToFrontend = (cost: any) => {
   };
 };
 
+  return {
+    id: cost.id,
+    tripRequestId: request?.id || "N/A",
+    requestNumber: request?.request_number || "N/A",
+    cabServiceName: vendor?.name || "Unassigned",
+    cabServiceId: vendor?.id || "",
+    
+    // FIX: Just use the DB status directly. 
+    // Don't try to guess based on invoice_number presence.
+    status: cost.payment_status || "Draft",
+            
+    createdAt: cost.created_at,
+    totalCost: Number(cost.total_cost) || 0,
+    
+    
+    billing: {
+      billToDepartment: 
+      department?.name || 
+      request?.cost_center || 
+      requester?.department_name || "Unassigned",
+      taxAmount: Number(cost.tax_amount) || 0,
+    },
+
+    payment: {
+      status: cost.payment_status || "Draft",
+      method: cost.payment_method || "N/A",
+      paidDate: cost.paid_at || null,
+      invoiceNumber: cost.invoice_number || "N/A",
+    },
+    
+    requestedBy: requester ? {
+      id: requester.id,
+      name: getFullName(requester),
+      email: requester.email,
+    } : {
+      id: "N/A",
+      name: "Unknown",
+      email: "N/A",
+    },
+  };
+};
+
 /**
- * Get all trip costs with optional filtering and RBAC
+ * Get all trip costs with optional filtering
  */
 /**
- * Get all trip costs with Strict RBAC
+ * Get all trip costs with optional filtering
  */
 export const getAllTripCosts = async (filters: any) => {
-  const { status, vendor_id, start_date, end_date, page, pageSize, user } = filters;
-
-  // --- 1. SECURITY GATE ---
-  if (!hasFinancialAccess(user?.role)) {
-    throw new Error("FORBIDDEN: You do not have permission to view financial data.");
-  }
-
+  const { status, vendor_id, start_date, end_date, page, pageSize } = filters;
+  
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(pageSize) || 10;
   const skip = (pageNum - 1) * limitNum;
 
-  // Initialize where object
   const where: any = {};
 
-  // --- 2. FILTER: Status (Mapping Frontend to DB) ---
-  if (status && status !== "all") {
-    // Frontend sends "Draft", "Pending", "Paid", "Overdue"
-    // DB stores: "Draft", "Pending", "Paid", "Overdue" (Assuming your map logic works)
-    // We use the direct value for now.
-    where.payment_status = status;
+  // --- 1. FILTER: Vendor ---
+  if (vendor_id && vendor_id !== "all" && vendor_id !== "all-vendors") {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vendor_id)) {
+      console.warn("Invalid vendor_id format:", vendor_id);
+    } else {
+      where.trip_assignments = {
+        vehicles: {
+          cab_service_id: vendor_id,
+        },
+      };
+    }
   }
 
-  // --- 3. FILTER: Vendor (Nested Relation - FIXED) ---
-  // Note: We use a specific object for trip_assignments to avoid conflicts
-  if (vendor_id && vendor_id !== "all") {
-    where.trip_assignments = {
-      vehicles: {
-        cab_service_id: vendor_id
-      }
-    };
-  }
-// --- ADD MONTH FILTER FOR INVOICE DETAILS ---
-if (filters.month) {
-  const [year, monthNum] = filters.month.split("-");
-  if (year && monthNum) {
-    const start = new Date(Number(year), Number(monthNum) - 1, 1);
-    const end = new Date(Number(year), Number(monthNum), 1);
+  // --- 2. FILTER: Date / Month ---
+  if (filters.month) {
+    const [year, monthNum] = filters.month.split("-");
+    if (year && monthNum) {
+      const start = new Date(Number(year), Number(monthNum) - 1, 1);
+      const end = new Date(Number(year), Number(monthNum), 1);
 
-    where.created_at = {
-      gte: start,
-      lt: end,
-    };
-  }
-}
-
-// --- ADD VENDOR FILTER (already there but make sure) ---
-if (filters.vendor_id && filters.vendor_id !== "all") {
-  where.trip_assignments = {
-    ...(where.trip_assignments || {}),
-    vehicles: {
-      cab_service_id: filters.vendor_id,
-    },
-  };
-}
-  // --- 4. FILTER: Date Range ---
-  if (start_date || end_date) {
+      where.created_at = {
+        gte: start,
+        lt: end,
+      };
+    }
+  } else if (start_date || end_date) {
     where.created_at = {};
     if (start_date) where.created_at.gte = new Date(start_date);
     if (end_date) where.created_at.lte = new Date(end_date);
   }
 
-  console.log("Executing Trip Cost Query with where:", JSON.stringify(where));
+  // --- 3. FILTER: Status ---
+  // FIX: We do NOT filter by 'payment_status' in the DB query anymore.
+  // We fetch ALL trips, and filter in frontend OR map status in service.
+  // Why? Because if a trip has an invoice (invoice_id != null), the DB status is "Paid".
+  // But we still want to show it in the Trip Costs list if the user searches "all".
   
-  // --- 5. EXECUTE QUERY ---
+  // NOTE: If you want "Draft Only" tab to show ONLY uninvoiced trips:
+  if (status && status === "Draft") {
+     where.invoice_id = null; 
+  }
+  // If status is "Paid", we rely on standard payment_status
+  if (status && status !== "all" && status !== "Draft") {
+     where.payment_status = status;
+  }
+
+  // --- 4. EXECUTE QUERY ---
   const [costs, totalCount] = await Promise.all([
     prisma.trip_costs.findMany({
       where,
@@ -250,10 +278,6 @@ if (filters.vendor_id && filters.vendor_id !== "all") {
     }),
     prisma.trip_costs.count({ where }),
   ]);
-  console.log(`Fetched ${costs.length} trips for vendor ${filters.vendor_id || 'all'} in month ${filters.month || 'any'}`);
-if (costs.length > 0) {
-  console.log("First trip full data:", JSON.stringify(costs[0], null, 2));
-}
 
   return {
     data: costs.map(mapDbToFrontend),
@@ -378,12 +402,11 @@ export const deleteTripCost = async (id: string) => {
 };
 
 /**
- * Generate Invoice for a specific trip cost
+ * Generate Invoice for a specific trip cost (Legacy function, likely unused now)
  */
 export const generateInvoice = async (id: string, data: any) => {
   const { generatedByUserId, due_date, notes } = data;
 
-  // 1. Fetch current record first to get existing details
   const currentCost = await prisma.trip_costs.findUnique({
     where: { id },
     select: { cost_breakdown_details: true }
@@ -393,19 +416,18 @@ export const generateInvoice = async (id: string, data: any) => {
     throw new Error("Trip Cost not found");
   }
 
-  // 2. Cast to 'any' (or 'Record<string, any>') to satisfy the spread operator check
   const existingDetails = (currentCost.cost_breakdown_details as any) || {};
 
   const updatedCost = await prisma.trip_costs.update({
     where: { id },
     data: {
-      invoice_number: `INV-${Date.now()}`, // Simple generation logic
+      invoice_number: `INV-${Date.now()}`,
       invoice_date: new Date(),
       payment_status: "Pending",
       updated_by: generatedByUserId,
       updated_at: new Date(),
       cost_breakdown_details: {
-        ...existingDetails, // Now safe because we cast it to 'any'
+        ...existingDetails,
         notes,
         due_date,
       },
