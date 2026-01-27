@@ -5,6 +5,7 @@ import {
   generateInvoiceSchema,
   recordPaymentSchema,
 } from "./invoice.validation.js";
+import prisma from "../../config/database.js";
 
 // Helper function to run Joi validation
 const validate = (schema: any) => {
@@ -19,21 +20,17 @@ const validate = (schema: any) => {
 };
 
 /**
- * GET ALL INVOICES (Mapped to Frontend Interface)
- * Changed: Now uses service.getInvoices and maps 'billing_month' to 'displayMonth'
+ * GET ALL INVOICES (List View)
  */
-
-
 export const getAllInvoices = async (req: Request, res: Response) => {
   try {
     const filters = req.query;
+    
+    // Fetch grouped data
     const invoices = await invoiceService.getInvoices(filters);
 
     const formattedInvoices = invoices.map((inv: any) => {
-      // 1. Get the RAW database string (e.g., "2024-01")
-      const rawMonth = inv.billing_month; 
-      
-      // 2. Create the pretty string ONLY for displayMonth
+      const rawMonth = inv.billingMonth; 
       let displayMonth = "N/A";
       
       if (rawMonth) {
@@ -45,21 +42,17 @@ export const getAllInvoices = async (req: Request, res: Response) => {
       }
 
       return {
-        id: inv.id,
-        cabServiceId: inv.cab_service_id,
-        cabServiceName: inv.cab_service?.name || "Unknown Vendor",
-        
-        billingMonth: rawMonth, 
-        
+        id: inv.id, // This is now the Cab Service ID
+        cabServiceId: inv.cabServiceId,
+        cabServiceName: inv.cabServiceName,
+        billingMonth: inv.billingMonth, 
         displayMonth: displayMonth, 
-        
-        tripCount: inv.trip_costs?.length || 0,
-        totalAmount: Number(inv.total_amount),
+        tripCount: inv.tripCount,
+        totalAmount: inv.totalAmount, // Now calculated correctly!
         status: inv.status,
-        dueDate: inv.due_date,
-        paidDate: inv.paid_date,
-        invoiceNumber: inv.invoice_number,
-        trips: inv.trip_costs || [] 
+        dueDate: null, // Grouped view might not have a single due date
+        paidDate: null,
+        invoiceNumber: "Multiple", // Indicate multiple invoices
       };
     });
 
@@ -71,13 +64,14 @@ export const getAllInvoices = async (req: Request, res: Response) => {
 };
 
 /**
- * GET INVOICE BY ID (For Details Dialog)
+ * GET INVOICE BY ID (Detail View)
+ * Returns full data grouped by Vehicle
  */
 export const getInvoiceById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const invoice = await invoiceService.getInvoiceById(id);
-    res.json(invoice);
+    const invoiceData = await invoiceService.getInvoiceById(id);
+    res.json(invoiceData);
   } catch (error: any) {
     res.status(404).json({ error: error.message || "Invoice not found" });
   }
@@ -134,18 +128,58 @@ export const recordPayment = [
 ];
 
 /**
- * PREVIEW INVOICE (Optional Helper)
+ * PREVIEW INVOICE
  */
 export const previewInvoice = async (req: Request, res: Response) => {
   try {
     const { cab_service_id, month } = req.query;
+    
+    if (!cab_service_id || !month) {
+      return res.status(400).json({ error: "Missing cab_service_id or month" });
+    }
+
     const data = await invoiceService.getDraftInvoiceDetails(
       cab_service_id as string,
       month as string
     );
-    if (!data) return res.status(404).json({ message: "No trips found" });
+    if (!data) return res.status(404).json({ message: "No trips found for this period" });
     res.json(data);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Get Invoice Details by Cab Service & Month
+ * This handles Grouped View where ID is actually a CabService ID.
+ */
+// FIXED: Added 'export' keyword
+export const getInvoiceDetailsByService = async (req: Request, res: Response) => {
+  try {
+    const { serviceId } = req.params;
+    const { month } = req.query;
+
+    if (!month) return res.status(400).json({ error: "Month parameter is required" });
+
+    // Find the actual invoice for this Service + Month
+    const targetInvoice = await prisma.invoice.findFirst({
+      where: {
+        cab_service_id: serviceId,
+        billing_month: month as string,
+      },
+      orderBy: [
+        { status: "asc" },
+        { created_at: "desc" }
+      ]
+    });
+
+    if (!targetInvoice) return res.status(404).json({ error: "No invoice found for this vendor/month" });
+
+    // Use the standard service function to get breakdown
+    const invoiceData = await invoiceService.getInvoiceById(targetInvoice.id);
+    res.json(invoiceData);
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ error: error.message || "Failed to fetch details" });
   }
 };
