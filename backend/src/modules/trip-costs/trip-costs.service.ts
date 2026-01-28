@@ -61,47 +61,6 @@ const mapDbToFrontend = (cost: any) => {
   const vehicle = assignment?.vehicles;
   const vendor = vehicle?.cab_services;
 
-// --- Helper: Map DB Result to Frontend Interface ---
-const mapDbToFrontend = (cost: any) => {
-  const assignment = cost.trip_assignments;
-  const request = assignment?.trip_requests;
-  const requester = request?.users_trip_requests_requested_by_user_idTousers;
-  const department = requester?.departments_users_department_idTodepartments;
-  const vehicle = assignment?.vehicles;
-  const vendor = vehicle?.cab_services;
-
-  const costBreakdown = {
-    driverCharges: {
-      baseFare: Number(cost.base_fare) || 0,
-      driverAllowance: Number(cost.driver_allowance) || 0,
-      total: (Number(cost.base_fare) || 0) + (Number(cost.driver_allowance) || 0),
-    },
-    vehicleCosts: {
-      distanceCharges: Number(cost.distance_charges) || 0,
-      timeCharges: Number(cost.time_charges) || 0,
-      fuelCost: Number(cost.fuel_cost) || 0,
-      total: (Number(cost.distance_charges) || 0) + (Number(cost.time_charges) || 0) + (Number(cost.fuel_cost) || 0),
-    },
-    additionalCosts: {
-      toll: Number(cost.toll_charges) || 0,
-      parking: Number(cost.parking_charges) || 0,
-      waiting: Number(cost.waiting_charges) || 0,
-      nightSurcharge: Number(cost.night_surcharge) || 0,
-      holidaySurcharge: Number(cost.holiday_surcharge) || 0,
-      others: Number(cost.other_charges) || 0,
-      total: (Number(cost.toll_charges) || 0) + 
-             (Number(cost.parking_charges) || 0) + 
-             (Number(cost.waiting_charges) || 0) + 
-             (Number(cost.night_surcharge) || 0) + 
-             (Number(cost.holiday_surcharge) || 0) + 
-             (Number(cost.other_charges) || 0),
-    },
-    totalAdditionalCosts: (Number(cost.toll_charges) || 0) + 
-                        (Number(cost.parking_charges) || 0) + 
-                        (Number(cost.waiting_charges) || 0),
-    taxAmount: Number(cost.tax_amount) || 0,
-  };
-
   return {
     id: cost.id,
     tripRequestId: request?.id || "N/A",
@@ -109,58 +68,12 @@ const mapDbToFrontend = (cost: any) => {
     cabServiceName: vendor?.name || "Unassigned",
     cabServiceId: vendor?.id || "",
     
-    status: cost.payment_status || "Draft",
-            
-    createdAt: cost.created_at,
-    // FIX: Ensure Total is always the Sum of breakdown, not the DB field
-    totalCost: costBreakdown.driverCharges.total + 
-               costBreakdown.vehicleCosts.total + 
-               costBreakdown.additionalCosts.total + 
-               costBreakdown.taxAmount,
-    costBreakdown: costBreakdown,
-    
-    billing: {
-      billToDepartment: 
-      department?.name || 
-      request?.cost_center || 
-      requester?.department_name || "Unassigned",
-      taxAmount: Number(cost.tax_amount) || 0,
-    },
-
-    payment: {
-      status: cost.payment_status || "Draft",
-      method: cost.payment_method || "N/A",
-      paidDate: cost.paid_at || null,
-      invoiceNumber: cost.invoice_number || "N/A",
-    },
-    
-    requestedBy: requester ? {
-      id: requester.id,
-      name: getFullName(requester),
-      email: requester.email,
-    } : {
-      id: "N/A",
-      name: "Unknown",
-      email: "N/A",
-    },
-  };
-};
-
-  return {
-    id: cost.id,
-    tripRequestId: request?.id || "N/A",
-    requestNumber: request?.request_number || "N/A",
-    cabServiceName: vendor?.name || "Unassigned",
-    cabServiceId: vendor?.id || "",
-    
-    // FIX: Just use the DB status directly. 
-    // Don't try to guess based on invoice_number presence.
+    // Use the DB payment_status directly
     status: cost.payment_status || "Draft",
             
     createdAt: cost.created_at,
     totalCost: Number(cost.total_cost) || 0,
     
-    
     billing: {
       billToDepartment: 
       department?.name || 
@@ -188,9 +101,6 @@ const mapDbToFrontend = (cost: any) => {
   };
 };
 
-/**
- * Get all trip costs with optional filtering
- */
 /**
  * Get all trip costs with optional filtering
  */
@@ -235,16 +145,9 @@ export const getAllTripCosts = async (filters: any) => {
   }
 
   // --- 3. FILTER: Status ---
-  // FIX: We do NOT filter by 'payment_status' in the DB query anymore.
-  // We fetch ALL trips, and filter in frontend OR map status in service.
-  // Why? Because if a trip has an invoice (invoice_id != null), the DB status is "Paid".
-  // But we still want to show it in the Trip Costs list if the user searches "all".
-  
-  // NOTE: If you want "Draft Only" tab to show ONLY uninvoiced trips:
   if (status && status === "Draft") {
      where.invoice_id = null; 
   }
-  // If status is "Paid", we rely on standard payment_status
   if (status && status !== "all" && status !== "Draft") {
      where.payment_status = status;
   }
@@ -402,7 +305,7 @@ export const deleteTripCost = async (id: string) => {
 };
 
 /**
- * Generate Invoice for a specific trip cost (Legacy function, likely unused now)
+ * Generate Invoice for a specific trip cost (Legacy function)
  */
 export const generateInvoice = async (id: string, data: any) => {
   const { generatedByUserId, due_date, notes } = data;
