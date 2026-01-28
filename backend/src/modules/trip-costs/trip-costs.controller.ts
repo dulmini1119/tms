@@ -148,12 +148,6 @@ export const recordPayment = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/**
- * Middleware: Restrict editing costs if invoice is generated or paid
- */
-/**
- * Middleware: Restrict editing costs if invoice is generated or paid
- */
 export const restrictEditIfFinalized = async (
   req: AuthRequest, 
   res: Response, 
