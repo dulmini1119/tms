@@ -1,396 +1,166 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "../../config/database.js";
+import * as repo from "./invoice.repository.js";
 
 /**
- * Helper: Get Draft Details (Uninvoiced Trips)
+ * PREVIEW
  */
-export const getDraftInvoiceDetails = async (
+export const previewInvoice = async (
   cabServiceId: string,
-  month: string
+  month: string,
+  userId: string
 ) => {
-  const [year, monthIndex] = month.split("-");
-  const startDate = new Date(parseInt(year), parseInt(monthIndex) - 1, 1);
-  const endDate = new Date(parseInt(year), parseInt(monthIndex), 1);
+  let invoice = await repo.findInvoiceByServiceMonth(cabServiceId, month);
 
-  const tripCosts = await prisma.trip_costs.findMany({
-    where: {
-      invoice_id: null, // Only uninvoiced
-      trip_assignments: {
-        vehicles: {
-          cab_service_id: cabServiceId,
-        },
-      },
-      created_at: {
-        gte: startDate,
-        lt: endDate,
-      },
-    },
-    include: {
-      trip_assignments: {
-        include: {
-          trip_requests: {
-            include: {
-              users_trip_requests_requested_by_user_idTousers: {
-                include: { departments_users_department_idTodepartments: { select: { name: true } } }
-              }
-            },
-          },
-          vehicles: {
-            include: { cab_services: true },
-          },
-        },
-      },
-    },
-  });
+  if (!invoice) {
+    invoice = await repo.createDraftInvoice(cabServiceId, month, userId);
+  }
 
-  if (tripCosts.length === 0) return null;
+  if (invoice.status !== "Draft") {
+    throw new Error("Invoice already generated");
+  }
 
-  const totalAmount = tripCosts.reduce(
-    (sum, trip) => sum + Number(trip.total_cost),
+  const trips = await repo.getUninvoicedTrips(cabServiceId, month);
+
+  const totalAmount = trips.reduce(
+    (sum, t) => sum + Number(t.total_cost),
     0
   );
 
   return {
-    cabServiceId,
-    cabServiceName:
-      tripCosts[0].trip_assignments?.vehicles?.cab_services?.name || "Unknown Vendor",
-    month,
-    tripCount: tripCosts.length,
+    invoiceId: invoice.id,
+    status: invoice.status,
+    tripCount: trips.length,
     totalAmount,
-    trips: tripCosts,
-    tripIds: tripCosts.map((t) => t.id),
+    trips,
   };
 };
 
 /**
- * GENERATE: Create Invoice (Link Trips & Save Total)
+ * GENERATE
  */
-export const createMonthlyInvoice = async (payload: {
-  cabServiceId: string;
-  month: string;
-  dueDate: string;
-  notes: string;
-  userId: string;
-}) => {
-  const { cabServiceId, month, dueDate, notes, userId } = payload;
+export const generateInvoice = async (
+  invoiceId: string,
+  dueDate: string,
+  notes?: string
+) => {
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: invoiceId },
+  });
 
-  // 1. Calculate data from uninvoiced trips
-  const draftData = await getDraftInvoiceDetails(cabServiceId, month);
-  const tripIds = draftData?.tripIds || [];
-  const totalAmount = draftData?.totalAmount || 0;
-  const tripCount = draftData?.tripCount || 0;
-
-  let finalNotes = notes || "";
-  if (tripIds.length === 0) {
-    finalNotes = finalNotes
-      ? `${finalNotes}\n[Auto: No billable trips found for this period]`
-      : "[Auto: No billable trips found for this period]";
+  if (!invoice || invoice.status !== "Draft") {
+    throw new Error("Invoice cannot be generated");
   }
 
-  // 2. Create Invoice
-  const invoice = await prisma.invoice.create({
-    data: {
-      invoice_number: `INV-${cabServiceId.slice(0, 4).toUpperCase()}-${month.replace("-", "")}-${Date.now()}`,
-      cab_service_id: cabServiceId,
-      billing_month: month,
-      total_amount: totalAmount, // Save calculated total
-      due_date: new Date(dueDate),
-      notes: finalNotes,
-      created_by: userId,
-      status: tripCount === 0 ? "NoCharges" : "Pending",
-      trip_costs: {
-        connect: tripIds.map((id) => ({ id })), // Link trips
+  const trips = await repo.getUninvoicedTrips(
+    invoice.cab_service_id,
+    invoice.billing_month
+  );
+
+  const totalAmount = trips.reduce(
+    (sum, t) => sum + Number(t.total_cost),
+    0
+  );
+
+  await prisma.$transaction([
+    prisma.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        total_amount: totalAmount,
+        due_date: new Date(dueDate),
+        notes,
+        status: "Pending",
       },
-    },
-    include: { cab_service: true },
-  });
-
-  // 3. Update Trip Costs to link back to Invoice
-  if (tripIds.length > 0) {
-    await prisma.trip_costs.updateMany({
-      where: { id: { in: tripIds } },
-      data: { invoice_id: invoice.id, payment_status: "Pending" },
-    });
-  }
-
-  return invoice;
+    }),
+    prisma.trip_costs.updateMany({
+      where: { id: { in: trips.map(t => t.id) } },
+      data: { invoice_id: invoiceId },
+    }),
+  ]);
 };
 
 /**
- * PAYMENT: Mark Invoice as Paid
+ * PAY
  */
-export const payInvoice = async (invoiceId: string, paymentData: any) => {
-  const { paid_at, transaction_id, notes } = paymentData;
-
-  const currentInvoice = await prisma.invoice.findUnique({
+export const recordPayment = async (
+  invoiceId: string,
+  data: any
+) => {
+  const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
   });
-  if (!currentInvoice) throw new Error("Invoice not found");
 
-  const newNotes = notes
-    ? `${currentInvoice.notes || ""}\n[Payment Note: ${notes}]`
-    : currentInvoice.notes || "";
+  if (!invoice || invoice.status !== "Pending") {
+    throw new Error("Invoice cannot be paid");
+  }
 
-  const updatedInvoice = await prisma.invoice.update({
-    where: { id: invoiceId },
-    data: {
-      status: "Paid",
-      paid_date: new Date(paid_at),
-      notes: newNotes,
-    },
-  });
-
-  await prisma.trip_costs.updateMany({
-    where: { invoice_id: invoiceId },
-    data: { payment_status: "Paid" },
-  });
-
-  return updatedInvoice;
+  await prisma.$transaction([
+    prisma.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        status: "Paid",
+        paid_date: new Date(data.paid_at),
+        notes: data.notes,
+      },
+    }),
+    prisma.trip_costs.updateMany({
+      where: { invoice_id: invoiceId },
+      data: {
+        payment_status: "Paid",
+        payment_method: data.payment_method,
+        paid_at: new Date(data.paid_at),
+      },
+    }),
+  ]);
 };
 
 /**
- * FETCH LIST: Get Invoices Grouped by Service & Month
+ * LIST
  */
-export const getInvoices = async (filters: any = {}) => {
-  const { status, cab_service_id, month, search } = filters;
-  const where: any = {};
-
-  if (status && status !== "all") where.status = status;
-  if (cab_service_id && cab_service_id !== "all") where.cab_service_id = cab_service_id;
-  if (month && month !== "all") where.billing_month = month; // Filter by Month
-  
-  if (search) {
-    where.OR = [
-      { invoice_number: { contains: search, mode: 'insensitive' } },
-      { cab_service: { name: { contains: search, mode: 'insensitive' } } },
-    ];
-  }
-
-  const invoices = await prisma.invoice.findMany({
-    where,
+export const listInvoices = async () =>
+  prisma.invoice.findMany({
     include: {
-      cab_service: { select: { id: true, name: true } },
-      trip_costs: { select: { id: true, total_cost: true } }
+      cab_service: { select: { name: true } },
     },
     orderBy: { billing_month: "desc" },
   });
 
-  // Group Logic
-  const groupedData: Record<string, any> = {};
-
-  for (const inv of invoices) {
-    // Key: ServiceID + Month (e.g., "123-Jan2026")
-    const key = `${inv.cab_service_id}-${inv.billing_month}`;
-
-    if (!groupedData[key]) {
-      groupedData[key] = {
-        id: inv.cab_service_id,
-        cabServiceId: inv.cab_service_id,
-        cabServiceName: inv.cab_service.name,
-        billingMonth: inv.billing_month,
-        tripCount: 0,
-        totalAmount: 0,
-        statuses: new Set<string>(),
-        _mostRecentInvoiceId: inv.id
-      };
-    }
-
-    const group = groupedData[key];
-    let invoiceRealTotal = 0;
-    let invoiceRealCount = 0;
-
-    if (inv.status === "Draft") {
-      // Draft: Look for uninvoiced trips
-      const [year, monthNum] = inv.billing_month.split("-");
-      const start = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
-      const end = new Date(parseInt(year), parseInt(monthNum), 1);
-
-      const draftTrips = await prisma.trip_costs.findMany({
-        where: {
-          invoice_id: null,
-          trip_assignments: { vehicles: { cab_service_id: inv.cab_service_id } },
-          created_at: { gte: start, lt: end }
-        },
-        select: { total_cost: true }
-      });
-
-      invoiceRealTotal = draftTrips.reduce((sum, t) => sum + Number(t.total_cost), 0);
-      invoiceRealCount = draftTrips.length;
-    } else {
-      // Paid/Pending: Use linked trips
-      // Edge case: If status is Paid but total is 0 (manual DB error), fallback to uninvoiced
-      let linkedTotal = inv.trip_costs.reduce((sum, t) => sum + Number(t.total_cost), 0);
-      
-      if (linkedTotal > 0) {
-        invoiceRealTotal = linkedTotal;
-        invoiceRealCount = inv.trip_costs.length;
-      } else {
-        // Fallback check
-        const [year, monthNum] = inv.billing_month.split("-");
-        const start = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
-        const end = new Date(parseInt(year), parseInt(monthNum), 1);
-
-        const orphanTrips = await prisma.trip_costs.findMany({
-          where: {
-            invoice_id: null,
-            trip_assignments: { vehicles: { cab_service_id: inv.cab_service_id } },
-            created_at: { gte: start, lt: end }
-          },
-          select: { total_cost: true }
-        });
-        invoiceRealTotal = orphanTrips.reduce((sum, t) => sum + Number(t.total_cost), 0);
-        invoiceRealCount = orphanTrips.length;
-      }
-    }
-
-    group.tripCount += invoiceRealCount;
-    group.totalAmount += invoiceRealTotal;
-    group.statuses.add(inv.status);
-  }
-
-  const result = Object.values(groupedData).map((group: any) => {
-    let finalStatus = "Draft";
-    if (group.statuses.has("Overdue")) finalStatus = "Overdue";
-    else if (group.statuses.has("Pending")) finalStatus = "Pending";
-    else if (group.statuses.has("Paid")) finalStatus = "Paid";
-    else if (group.statuses.has("NoCharges")) finalStatus = "NoCharges";
-
-    return {
-      ...group,
-      status: finalStatus,
-      statuses: undefined,
-      _mostRecentInvoiceId: undefined
-    };
-  });
-
-  return result;
-};
-
 /**
- * FETCH DETAILS: Get Single Invoice with Vehicle Breakdown
+ * DETAILS
  */
-export const getInvoiceById = async (invoiceId: string) => {
+export const getInvoiceDetails = async (id: string) => {
   const invoice = await prisma.invoice.findUnique({
-    where: { id: invoiceId },
+    where: { id },
     include: {
       cab_service: true,
-      trip_costs: { select: { id: true } }
+      trip_costs: {
+        include: {
+          trip_assignments: {
+            include: {
+              // 1. Vehicles
+              vehicles: true,
+              
+              // 2. Drivers
+              drivers: {
+                include: {
+                  users_drivers_user_idTousers: true,
+                },
+              },
+
+              // 3. !!! CRITICAL: MISSING PART ADDED !!!
+              // This is required to get the Requester Name (User who requested the trip)
+              trip_requests: {
+                include: {
+                  users_trip_requests_requested_by_user_idTousers: true,
+                },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
   if (!invoice) throw new Error("Invoice not found");
 
-  let detailedTrips: any[] = [];
-
-  // Logic for Draft vs Finalized
-  if (invoice.status === "Draft" || invoice.trip_costs.length === 0) {
-    // Fetch Uninvoiced Trips
-    const [year, monthIndex] = invoice.billing_month.split("-");
-    const startDate = new Date(parseInt(year), parseInt(monthIndex) - 1, 1);
-    const endDate = new Date(parseInt(year), parseInt(monthIndex), 1);
-
-    const rawTripCosts = await prisma.trip_costs.findMany({
-      where: {
-        invoice_id: null,
-        trip_assignments: {
-          vehicles: { cab_service_id: invoice.cab_service_id },
-        },
-        created_at: { gte: startDate, lt: endDate },
-      },
-      include: {
-        trip_assignments: {
-          include: {
-            trip_requests: {
-              include: {
-                users_trip_requests_requested_by_user_idTousers: {
-                  include: { departments_users_department_idTodepartments: { select: { name: true } } }
-                }
-              }
-            },
-            vehicles: { select: { id: true, registration_number: true, make: true, model: true } },
-            drivers: {
-              select: { id: true, users_drivers_user_idTousers: { select: { first_name: true, last_name: true } } }
-            }
-          },
-        },
-      },
-      orderBy: { created_at: 'desc' }
-    });
-
-    detailedTrips = rawTripCosts.map((tc: any) => {
-      const driverUser = tc.trip_assignments?.drivers?.users_drivers_user_idTousers;
-      return {
-        id: tc.id,
-        created_at: tc.created_at,
-        total_cost: Number(tc.total_cost),
-        driverName: driverUser ? `${driverUser.first_name} ${driverUser.last_name}` : "Unassigned",
-        trip_assignments: tc.trip_assignments,
-        billing: { billToDepartment: tc.trip_assignments?.trip_requests?.users_trip_requests_requested_by_user_idTousers?.departments_users_department_idTodepartments?.name || "Unassigned" }
-      };
-    });
-  } else {
-    // Fetch Linked Trips
-    const linkedTrips = await prisma.trip_costs.findMany({
-      where: { invoice_id: invoiceId },
-      include: {
-        trip_assignments: {
-          include: {
-            trip_requests: {
-              include: {
-                users_trip_requests_requested_by_user_idTousers: {
-                  include: { departments_users_department_idTodepartments: { select: { name: true } } }
-                }
-              }
-            },
-            vehicles: { select: { id: true, registration_number: true, make: true, model: true } },
-            drivers: {
-              select: { id: true, users_drivers_user_idTousers: { select: { first_name: true, last_name: true } } }
-            }
-          },
-        },
-      },
-      orderBy: { created_at: 'desc' }
-    });
-
-    detailedTrips = linkedTrips.map((tc: any) => {
-      const driverUser = tc.trip_assignments?.drivers?.users_drivers_user_idTousers;
-      return {
-        id: tc.id,
-        created_at: tc.created_at,
-        total_cost: Number(tc.total_cost),
-        driverName: driverUser ? `${driverUser.first_name} ${driverUser.last_name}` : "Unassigned",
-        trip_assignments: tc.trip_assignments,
-      };
-    });
-  }
-
-  // Group by Vehicle
-  const vehicleGroups: Record<string, any> = {};
-  detailedTrips.forEach((trip) => {
-    const vehicle = trip.trip_assignments?.vehicles;
-    const regNumber = vehicle?.registration_number || "Unknown Vehicle";
-
-    if (!vehicleGroups[regNumber]) {
-      vehicleGroups[regNumber] = {
-        vehicleId: vehicle?.id || "unknown",
-        registrationNumber: regNumber,
-        make: vehicle?.make || "N/A",
-        model: vehicle?.model || "N/A",
-        trips: [],
-        totalCost: 0,
-        tripCount: 0
-      };
-    }
-
-    vehicleGroups[regNumber].trips.push(trip);
-    vehicleGroups[regNumber].totalCost += Number(trip.total_cost);
-    vehicleGroups[regNumber].tripCount += 1;
-  });
-
-  return {
-    ...invoice,
-    totalAmount: Object.values(vehicleGroups).reduce((sum: any, vg: any) => sum + vg.totalCost, 0),
-    breakdownByVehicle: Object.values(vehicleGroups)
-  };
+  return invoice;
 };
