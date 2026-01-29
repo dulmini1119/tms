@@ -852,7 +852,7 @@ model Invoice {
 model trip_logs {
   id                       String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   trip_request_id          String?           @db.Uuid
-  trip_assignment_id       String?           @db.Uuid
+  trip_assignment_id       String?           @unique @db.Uuid
   trip_number              String            @unique @db.VarChar(100)
   trip_date                DateTime          @db.Date
   trip_status              String?           @db.VarChar(50)
