@@ -42,6 +42,7 @@ export interface FormattedGPSLog {
   lastPing: Date;
   createdAt: Date;
   updatedAt: Date; // we'll use server_timestamp
+  
 }
 
 export interface GPSLogsResponse {
