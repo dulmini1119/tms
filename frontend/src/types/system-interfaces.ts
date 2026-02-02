@@ -70,7 +70,7 @@ export interface ExpiryAlert {
   entityId: string;
   entityName: string;
   documentName: string;
-  documentNumber?: string;
+  documentNumber: string | null;
   issueDate: string;
   expiryDate: string;
   daysToExpiry: number;
