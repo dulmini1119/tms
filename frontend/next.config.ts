@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: "/expiry-alerts",
+        destination: "http://localhost:3001/expiry-alerts",
+      },
+      {
+        source: "/expiry-alerts/:path*",
+        destination: "http://localhost:3001/expiry-alerts/:path*",
+      },
+      {
         source: "/gps-logs",
         destination: "http://localhost:3001/gps-logs",
       },

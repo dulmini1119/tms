@@ -1,14 +1,11 @@
-// src/middleware/auth.ts
-
-import { Request, Response, NextFunction, ParamsDictionary } from 'express-serve-static-core'; // Import core types
+import { Request, Response, NextFunction, ParamsDictionary } from 'express-serve-static-core'; 
 import { ParsedQs } from 'qs';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/database.js';
 import ApiResponse from '../utils/response.js';
 import logger from '../utils/logger.js';
 
-// --- CHANGE 1: Make AuthRequest generic ---
-// This allows it to be used like AuthRequest<{}, {}, CreateDepartmentDto> in your controllers
+
 export interface AuthRequest<
   P = ParamsDictionary,
   ResBody = any,
@@ -37,7 +34,6 @@ export const authenticate = async (
   res: Response,
   next: NextFunction
 ): Promise<void | Response> => {
-  console.log("Auth middleware: Cokkies received are" ,req.cookies);
   try {
     const accessToken = req.cookies.accessToken;
     const refreshToken = req.cookies.refreshToken;
@@ -46,7 +42,6 @@ export const authenticate = async (
       return ApiResponse.error(res, 'UNAUTHORIZED', 'No token provided', 401);
     }
 
-    // Try access token
     if (accessToken) {
       try {
         const decoded = jwt.verify(accessToken, process.env.JWT_ACCESS_SECRET!) as { userId: string };
@@ -77,19 +72,16 @@ export const authenticate = async (
           return next();
         }
       } catch (err) {
-        // Expired or invalid → fall through to refresh token
         logger.debug('Access token invalid or expired');
       }
     }
 
-    // Try refresh token
     if (refreshToken) {
       try {
         const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as { userId: string };
-        // --- CHANGE 2 (Optional but Recommended): Fetch full user data on refresh for consistency ---
         const user = await prisma.users.findUnique({
           where: { id: decoded.userId },
-          select: { // Select the same full set of fields
+          select: { 
             id: true,
             email: true,
             first_name: true,
@@ -115,7 +107,6 @@ export const authenticate = async (
           maxAge: 15 * 60 * 1000,
         });
 
-        // Attach the full user object, not just id and email
         req.user = {
           id: user.id,
           email: user.email,
