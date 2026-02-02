@@ -1195,6 +1195,3 @@ model PasswordReset {
   expires_at  DateTime
   created_at  DateTime @default(now())
 }
-
-
-     

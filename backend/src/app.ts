@@ -28,6 +28,7 @@ import tripLogRoutes  from './modules/trip-logs/trip-logs.routes.js';
 import tripCostRoutes  from './modules/trip-costs/trip-costs.routes.js';
 import invoiceRoutes from './modules/invoice/invoice.routes.js';
 import gpsLogsRoutes from './modules/gpslogs/gpslogs.routes.js';
+import expiryAlertRoutes from './modules/expiry-alerts/expiry-alerts.routes.js';
 // ADD THIS LINE — CRITICAL!
 import { authenticate } from './middleware/auth.js';
 
@@ -87,6 +88,7 @@ app.use('/trip-logs', authenticate,  tripLogRoutes); // PROTECTED
 app.use('/trip-costs', authenticate,  tripCostRoutes); 
 app.use('/invoices', authenticate, invoiceRoutes); // PROTECTED
 app.use('/gps-logs', authenticate, gpsLogsRoutes)
+app.use('/expiry-alerts', authenticate, expiryAlertRoutes);
 // 404 & Error handlers
 app.use(notFoundHandler);
 app.use(errorHandler);
