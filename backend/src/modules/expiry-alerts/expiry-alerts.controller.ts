@@ -41,7 +41,6 @@ export const getExpiryAlerts = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// expiry-alerts.controller.ts
 export const updateExpiryAlert = async (
   req: AuthRequest<{ id: string }, {}, any>,
   res: Response
@@ -50,37 +49,61 @@ export const updateExpiryAlert = async (
   const userId = req.user!.id;
 
   try {
-    // 1. Destructure the body
     const { assigned_to, ...restOfBody } = req.body;
 
-    // 2. Helper function to check if a string is a valid UUID
     const isValidUUID = (str: string) => {
       return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(str);
     };
 
-    // 3. Create sanitized body
     const sanitizedBody = { ...restOfBody };
 
-    // Only add assigned_to if it is actually a UUID, otherwise ignore it (prevents crash)
+    // Handle 'assigned_to' (Relation)
     if (assigned_to && isValidUUID(assigned_to)) {
-      sanitizedBody.assigned_to = assigned_to;
+      sanitizedBody.users_expiry_alerts_assigned_toTousers = {
+        connect: { id: assigned_to }
+      };
+      delete sanitizedBody.assigned_to;
     }
 
-    // Only update updated_by/resolved_by if we have a valid user ID
-    if (userId) {
-      sanitizedBody.updated_by = userId;
-      if (req.body.status === "Renewed") {
-        sanitizedBody.resolved_by = userId;
-      }
+    // ❌ REMOVE THIS BLOCK: updated_by is not in your schema
+    // if (userId) {
+    //   sanitizedBody.updated_by = userId;
+    //   if (sanitizedBody.status === "Renewed") {
+    //     sanitizedBody.resolved_by = userId; // Wait, resolved_by IS in schema
+    //   }
+    // }
+
+    // ✅ We keep resolved_by logic because it IS in schema
+    if (userId && restOfBody.status === "Renewed") {
+      sanitizedBody.users_expiry_alerts_resolved_byTousers = {
+        connect: { id: userId }
+      };
+      delete sanitizedBody.resolved_by;
     }
 
-    // 4. Pass sanitized data to service
     const updatedAlert = await expiryAlertService.updateExpiryAlert(id, sanitizedBody);
     
     return res.status(200).json(updatedAlert);
-  } catch (error) {
-    console.error("Error updating alert:", error); // Log the specific error in console
-    return res.status(500).json({ message: "Error updating alert", error });
+  } catch (error: any) {
+    console.error("Full Error Object:", JSON.stringify(error, null, 2));
+    return res.status(500).json({ 
+      message: "Error updating alert", 
+      details: error.message 
+    });
   }
 };
+
+export const triggerSync = async (req: AuthRequest, res : Response) => {
+  try{
+    const count = await expiryAlertService.syncExpiryAlerts();
+    res.status(200).json({
+      message: "Sync completes successfully",
+      alert_created: count
+    });
+  }catch(error){
+    console.error("Error during sync:", error);
+    res.status(500).json({ message: "Internal server error during sync" });
+  }
+}
+
 

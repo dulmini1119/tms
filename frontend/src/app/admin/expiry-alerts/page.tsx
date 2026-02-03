@@ -7,11 +7,9 @@ import {
   Search,
   MoreHorizontal,
   Eye,
-  Edit,
   CheckCircle,
   XCircle,
   Clock,
-  FileText,
   Car,
   User,
   Send,
@@ -19,16 +17,9 @@ import {
   Download,
 } from "lucide-react";
 
-// UI Components
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -62,17 +53,15 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-// Types
 import { ExpiryAlert } from "@/types/system-interfaces";
 import { VariantProps } from "class-variance-authority";
 
-// API Helper
 import { fetchAPI } from "@/lib/api";
+import { toast } from "sonner";
 
-// --- 1. LOCAL INTERFACE FOR BACKEND RESPONSE (Snake Case) ---
 interface BackendAlert {
   id: string;
-  alert_type: string | null; // ✅ ADDED: Required by ExpiryAlert interface
+  alert_type: string | null;
   entity_type: string;
   entity_id: string;
   entity_name: string | null;
@@ -101,98 +90,121 @@ interface BackendAlert {
   resolved_at: string | null;
   resolved_by: string | null;
   attachments?: string[];
+  users_expiry_alerts_assigned_toTousers?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  documents?: {
+    file_name: string | null;
+    file_path: string | null;
+  };
 }
 
-// Form Validation Errors
 type FormErrors = {
   renewalNotes?: string;
   assignedTo?: string;
 };
 
 export default function ExpiryAlerts() {
-  // --- STATE ---
   const [alerts, setAlerts] = useState<ExpiryAlert[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Filters
+  const [syncing, setSyncing] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
-  
-  // Dialogs
+
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isRenewalDialogOpen, setIsRenewalDialogOpen] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState<ExpiryAlert | null>(null);
 
-  // Form State
   const [renewalNotes, setRenewalNotes] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [formErrors, setFormErrors] = useState<FormErrors>({});
-
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10); // ✅ KEEP: Used below
+  const [pageSize, setPageSize] = useState(10);
 
-  // --- EFFECTS ---
+  const loadAlerts = async () => {
+    try {
+      setLoading(true);
+      const data: BackendAlert[] = await fetchAPI("/expiry-alerts");
+
+      const mappedAlerts: ExpiryAlert[] = data.map((item) => ({
+        id: item.id,
+        alertType: (item.alert_type || "Document") as ExpiryAlert["alertType"],
+
+        entityType: item.entity_type as "Vehicle" | "Driver" | "Document",
+        entityId: item.entity_id,
+        entityName: item.entity_name || "Unknown Entity",
+        documentName:
+          item.documents?.file_name || item.document_name || "Unknown",
+        documentNumber: item.document_number || null,
+        issueDate: item.issue_date || "",
+        expiryDate: item.expiry_date,
+        daysToExpiry: item.days_to_expiry || 0,
+        status: item.status as ExpiryAlert["status"],
+        priority: (item.priority || "Low") as ExpiryAlert["priority"],
+        assignedTo: item.assigned_to || undefined,
+        assignedUser: item.users_expiry_alerts_assigned_toTousers
+          ? {
+              id: item.users_expiry_alerts_assigned_toTousers.id,
+              firstName: item.users_expiry_alerts_assigned_toTousers.first_name,
+
+              lastName: item.users_expiry_alerts_assigned_toTousers.last_name,
+              email: item.users_expiry_alerts_assigned_toTousers.email,
+            }
+          : null,
+        renewalCost: item.renewal_cost ? Number(item.renewal_cost) : undefined,
+        currency: item.currency || undefined,
+        vendor: item.vendor || undefined,
+
+        // Map Nested Object
+        renewalProcess: {
+          processStarted: !!item.renewal_process_started,
+          documentsSubmitted: !!item.renewal_documents_submitted,
+          paymentMade: !!item.renewal_payment_made,
+          newExpiryDate: item.new_expiry_date || undefined,
+          renewalReference: item.renewal_reference || undefined,
+        },
+
+        remindersSent: item.reminders_sent || 0,
+        lastReminderDate: item.last_reminder_date || undefined,
+        notes: item.notes || undefined,
+        attachments: item.attachments || [], // DB might not have this, so default empty
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+        resolvedAt: item.resolved_at || undefined,
+        resolvedBy: item.resolved_by || undefined,
+      }));
+
+      setAlerts(mappedAlerts);
+    } catch (error) {
+      console.error("Failed to fetch alerts", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadAlerts = async () => {
-      try {
-        setLoading(true);
-        const data: BackendAlert[] = await fetchAPI("/expiry-alerts");
-        
-        // Map Backend Data (Snake) to Frontend Interface (Camel)
-        const mappedAlerts: ExpiryAlert[] = data.map((item) => ({
-          id: item.id,
-          
-          // ✅ FIX: Map alert_type explicitly
-          alertType: (item.alert_type || "Document") as ExpiryAlert["alertType"],
-          
-          entityType: item.entity_type as "Vehicle" | "Driver" | "Document",
-          entityId: item.entity_id,
-          entityName: item.entity_name || "Unknown Entity",
-          documentName: item.document_name || "Unknown Document",
-          documentNumber: item.document_number || null,
-          issueDate: item.issue_date || "",
-          expiryDate: item.expiry_date,
-          daysToExpiry: item.days_to_expiry || 0,
-          status: item.status as ExpiryAlert["status"],
-          priority: (item.priority || "Low") as ExpiryAlert["priority"],
-          assignedTo: item.assigned_to || undefined,
-          renewalCost: item.renewal_cost ? Number(item.renewal_cost) : undefined,
-          currency: item.currency || undefined,
-          vendor: item.vendor || undefined,
-          
-          // Map Nested Object
-          renewalProcess: {
-            processStarted: !!item.renewal_process_started,
-            documentsSubmitted: !!item.renewal_documents_submitted,
-            paymentMade: !!item.renewal_payment_made,
-            newExpiryDate: item.new_expiry_date || undefined,
-            renewalReference: item.renewal_reference || undefined,
-          },
-
-          remindersSent: item.reminders_sent || 0,
-          lastReminderDate: item.last_reminder_date || undefined,
-          notes: item.notes || undefined,
-          attachments: item.attachments || [], // DB might not have this, so default empty
-          createdAt: item.created_at,
-          updatedAt: item.updated_at,
-          resolvedAt: item.resolved_at || undefined,
-          resolvedBy: item.resolved_by || undefined,
-        }));
-
-        setAlerts(mappedAlerts);
-      } catch (error) {
-        console.error("Failed to fetch alerts", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadAlerts();
   }, []);
 
-  // --- FILTERING LOGIC ---
+  const handleSyncAlerts = async () => {
+    try {
+      setSyncing(true);
+      await fetchAPI("/expiry-alerts/sync");
+
+      await loadAlerts();
+    } catch (error) {
+      console.error("Failed to sync alerts", error);
+      toast.error("Failed to sync alerts. Please try again.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const filteredAlerts = alerts.filter((alert) => {
     const matchesSearch =
       alert.entityName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -208,18 +220,14 @@ export default function ExpiryAlerts() {
       priorityFilter === "all" ||
       alert.priority.toLowerCase() === priorityFilter;
 
-    // Removed entity filter logic to fix unused variable error, or implement it if needed
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  // Pagination Logic
   const totalPages = Math.ceil(filteredAlerts.length / pageSize);
   const paginatedAlerts = filteredAlerts.slice(
     (currentPage - 1) * pageSize,
-    currentPage * pageSize
+    currentPage * pageSize,
   );
-
-  // --- HANDLERS ---
 
   const handleViewDetails = (alert: ExpiryAlert) => {
     setSelectedAlert(alert);
@@ -236,7 +244,8 @@ export default function ExpiryAlerts() {
 
   const validateForm = () => {
     const errors: FormErrors = {};
-    if (!renewalNotes.trim()) errors.renewalNotes = "Renewal notes are required";
+    if (!renewalNotes.trim())
+      errors.renewalNotes = "Renewal notes are required";
     if (!assignedTo.trim()) errors.assignedTo = "Assigned person is required";
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -248,8 +257,6 @@ export default function ExpiryAlerts() {
     try {
       setLoading(true);
 
-      // ✅ FIX: Pass object directly, NOT JSON.stringify. 
-      // Axios handles the serialization.
       await fetchAPI(`/expiry-alerts/${selectedAlert.id}`, {
         method: "PATCH",
         body: {
@@ -260,7 +267,6 @@ export default function ExpiryAlerts() {
         },
       });
 
-      // Optimistic Update
       setAlerts((prev) =>
         prev.map((a) =>
           a.id === selectedAlert.id
@@ -271,11 +277,10 @@ export default function ExpiryAlerts() {
                 assignedTo,
                 notes: renewalNotes,
               }
-            : a
-        )
+            : a,
+        ),
       );
 
-      // ✅ FIX: Correct function name
       handleCloseRenewalDialog();
     } catch (error) {
       console.error("Error starting renewal:", error);
@@ -286,7 +291,6 @@ export default function ExpiryAlerts() {
 
   const handleSendReminder = async (alert: ExpiryAlert) => {
     try {
-      // ✅ FIX: Pass object directly
       await fetchAPI(`/expiry-alerts/${alert.id}`, {
         method: "PATCH",
         body: {
@@ -303,8 +307,8 @@ export default function ExpiryAlerts() {
                 remindersSent: a.remindersSent + 1,
                 lastReminderDate: new Date().toISOString(),
               }
-            : a
-        )
+            : a,
+        ),
       );
     } catch (error) {
       console.error("Error sending reminder:", error);
@@ -313,20 +317,21 @@ export default function ExpiryAlerts() {
 
   const handleUpdateStatus = async (alert: ExpiryAlert, newStatus: string) => {
     try {
-      // ✅ FIX: Pass object directly
       await fetchAPI(`/expiry-alerts/${alert.id}`, {
         method: "PATCH",
         body: {
           status: newStatus,
-          resolved_at: newStatus === "Renewed" ? new Date().toISOString() : null,
+          resolved_at:
+            newStatus === "Renewed" ? new Date().toISOString() : null,
         },
       });
 
-      // ✅ FIX: Use proper union type cast instead of 'any'
       setAlerts((prev) =>
         prev.map((a) =>
-          a.id === alert.id ? { ...a, status: newStatus as ExpiryAlert["status"] } : a
-        )
+          a.id === alert.id
+            ? { ...a, status: newStatus as ExpiryAlert["status"] }
+            : a,
+        ),
       );
     } catch (error) {
       console.error("Error updating status:", error);
@@ -376,12 +381,30 @@ export default function ExpiryAlerts() {
 
   // --- UTILS ---
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: VariantProps<typeof badgeVariants>["variant"]; icon: React.ReactNode }> = {
+    const variants: Record<
+      string,
+      {
+        variant: VariantProps<typeof badgeVariants>["variant"];
+        icon: React.ReactNode;
+      }
+    > = {
       Active: { variant: "default", icon: <CheckCircle className="h-3 w-3" /> },
-      Expiring_Soon: { variant: "secondary", icon: <Clock className="h-3 w-3" /> },
-      Expired: { variant: "destructive", icon: <XCircle className="h-3 w-3" /> },
-      Renewed: { variant: "default", icon: <CheckCircle className="h-3 w-3" /> },
-      Under_Process: { variant: "outline", icon: <RefreshCw className="h-3 w-3" /> },
+      Expiring_Soon: {
+        variant: "secondary",
+        icon: <Clock className="h-3 w-3" />,
+      },
+      Expired: {
+        variant: "destructive",
+        icon: <XCircle className="h-3 w-3" />,
+      },
+      Renewed: {
+        variant: "default",
+        icon: <CheckCircle className="h-3 w-3" />,
+      },
+      Under_Process: {
+        variant: "outline",
+        icon: <RefreshCw className="h-3 w-3" />,
+      },
     };
     const config = variants[status] || variants["Active"];
     return (
@@ -415,15 +438,13 @@ export default function ExpiryAlerts() {
     setFormErrors({});
   };
 
-  // --- RENDER ---
   if (loading) return <div className="p-8">Loading alerts...</div>;
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Expiry Alerts</h1>
+        <div className="p-3">
+          <h1 className="text-2xl">EXPIRY ALERTS</h1>
           <p className="text-sm text-muted-foreground">
             Monitor document expiry and renewals
           </p>
@@ -431,6 +452,11 @@ export default function ExpiryAlerts() {
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExportReport}>
             <Download className="mr-2 h-4 w-4" /> Export
+          </Button>
+
+          <Button onClick={handleSyncAlerts} disabled={syncing}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing..." : "Sync Alerts"}
           </Button>
         </div>
       </div>
@@ -551,26 +577,44 @@ export default function ExpiryAlerts() {
                     <TableCell>
                       <div>
                         <div className="font-medium flex items-center">
-                          {alert.entityType === "Vehicle" ? <Car className="h-3 w-3 mr-2" /> : <User className="h-3 w-3 mr-2" />}
+                          {alert.entityType === "Vehicle" ? (
+                            <Car className="h-3 w-3 mr-2" />
+                          ) : (
+                            <User className="h-3 w-3 mr-2" />
+                          )}
                           {alert.entityName}
                         </div>
-                        <div className="text-sm text-muted-foreground">{alert.documentName}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {alert.documentName}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className={`text-sm font-medium ${getDaysColor(alert.daysToExpiry)}`}>
-                        {alert.daysToExpiry < 0 ? `Overdue by ${Math.abs(alert.daysToExpiry)}` : `${alert.daysToExpiry} days`}
+                      <div
+                        className={`text-sm font-medium ${getDaysColor(alert.daysToExpiry)}`}
+                      >
+                        {alert.daysToExpiry < 0
+                          ? `Overdue by ${Math.abs(alert.daysToExpiry)}`
+                          : `${alert.daysToExpiry} days`}
                       </div>
-                      <div className="text-xs text-muted-foreground">{formatDate(alert.expiryDate)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatDate(alert.expiryDate)}
+                      </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(alert.status)}</TableCell>
                     <TableCell>
                       <div className="text-xs">
-                        Status: {alert.renewalProcess.processStarted ? "Started" : "Not Started"}
+                        Status:{" "}
+                        {alert.renewalProcess.processStarted
+                          ? "Started"
+                          : "Not Started"}
                       </div>
                       {alert.assignedTo && (
                         <div className="text-xs flex items-center text-muted-foreground">
-                          <User className="h-3 w-3 mr-1" /> {alert.assignedTo.split("@")[0]}
+                          <User className="h-3 w-3 mr-1" />{" "}
+                          {alert.assignedUser
+                            ? `${alert.assignedUser.firstName} ${alert.assignedUser.lastName}`
+                            : alert.assignedTo}
                         </div>
                       )}
                     </TableCell>
@@ -582,17 +626,26 @@ export default function ExpiryAlerts() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewDetails(alert)}>
+                          <DropdownMenuItem
+                            onClick={() => handleViewDetails(alert)}
+                          >
                             <Eye className="h-4 w-4 mr-2" /> View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleStartRenewal(alert)}>
+                          <DropdownMenuItem
+                            onClick={() => handleStartRenewal(alert)}
+                          >
                             <RefreshCw className="h-4 w-4 mr-2" /> Start Renewal
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleSendReminder(alert)}>
+                          <DropdownMenuItem
+                            onClick={() => handleSendReminder(alert)}
+                          >
                             <Mail className="h-4 w-4 mr-2" /> Send Reminder
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleUpdateStatus(alert, "Renewed")}>
-                            <CheckCircle className="h-4 w-4 mr-2" /> Mark Renewed
+                          <DropdownMenuItem
+                            onClick={() => handleUpdateStatus(alert, "Renewed")}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" /> Mark
+                            Renewed
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -602,31 +655,132 @@ export default function ExpiryAlerts() {
               </TableBody>
             </Table>
           </div>
-          
+
+          {/* Mobile Card View */}
+          <div className="space-y-4 md:hidden">
+            {paginatedAlerts.map((alert) => (
+              <Card key={alert.id} className="p-4">
+                {/* Header */}
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-medium flex items-center">
+                      {alert.entityType === "Vehicle" ? (
+                        <Car className="h-4 w-4 mr-2" />
+                      ) : (
+                        <User className="h-4 w-4 mr-2" />
+                      )}
+                      {alert.entityName}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {alert.documentName}
+                    </div>
+                  </div>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => handleViewDetails(alert)}
+                      >
+                        <Eye className="h-4 w-4 mr-2" /> View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleStartRenewal(alert)}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" /> Start Renewal
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleSendReminder(alert)}
+                      >
+                        <Mail className="h-4 w-4 mr-2" /> Send Reminder
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleUpdateStatus(alert, "Renewed")}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" /> Mark Renewed
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Divider */}
+                <div className="my-3 border-t" />
+
+                {/* Expiry */}
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Expiry</span>
+                  <div className="text-right">
+                    <div
+                      className={`font-medium ${getDaysColor(alert.daysToExpiry)}`}
+                    >
+                      {alert.daysToExpiry < 0
+                        ? `Overdue by ${Math.abs(alert.daysToExpiry)}`
+                        : `${alert.daysToExpiry} days`}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatDate(alert.expiryDate)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div className="flex justify-between items-center mt-2">
+                  <span className="text-muted-foreground text-sm">Status</span>
+                  {getStatusBadge(alert.status)}
+                </div>
+
+                {/* Renewal */}
+                <div className="mt-2 text-sm">
+                  <div>
+                    Renewal:{" "}
+                    <span className="font-medium">
+                      {alert.renewalProcess.processStarted
+                        ? "Started"
+                        : "Not Started"}
+                    </span>
+                  </div>
+
+                  {alert.assignedTo && (
+                    <div className="flex items-center text-muted-foreground text-xs mt-1">
+                      <User className="h-3 w-3 mr-1" />
+                      {alert.assignedUser
+                        ? `${alert.assignedUser.firstName} ${alert.assignedUser.lastName}`
+                        : alert.assignedTo}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+
           {/* Pagination */}
           <div className="flex items-center justify-end space-x-2 py-4">
             <div className="flex-1 text-sm text-muted-foreground">
               Showing {paginatedAlerts.length} of {filteredAlerts.length} alerts
             </div>
-             {/* ✅ FIX: Use setPageSize properly in JSX */}
-             <Select
-                value={pageSize.toString()}
-                onValueChange={(v) => {
-                  setPageSize(Number(v));
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="w-16">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[10, 25, 50].map((s) => (
-                    <SelectItem key={s} value={s.toString()}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* ✅ FIX: Use setPageSize properly in JSX */}
+            <Select
+              value={pageSize.toString()}
+              onValueChange={(v) => {
+                setPageSize(Number(v));
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-16">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[10, 25, 50].map((s) => (
+                  <SelectItem key={s} value={s.toString()}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="sm"
@@ -653,15 +807,26 @@ export default function ExpiryAlerts() {
           <DialogHeader>
             <DialogTitle>Start Renewal Process</DialogTitle>
             <DialogDescription>
-              {selectedAlert && `Renewing ${selectedAlert.documentName} for ${selectedAlert.entityName}`}
+              {selectedAlert &&
+                `Renewing ${selectedAlert.documentName} for ${selectedAlert.entityName}`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {selectedAlert && (
-               <div className="grid grid-cols-2 gap-4 text-sm bg-muted p-3 rounded">
-                 <div>Document: <span className="font-medium">{selectedAlert.documentName}</span></div>
-                 <div>Expiry: <span className="font-medium">{formatDate(selectedAlert.expiryDate)}</span></div>
-               </div>
+              <div className="grid grid-cols-2 gap-4 text-sm bg-muted p-3 rounded">
+                <div>
+                  Document:{" "}
+                  <span className="font-medium">
+                    {selectedAlert.documentName}
+                  </span>
+                </div>
+                <div>
+                  Expiry:{" "}
+                  <span className="font-medium">
+                    {formatDate(selectedAlert.expiryDate)}
+                  </span>
+                </div>
+              </div>
             )}
             <div className="space-y-2">
               <Label>Assigned To</Label>
@@ -670,7 +835,9 @@ export default function ExpiryAlerts() {
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
               />
-              {formErrors.assignedTo && <p className="text-xs text-red-600">{formErrors.assignedTo}</p>}
+              {formErrors.assignedTo && (
+                <p className="text-xs text-red-600">{formErrors.assignedTo}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Notes</Label>
@@ -679,11 +846,17 @@ export default function ExpiryAlerts() {
                 value={renewalNotes}
                 onChange={(e) => setRenewalNotes(e.target.value)}
               />
-              {formErrors.renewalNotes && <p className="text-xs text-red-600">{formErrors.renewalNotes}</p>}
+              {formErrors.renewalNotes && (
+                <p className="text-xs text-red-600">
+                  {formErrors.renewalNotes}
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={handleCloseRenewalDialog}>Cancel</Button>
+            <Button variant="outline" onClick={handleCloseRenewalDialog}>
+              Cancel
+            </Button>
             <Button onClick={handleStartRenewalProcess}>Start Process</Button>
           </DialogFooter>
         </DialogContent>
@@ -698,16 +871,35 @@ export default function ExpiryAlerts() {
           {selectedAlert && (
             <div className="space-y-4 py-4 text-sm">
               <div className="grid grid-cols-2 gap-4">
-                <div><span className="text-muted-foreground">Entity:</span> {selectedAlert.entityName}</div>
-                <div><span className="text-muted-foreground">Document:</span> {selectedAlert.documentName}</div>
-                <div><span className="text-muted-foreground">Expiry:</span> {formatDate(selectedAlert.expiryDate)}</div>
-                <div><span className="text-muted-foreground">Days Left:</span> {selectedAlert.daysToExpiry}</div>
-                <div><span className="text-muted-foreground">Status:</span> {selectedAlert.status}</div>
-                <div><span className="text-muted-foreground">Priority:</span> {selectedAlert.priority}</div>
+                <div>
+                  <span className="text-muted-foreground">Entity:</span>{" "}
+                  {selectedAlert.entityName}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Document:</span>{" "}
+                  {selectedAlert.documentName}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Expiry:</span>{" "}
+                  {formatDate(selectedAlert.expiryDate)}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Days Left:</span>{" "}
+                  {selectedAlert.daysToExpiry}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Status:</span>{" "}
+                  {selectedAlert.status}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Priority:</span>{" "}
+                  {selectedAlert.priority}
+                </div>
               </div>
               {selectedAlert.notes && (
                 <div className="bg-muted p-3 rounded">
-                  <span className="font-medium">Notes:</span> {selectedAlert.notes}
+                  <span className="font-medium">Notes:</span>{" "}
+                  {selectedAlert.notes}
                 </div>
               )}
             </div>

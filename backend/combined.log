@@ -1462,3 +1462,161 @@
 {"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-02T11:23:58.295Z"}
 {"level":"error","message":"Prisma Error: \nInvalid `prisma.expiry_alerts.update()` invocation in\nC:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\expiry-alerts\\expiry-alerts.service.ts:46:33\n\n  43     updateData.resolved_at = new Date();\n  44 }\n  45 \n→ 46 return prisma.expiry_alerts.update({\n       where: {\n         id: \"63a59ab2-0f2d-42b8-b57a-950bd791548f\"\n       },\n       data: {\n         reminders_sent: 1,\n         last_reminder_date: \"2026-02-02T11:24:25.373Z\",\n         updated_by: \"9aa93d17-dc9f-4283-8758-0b55f2bb3e81\",\n         ~~~~~~~~~~\n         updated_at: new Date(\"2026-02-02T11:24:25.433Z\"),\n     ?   id?: String | StringFieldUpdateOperationsInput,\n     ?   alert_type?: String | StringFieldUpdateOperationsInput,\n     ?   entity_type?: String | StringFieldUpdateOperationsInput,\n     ?   entity_id?: String | StringFieldUpdateOperationsInput,\n     ?   entity_name?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   document_name?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   document_number?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   issue_date?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   expiry_date?: DateTime | DateTimeFieldUpdateOperationsInput,\n     ?   days_to_expiry?: Int | NullableIntFieldUpdateOperationsInput | Null,\n     ?   status?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   priority?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   department?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   renewal_process_started?: Boolean | NullableBoolFieldUpdateOperationsInput | Null,\n     ?   renewal_documents_submitted?: Boolean | NullableBoolFieldUpdateOperationsInput | Null,\n     ?   renewal_payment_made?: Boolean | NullableBoolFieldUpdateOperationsInput | Null,\n     ?   new_expiry_date?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   renewal_reference?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   renewal_cost?: Decimal | NullableDecimalFieldUpdateOperationsInput | Null,\n     ?   renewal_vendor?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   notes?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   resolved_at?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   created_at?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   users_expiry_alerts_assigned_toTousers?: usersUpdateOneWithoutExpiry_alerts_expiry_alerts_assigned_toTousersNestedInput,\n     ?   documents?: documentsUpdateOneWithoutExpiry_alertsNestedInput,\n     ?   users_expiry_alerts_resolved_byTousers?: usersUpdateOneWithoutExpiry_alerts_expiry_alerts_resolved_byTousersNestedInput\n       }\n     })\n\nUnknown argument `updated_by`. Did you mean `updated_at`? Available options are marked with ?.","service":"tms-backend","target":"expiry_alerts.update","timestamp":"2026-02-02T11:24:25.448Z"}
 {"level":"error","message":"Prisma Error: \nInvalid `prisma.expiry_alerts.update()` invocation in\nC:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\expiry-alerts\\expiry-alerts.service.ts:46:33\n\n  43     updateData.resolved_at = new Date();\n  44 }\n  45 \n→ 46 return prisma.expiry_alerts.update({\n       where: {\n         id: \"63a59ab2-0f2d-42b8-b57a-950bd791548f\"\n       },\n       data: {\n         renewal_process_started: true,\n         status: \"Under_Process\",\n         notes: \"Please Renew this\",\n         assigned_to: \"04786d91-bc24-4685-aed2-c6ddb53dc8f7\",\n         ~~~~~~~~~~~\n         updated_by: \"9aa93d17-dc9f-4283-8758-0b55f2bb3e81\",\n         updated_at: new Date(\"2026-02-02T11:25:02.813Z\"),\n     ?   id?: String | StringFieldUpdateOperationsInput,\n     ?   alert_type?: String | StringFieldUpdateOperationsInput,\n     ?   entity_type?: String | StringFieldUpdateOperationsInput,\n     ?   entity_id?: String | StringFieldUpdateOperationsInput,\n     ?   entity_name?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   document_name?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   document_number?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   issue_date?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   expiry_date?: DateTime | DateTimeFieldUpdateOperationsInput,\n     ?   days_to_expiry?: Int | NullableIntFieldUpdateOperationsInput | Null,\n     ?   priority?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   department?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   reminders_sent?: Int | NullableIntFieldUpdateOperationsInput | Null,\n     ?   last_reminder_date?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   renewal_documents_submitted?: Boolean | NullableBoolFieldUpdateOperationsInput | Null,\n     ?   renewal_payment_made?: Boolean | NullableBoolFieldUpdateOperationsInput | Null,\n     ?   new_expiry_date?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   renewal_reference?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   renewal_cost?: Decimal | NullableDecimalFieldUpdateOperationsInput | Null,\n     ?   renewal_vendor?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   resolved_at?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   created_at?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   users_expiry_alerts_assigned_toTousers?: usersUpdateOneWithoutExpiry_alerts_expiry_alerts_assigned_toTousersNestedInput,\n     ?   documents?: documentsUpdateOneWithoutExpiry_alertsNestedInput,\n     ?   users_expiry_alerts_resolved_byTousers?: usersUpdateOneWithoutExpiry_alerts_expiry_alerts_resolved_byTousersNestedInput\n       }\n     })\n\nUnknown argument `assigned_to`. Available options are marked with ?.","service":"tms-backend","target":"expiry_alerts.update","timestamp":"2026-02-02T11:25:02.817Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-02T11:29:47.176Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-02T11:29:47.181Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-02T11:29:47.181Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-02T11:29:47.182Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-02T11:29:47.182Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-02T11:29:51.654Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-02T11:29:51.659Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-02T11:29:51.660Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-02T11:29:51.660Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-02T11:29:51.661Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T02:52:29.092Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T02:52:29.096Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T02:52:29.097Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T02:52:29.098Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T02:52:29.098Z"}
+{"level":"info","message":"User logged in: superadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-02-03T02:53:44.185Z"}
+{"level":"error","message":"Prisma Error: \nInvalid `prisma.expiry_alerts.update()` invocation in\nC:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\expiry-alerts\\expiry-alerts.service.ts:46:33\n\n  43     updateData.resolved_at = new Date();\n  44 }\n  45 \n→ 46 return prisma.expiry_alerts.update({\n       where: {\n         id: \"63a59ab2-0f2d-42b8-b57a-950bd791548f\"\n       },\n       data: {\n         renewal_process_started: true,\n         status: \"Under_Process\",\n         notes: \"cc\",\n         assigned_to: \"04786d91-bc24-4685-aed2-c6ddb53dc8f7\",\n         ~~~~~~~~~~~\n         updated_by: \"9aa93d17-dc9f-4283-8758-0b55f2bb3e81\",\n         updated_at: new Date(\"2026-02-03T02:54:51.860Z\"),\n     ?   id?: String | StringFieldUpdateOperationsInput,\n     ?   alert_type?: String | StringFieldUpdateOperationsInput,\n     ?   entity_type?: String | StringFieldUpdateOperationsInput,\n     ?   entity_id?: String | StringFieldUpdateOperationsInput,\n     ?   entity_name?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   document_name?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   document_number?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   issue_date?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   expiry_date?: DateTime | DateTimeFieldUpdateOperationsInput,\n     ?   days_to_expiry?: Int | NullableIntFieldUpdateOperationsInput | Null,\n     ?   priority?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   department?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   reminders_sent?: Int | NullableIntFieldUpdateOperationsInput | Null,\n     ?   last_reminder_date?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   renewal_documents_submitted?: Boolean | NullableBoolFieldUpdateOperationsInput | Null,\n     ?   renewal_payment_made?: Boolean | NullableBoolFieldUpdateOperationsInput | Null,\n     ?   new_expiry_date?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   renewal_reference?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   renewal_cost?: Decimal | NullableDecimalFieldUpdateOperationsInput | Null,\n     ?   renewal_vendor?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   resolved_at?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   created_at?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   users_expiry_alerts_assigned_toTousers?: usersUpdateOneWithoutExpiry_alerts_expiry_alerts_assigned_toTousersNestedInput,\n     ?   documents?: documentsUpdateOneWithoutExpiry_alertsNestedInput,\n     ?   users_expiry_alerts_resolved_byTousers?: usersUpdateOneWithoutExpiry_alerts_expiry_alerts_resolved_byTousersNestedInput\n       }\n     })\n\nUnknown argument `assigned_to`. Available options are marked with ?.","service":"tms-backend","target":"expiry_alerts.update","timestamp":"2026-02-03T02:54:51.882Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T03:23:28.003Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T03:23:28.009Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T03:23:28.010Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T03:23:28.010Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T03:23:28.011Z"}
+{"level":"error","message":"Prisma Error: \nInvalid `prisma.expiry_alerts.update()` invocation in\nC:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\expiry-alerts\\expiry-alerts.service.ts:80:31\n\n  77 // Clean up auto-managed fields to avoid \"Unknown argument\" errors\n  78 delete safeData.updated_at; // Prisma handles this automatically\n  79 \n→ 80 return prisma.expiry_alerts.update({\n       where: {\n         id: \"63a59ab2-0f2d-42b8-b57a-950bd791548f\"\n       },\n       data: {\n         renewal_process_started: true,\n         status: \"Under_Process\",\n         notes: \"kjkk\",\n         updated_by: \"9aa93d17-dc9f-4283-8758-0b55f2bb3e81\",\n         ~~~~~~~~~~\n         users_expiry_alerts_assigned_toTousers: {\n           connect: {\n             id: \"04786d91-bc24-4685-aed2-c6ddb53dc8f7\"\n           }\n         },\n     ?   id?: String | StringFieldUpdateOperationsInput,\n     ?   alert_type?: String | StringFieldUpdateOperationsInput,\n     ?   entity_type?: String | StringFieldUpdateOperationsInput,\n     ?   entity_id?: String | StringFieldUpdateOperationsInput,\n     ?   entity_name?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   document_name?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   document_number?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   issue_date?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   expiry_date?: DateTime | DateTimeFieldUpdateOperationsInput,\n     ?   days_to_expiry?: Int | NullableIntFieldUpdateOperationsInput | Null,\n     ?   priority?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   department?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   reminders_sent?: Int | NullableIntFieldUpdateOperationsInput | Null,\n     ?   last_reminder_date?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   renewal_documents_submitted?: Boolean | NullableBoolFieldUpdateOperationsInput | Null,\n     ?   renewal_payment_made?: Boolean | NullableBoolFieldUpdateOperationsInput | Null,\n     ?   new_expiry_date?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   renewal_reference?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   renewal_cost?: Decimal | NullableDecimalFieldUpdateOperationsInput | Null,\n     ?   renewal_vendor?: String | NullableStringFieldUpdateOperationsInput | Null,\n     ?   resolved_at?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   created_at?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   updated_at?: DateTime | NullableDateTimeFieldUpdateOperationsInput | Null,\n     ?   documents?: documentsUpdateOneWithoutExpiry_alertsNestedInput,\n     ?   users_expiry_alerts_resolved_byTousers?: usersUpdateOneWithoutExpiry_alerts_expiry_alerts_resolved_byTousersNestedInput\n       }\n     })\n\nUnknown argument `updated_by`. Did you mean `updated_at`? Available options are marked with ?.","service":"tms-backend","target":"expiry_alerts.update","timestamp":"2026-02-03T03:23:48.100Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T03:26:46.604Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T03:26:46.610Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T03:26:46.611Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T03:26:46.611Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T03:26:46.612Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T03:27:09.947Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T03:27:09.954Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T03:27:09.955Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T03:27:09.956Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T03:27:09.956Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T03:32:45.314Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T03:32:45.321Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T03:32:45.322Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T03:32:45.323Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T03:32:45.323Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T04:26:56.439Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T04:26:56.462Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T04:26:56.465Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T04:26:56.467Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T04:26:56.469Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T04:31:26.808Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T04:31:26.816Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T04:31:26.817Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T04:31:26.817Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T04:31:26.818Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T07:28:43.381Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T07:28:43.387Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T07:28:43.387Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T07:28:43.388Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T07:28:43.388Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T07:34:08.500Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T07:34:08.505Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T07:34:08.506Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T07:34:08.507Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T07:34:08.507Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T07:34:18.638Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T07:34:18.644Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T07:34:18.644Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T07:34:18.645Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T07:34:18.645Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T09:30:31.216Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T09:30:31.221Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T09:30:31.222Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T09:30:31.222Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T09:30:31.223Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T09:50:49.175Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T09:50:49.180Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T09:50:49.181Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T09:50:49.181Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T09:50:49.181Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T10:32:43.972Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T10:32:43.976Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T10:32:43.977Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T10:32:43.977Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T10:32:43.978Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T10:37:41.702Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T10:37:41.710Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T10:37:41.712Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T10:37:41.715Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T10:37:41.716Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T10:38:14.986Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T10:38:14.990Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T10:38:14.991Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T10:38:14.991Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T10:38:14.992Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T10:38:23.562Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T10:38:23.566Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T10:38:23.566Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T10:38:23.567Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T10:38:23.567Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T10:41:01.372Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T10:41:01.378Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T10:41:01.379Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T10:41:01.379Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T10:41:01.380Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T10:43:26.527Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T10:43:26.532Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T10:43:26.533Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T10:43:26.533Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T10:43:26.534Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T10:49:01.441Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T10:49:01.460Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T10:49:01.479Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T10:49:01.491Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T10:49:01.492Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T10:50:08.369Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T10:50:08.374Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T10:50:08.375Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T10:50:08.375Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T10:50:08.375Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T10:57:17.985Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T10:57:17.990Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T10:57:17.991Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T10:57:17.992Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T10:57:17.992Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T10:58:28.316Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T10:58:28.321Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T10:58:28.322Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T10:58:28.322Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T10:58:28.322Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T11:02:24.973Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T11:02:24.978Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T11:02:24.978Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T11:02:24.979Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T11:02:24.979Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T11:08:15.313Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T11:08:15.319Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T11:08:15.319Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T11:08:15.320Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T11:08:15.320Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T11:09:13.772Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T11:09:13.776Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T11:09:13.777Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T11:09:13.777Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T11:09:13.778Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T11:09:46.700Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T11:09:46.705Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T11:09:46.706Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T11:09:46.706Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T11:09:46.706Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T11:11:18.810Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T11:11:18.817Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T11:11:18.818Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T11:11:18.818Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T11:11:18.819Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T11:11:26.659Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T11:11:26.665Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T11:11:26.666Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T11:11:26.666Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T11:11:26.667Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-03T11:17:16.652Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-03T11:17:16.656Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-03T11:17:16.657Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-03T11:17:16.657Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-03T11:17:16.658Z"}

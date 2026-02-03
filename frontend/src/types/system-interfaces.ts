@@ -78,6 +78,12 @@ export interface ExpiryAlert {
   priority: "Low" | "Medium" | "High" | "Critical";
   department?: string;
   assignedTo?: string;
+  assignedUser?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
   remindersSent: number;
   lastReminderDate?: string;
   renewalCost?: number;
