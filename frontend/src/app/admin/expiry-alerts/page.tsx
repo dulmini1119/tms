@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   AlertTriangle,
   Mail,
@@ -58,6 +58,7 @@ import { VariantProps } from "class-variance-authority";
 
 import { fetchAPI } from "@/lib/api";
 import { toast } from "sonner";
+import { Separator } from "@radix-ui/react-separator";
 
 interface BackendAlert {
   id: string;
@@ -106,7 +107,13 @@ type FormErrors = {
   renewalNotes?: string;
   assignedTo?: string;
 };
-
+interface SelectUser {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  roles?: string[]; 
+}
 export default function ExpiryAlerts() {
   const [alerts, setAlerts] = useState<ExpiryAlert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,6 +132,50 @@ export default function ExpiryAlerts() {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  const [availableUsers, setAvailableUsers] = useState<SelectUser[]>([]);
+
+
+// 3. Fetch users
+const loadUsers = async () => {
+  try {
+    const response = await fetchAPI("/users");
+    
+    let usersList: SelectUser[] = [];
+
+    // ✅ CORRECTLY EXTRACT 'users' FROM THE RESPONSE
+    if (response?.users && Array.isArray(response.users)) {
+      usersList = response.users;
+    } else if (Array.isArray(response)) {
+      // Fallback
+      usersList = response;
+    }
+
+    // Debugging log
+    console.log("First user data:", usersList[0]);
+
+    setAvailableUsers(usersList);
+  } catch (err) {
+    console.error("Failed to load users", err);
+  }
+};
+
+useEffect(() => {
+  loadUsers();
+}, []);
+
+
+const allowedRoles = new Set(["superadmin", "vehicleadmin", "driver"]);
+
+const usersToAssign = useMemo(() => {
+  return availableUsers.filter((user) => {
+    if (!user.roles || !Array.isArray(user.roles)) return false;
+
+    // ✅ FIX: Compare strings directly.
+    // The Service sends 'DRIVER', so we convert to lowercase to match the Set.
+    return user.roles.some((roleCode) => allowedRoles.has(roleCode.toLowerCase()));
+  });
+}, [availableUsers]);
 
   const loadAlerts = async () => {
     try {
@@ -603,20 +654,48 @@ export default function ExpiryAlerts() {
                     </TableCell>
                     <TableCell>{getStatusBadge(alert.status)}</TableCell>
                     <TableCell>
-                      <div className="text-xs">
-                        Status:{" "}
-                        {alert.renewalProcess.processStarted
-                          ? "Started"
-                          : "Not Started"}
-                      </div>
-                      {alert.assignedTo && (
-                        <div className="text-xs flex items-center text-muted-foreground">
-                          <User className="h-3 w-3 mr-1" />{" "}
-                          {alert.assignedUser
-                            ? `${alert.assignedUser.firstName} ${alert.assignedUser.lastName}`
-                            : alert.assignedTo}
+                      <div className="space-y-2">
+                        
+                        {/* 1. Renewal Status Badge */}
+                        <div className="flex items-center justify-between">
+                           <span className="text-xs text-muted-foreground">
+                              Status: 
+                           </span>
+                           <Badge 
+                             variant={alert.renewalProcess.processStarted ? "default" : "outline"}
+                             className="text-[10px] px-1.5 py-0.5"
+                           >
+                             {alert.renewalProcess.processStarted ? "In Process" : "Not Started"}
+                           </Badge>
                         </div>
-                      )}
+
+                        {/* 2. Assigned User Display */}
+                        {alert.assignedUser ? (
+                          <div className="flex items-center text-xs text-muted-foreground bg-muted/50 p-1.5 rounded">
+                            <User className="h-3 w-3 mr-1.5" />
+                            {alert.assignedUser.firstName} {alert.assignedUser.lastName}
+                          </div>
+                        ) : alert.assignedTo ? (
+                           // Fallback if user relation not found but ID exists
+                           <div className="text-xs text-orange-600 italic">
+                              Assigned (ID: {alert.assignedTo.substring(0, 6)}...)
+                           </div>
+                        ) : (
+                           <div className="text-xs text-gray-500 italic">Unassigned</div>
+                        )}
+
+                        {/* 3. Reminders Sent Count */}
+                        <div className="flex items-center justify-between border-l-2 border-blue-500 pl-2">
+                          <div className="flex items-center text-xs font-medium text-blue-600">
+                            <Mail className="h-3 w-3 mr-1" />
+                            Reminders
+                          </div>
+                          <span className="text-xs font-bold">
+                            {alert.remindersSent || 0}
+                          </span>
+                        </div>
+
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
@@ -733,25 +812,42 @@ export default function ExpiryAlerts() {
                   {getStatusBadge(alert.status)}
                 </div>
 
-                {/* Renewal */}
-                <div className="mt-2 text-sm">
-                  <div>
-                    Renewal:{" "}
-                    <span className="font-medium">
-                      {alert.renewalProcess.processStarted
-                        ? "Started"
-                        : "Not Started"}
-                    </span>
+                {/* Renewal Section */}
+                <div className="mt-2 text-sm space-y-2 bg-muted/30 p-3 rounded">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Status</span>
+                    <Badge 
+                       variant={alert.renewalProcess.processStarted ? "default" : "outline"}
+                       className="text-[10px]"
+                    >
+                      {alert.renewalProcess.processStarted ? "In Process" : "Not Started"}
+                    </Badge>
                   </div>
 
-                  {alert.assignedTo && (
-                    <div className="flex items-center text-muted-foreground text-xs mt-1">
-                      <User className="h-3 w-3 mr-1" />
-                      {alert.assignedUser
-                        ? `${alert.assignedUser.firstName} ${alert.assignedUser.lastName}`
-                        : alert.assignedTo}
+                  <Separator className="my-1" />
+
+                  <div className="flex justify-between items-center">
+                    <div className="text-muted-foreground text-xs">Assigned To</div>
+                    <div className="flex items-center text-xs font-medium">
+                      {alert.assignedUser ? (
+                        <>
+                          <User className="h-3 w-3 mr-1" />
+                          {alert.assignedUser.firstName} {alert.assignedUser.lastName}
+                        </>
+                      ) : (
+                        <span className="text-gray-500 italic">Unassigned</span>
+                      )}
                     </div>
-                  )}
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <div className="text-muted-foreground text-xs flex items-center">
+                      <Mail className="h-3 w-3 mr-1" /> Reminders
+                    </div>
+                    <div className="font-bold text-blue-600">
+                      {alert.remindersSent || 0}
+                    </div>
+                  </div>
                 </div>
               </Card>
             ))}
@@ -830,11 +926,31 @@ export default function ExpiryAlerts() {
             )}
             <div className="space-y-2">
               <Label>Assigned To</Label>
-              <Input
-                placeholder="Enter email or user ID"
-                value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-              />
+              <Select value="assignedTo" onValueChange={setAssignedTo}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select user..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {usersToAssign.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground text-center">
+                      No eligible users found
+                    </div>
+                  ) : (
+                    usersToAssign.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {user.first_name} {user.last_name}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {user.roles?.join(",") || "No roles"}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
               {formErrors.assignedTo && (
                 <p className="text-xs text-red-600">{formErrors.assignedTo}</p>
               )}

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import prisma from "../../config/database.js";
 
 export const createExpiryAlert = async (data: any) => {
@@ -233,8 +234,9 @@ export const syncExpiryAlerts = async () => {
   });
 
   for (const doc of expiringDocuments) {
+    const safeEntityId = doc.id || randomUUID();
     const existing = await prisma.expiry_alerts.findFirst({
-      where: { entity_type: "Document", entity_id: doc.id },
+      where: { entity_type: "Document", entity_id: safeEntityId },
     });
 
     if (existing) continue;
@@ -246,23 +248,27 @@ export const syncExpiryAlerts = async () => {
         (1000 * 60 * 60 * 24),
     );
 
-    let entityName = doc.entity_id; // Default to UUID
+    let entityName = safeEntityId; // Default to UUID
     let documentNumber = doc.document_number;
+
+    console.log(`[Document Alert] Processing Document ID: ${doc.id} | Type: "${doc.document_type}" | EntityType: ${doc.entity_type}| EntityID: "${doc.entity_id}"`);
 
     // ✅ FIX: LOOKUP REAL NAME
     // Since 'documents' table doesn't link to vehicles/drivers,
     // we must fetch them manually if we want real names.
-    if (doc.entity_type === "Vehicle") {
+    if (doc.entity_type === "VEHICLE" && doc.entity_id) {
       const vehicle = await prisma.vehicles.findUnique({
         where: { id: doc.entity_id },
         select: { registration_number: true },
       });
       if (vehicle) {
         entityName = `${vehicle.registration_number}`; // Use Plate Number
+      }else{
+        console.warn(`⚠️  Document ID ${doc.id} references VEHICLE with ID ${doc.entity_id}, but no such vehicle found.`);
       }
     }
 
-    if (doc.entity_type === "Driver") {
+    if (doc.entity_type === "Driver" && doc.entity_id) {
       const driver = await prisma.drivers.findUnique({
         where: { id: doc.entity_id },
         select: { license_number: true },
@@ -276,7 +282,7 @@ export const syncExpiryAlerts = async () => {
       data: {
         alert_type: "Document_Expiry",
         entity_type: "Document", // or "Vehicle" / "Driver" based on doc
-        entity_id: doc.entity_id,
+        entity_id: safeEntityId,
         entity_name: entityName, // ✅ NOW USES REG NUMBER OR LICENSE NO
         document_name: doc.document_type, // e.g., "Fitness_Certificate"
         document_number: documentNumber,
