@@ -21,6 +21,7 @@ export interface AuthRequest<
     department_id?: string;
     business_unit_id?: string;
     manager_id?: string;
+    position?: string;
   };
 }
 
@@ -55,6 +56,7 @@ export const authenticate = async (
             department_id: true,
             business_unit_id: true,
             manager_id: true,
+            position: true,
             status: true,
           },
         });
@@ -68,6 +70,7 @@ export const authenticate = async (
             department_id: user.department_id || undefined,
             business_unit_id: user.business_unit_id || undefined,
             manager_id: user.manager_id || undefined,
+            position: user.position || undefined,
           };
           return next();
         }
@@ -89,6 +92,7 @@ export const authenticate = async (
             department_id: true,
             business_unit_id: true,
             manager_id: true,
+            position: true,
             status: true,
           },
         });
@@ -115,6 +119,7 @@ export const authenticate = async (
           department_id: user.department_id || undefined,
           business_unit_id: user.business_unit_id || undefined,
           manager_id: user.manager_id || undefined,
+          position: user.position || undefined,
         };
         return next();
       } catch (err) {

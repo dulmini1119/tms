@@ -5,15 +5,16 @@ import logger from '../utils/logger.js';
 
 /**
  * Audit Log Middleware
- * Logs all mutation operations (POST, PUT, PATCH, DELETE)
+ * Logs all API operations with normalized action/status values.
  */
 export const auditLog = (moduleName?: string) => {
   return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+    if (shouldSkipRequest(req)) return next();
 
     const originalSend = res.send;
     const originalJson = res.json;
     let responseData: any;
+    const startedAt = Date.now();
 
     res.send = function (data: any) {
       responseData = data;
@@ -29,36 +30,49 @@ export const auditLog = (moduleName?: string) => {
 
     res.on('finish', async () => {
       try {
-        if (res.statusCode >= 400) return;
-
         const action = determineAction(req.method, req.path);
+        const module = moduleName || extractModule(req.path);
         const entityType = extractResourceType(req.path);
         const entityId = extractResourceId(req, responseData);
+        const status = mapStatus(res.statusCode);
+        const errorMessage = status === 'Failed' ? extractErrorMessage(responseData) : null;
+        const userName = buildUserName(req);
+        const durationMs = Date.now() - startedAt;
 
         await prisma.audit_logs.create({
           data: {
             user_id: req.user?.id || null,
-            user_name: req.user ? `${req.user.first_name} ${req.user.last_name}` : null,
+            user_name: userName,
             user_email: req.user?.email || null,
+            user_role: req.user?.position || null,
             action,
-            module: moduleName || 'GENERAL',
+            module,
             entity_type: entityType,
             entity_id: entityId,
             changes: {
-              method: req.method,
-              path: req.path,
-              body: sanitizeData(req.body),
-              query: req.query,
+              request: {
+                method: req.method,
+                path: req.path,
+                params: req.params,
+                query: req.query,
+                body: sanitizeData(req.body),
+              },
+              response: {
+                statusCode: res.statusCode,
+              },
+              durationMs,
             },
             ip_address: getClientIp(req),
             user_agent: req.get('user-agent') || null,
             request_method: req.method,
             request_url: req.originalUrl,
-            status: res.statusCode.toString(),
+            status,
+            error_message: errorMessage,
+            description: buildDescription(action, module, entityType, entityId),
           },
         });
 
-        logger.info(`Audit log created: ${action} by ${req.user?.email || 'anonymous'}`);
+        logger.info(`Audit log created: ${action} on ${module} by ${req.user?.email || 'anonymous'}`);
       } catch (error) {
         logger.error('Failed to create audit log:', error);
       }
@@ -69,47 +83,117 @@ export const auditLog = (moduleName?: string) => {
 };
 
 function determineAction(method: string, path: string): string {
-  const segments = path.split('/').filter(Boolean);
-  const resource = segments[segments.length - 1] || 'unknown';
+  if (path.startsWith('/auth/login')) return 'Login';
+  if (path.startsWith('/auth/logout')) return 'Logout';
+
   switch (method) {
-    case 'POST': return `CREATE_${resource.toUpperCase()}`;
+    case 'POST': return 'Create';
+    case 'GET': return 'Read';
     case 'PUT':
-    case 'PATCH': return `UPDATE_${resource.toUpperCase()}`;
-    case 'DELETE': return `DELETE_${resource.toUpperCase()}`;
-    default: return `${method}_${resource.toUpperCase()}`;
+    case 'PATCH': return 'Update';
+    case 'DELETE': return 'Delete';
+    default: return method;
   }
 }
 
 function extractResourceType(path: string): string {
   const segments = path.split('/').filter(Boolean);
-  const resourceIndex = segments.indexOf('v1') + 1;
-  return segments[resourceIndex]?.toUpperCase() || 'UNKNOWN';
+  return segments[0] || 'system';
+}
+
+function extractModule(path: string): string {
+  const segments = path.split('/').filter(Boolean);
+  return segments[0] || 'system';
 }
 
 function extractResourceId(req: AuthRequest, responseData: any): string | null {
-  if (req.params.id) return req.params.id;
+  if (req.params.id && isUuid(req.params.id)) return req.params.id;
 
   const idParams = ['userId', 'tripId', 'vehicleId', 'organizationId', 'cabServiceId'];
-  for (const param of idParams) if (req.params[param]) return req.params[param];
+  for (const param of idParams) {
+    if (req.params[param] && isUuid(req.params[param])) return req.params[param];
+  }
 
   try {
     const parsed = typeof responseData === 'string' ? JSON.parse(responseData) : responseData;
-    if (parsed?.data?.id) return parsed.data.id;
+    if (parsed?.data?.id && isUuid(parsed.data.id)) return parsed.data.id;
     for (const key of Object.keys(parsed?.data || {})) {
-      if (parsed.data[key]?.id) return parsed.data[key].id;
+      if (parsed.data[key]?.id && isUuid(parsed.data[key].id)) return parsed.data[key].id;
     }
   } catch {}
   return null;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function mapStatus(statusCode: number): 'Success' | 'Failed' | 'Pending' {
+  if (statusCode >= 500) return 'Failed';
+  if (statusCode >= 400) return 'Failed';
+  if (statusCode === 202) return 'Pending';
+  return 'Success';
+}
+
+function extractErrorMessage(responseData: any): string | null {
+  const parsed = safelyParseResponse(responseData);
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  if (typeof parsed.message === 'string') return parsed.message;
+  if (parsed.error && typeof parsed.error.message === 'string') return parsed.error.message;
+  if (typeof parsed.error === 'string') return parsed.error;
+  return null;
+}
+
+function buildUserName(req: AuthRequest): string | null {
+  if (!req.user) return null;
+  const firstName = req.user.first_name || '';
+  const lastName = req.user.last_name || '';
+  const fullName = `${firstName} ${lastName}`.trim();
+  return fullName || req.user.email || null;
+}
+
+function buildDescription(action: string, module: string, entityType: string, entityId: string | null): string {
+  const target = entityId ? `${entityType} (${entityId})` : entityType;
+  return `${action} on ${module} - ${target}`;
+}
+
+function safelyParseResponse(responseData: any): any {
+  if (typeof responseData !== 'string') return responseData;
+  try {
+    return JSON.parse(responseData);
+  } catch {
+    return null;
+  }
 }
 
 function sanitizeData(data: any): any {
   if (!data || typeof data !== 'object') return data;
 
   const sanitized = { ...data };
-  const sensitiveFields = ['password', 'passwordHash', 'token', 'refreshToken', 'secret'];
-  for (const field of sensitiveFields) {
-    if (sanitized[field]) sanitized[field] = '[REDACTED]';
+  const sensitiveFields = new Set([
+    'password',
+    'password_hash',
+    'passwordHash',
+    'token',
+    'refreshToken',
+    'accessToken',
+    'secret',
+    'otp',
+  ]);
+
+  for (const key of Object.keys(sanitized)) {
+    const value = sanitized[key];
+    if (sensitiveFields.has(key)) {
+      sanitized[key] = '[REDACTED]';
+      continue;
+    }
+
+    if (value && typeof value === 'object') {
+      sanitized[key] = sanitizeData(value);
+    }
   }
+
   return sanitized;
 }
 
@@ -120,4 +204,13 @@ function getClientIp(req: AuthRequest): string {
     req.socket.remoteAddress ||
     'unknown'
   ) as string;
+}
+
+function shouldSkipRequest(req: AuthRequest): boolean {
+  if (req.method === 'OPTIONS' || req.method === 'HEAD') return true;
+
+  // Avoid recursive/noisy logs for audit log reads/creates.
+  if (req.path.startsWith('/audit-logs')) return true;
+
+  return false;
 }

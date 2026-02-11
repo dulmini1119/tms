@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Bell,
   Send,
@@ -15,9 +15,10 @@ import {
   User,
   Link,
   Archive,
+  Loader2,
 } from "lucide-react";
-import { mockSystemData } from "@/data/mock-system-data";
-import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -59,14 +60,12 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { VariantProps } from "class-variance-authority";
+import { fetchAPI } from "@/lib/api"; 
+import { io } from "socket.io-client";
 
-// Mock toast function (replace with react-toastify or similar)
-const toast = (message: string, type: "success" | "error" = "success") => {
-  console.log(`[${type.toUpperCase()}] ${message}`);
-  // Implement toast notification (e.g., react-toastify)
-};
+// ── INTERFACES (Strict Typing) ────────────────────────────────────────────────────────
 
-// Notification interface
 export interface Notification {
   id: string;
   title: string;
@@ -104,12 +103,7 @@ export interface Notification {
     name: string;
   };
   actionable: boolean;
-  actions?: {
-    id: string;
-    label: string;
-    action: string;
-    parameters?: Record<string, unknown>;
-  }[];
+  actions?: NotificationAction[];
   scheduledFor?: string;
   expiresAt?: string;
   tags: string[];
@@ -128,7 +122,14 @@ export interface Notification {
   updatedAt: string;
 }
 
-// Form data interface for compose/edit dialog
+export interface NotificationAction {
+  id: string;
+  label: string;
+  action: string;
+  parameters?: Record<string, unknown>;
+}
+
+
 interface FormData {
   type: Notification["type"] | "";
   category: Notification["category"] | "";
@@ -142,8 +143,7 @@ interface FormData {
   scheduledFor?: string;
 }
 
-// Form errors interface
-interface FormErrors {
+type FormErrors = {
   type?: string;
   category?: string;
   title?: string;
@@ -152,30 +152,67 @@ interface FormErrors {
   severity?: string;
   recipientType?: string;
   recipientDetails?: string;
+};
+
+// Interfaces based on your Backend Services
+interface User {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  employee_id: string;
+  status: string;
+  position: string;
+  roles: string[];
+  phone?: string | null;
+  last_login?: string;
 }
 
-type NotificationAction = {
+interface Role {
   id: string;
-  label: string;
-  action: string;
-  parameters?: Record<string, unknown>;
-};
+  name: string;
+  code: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  _count: {
+    user_roles: number;
+  };
+}
+
+interface Department {
+  id: string;
+  name: string;
+  code?: string;
+  status?: string;
+  // Add other fields if your dropdown needs them
+}
+
+// Interface for the Lookup Data State
+interface LookupData {
+  users: User[];
+  roles: Role[];
+  departments: Department[];
+}
+
+// ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
 
 export default function Notifications() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isComposeDialogOpen, setIsComposeDialogOpen] = useState(false);
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
-  const [selectedNotification, setSelectedNotification] =
-    useState<Notification | null>(null);
-  const [selectedAction, setSelectedAction] =
-    useState<NotificationAction | null>(null);
-  const [notifications, setNotifications] = useState(
-    mockSystemData.notifications
-  );
+  
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [selectedAction, setSelectedAction] = useState<NotificationAction | null>(null);
+  
+  const [notifications, setNotifications] = useState<Notification[]>([]); // No mock data
+  const [loading, setLoading] = useState(true);
+  
   const [formData, setFormData] = useState<FormData>({
     type: "",
     category: "",
@@ -188,72 +225,194 @@ export default function Notifications() {
     actionable: false,
     scheduledFor: "",
   });
+  
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Mock current user ID (replace with actual auth context)
-  const currentUserId = "current-user-id"; // TODO: Replace with actual user ID from auth
+  // Add these inside your Notifications component
+const [lookupData, setLookupData] = useState<{
+  users: User[];
+  roles: Role[];
+  departments: Department[];
+}>({
+  users: [],
+  roles: [],
+  departments: [],
+});
+const [isLoadingLookup, setIsLoadingLookup] = useState(false);
 
-  // Filtered notifications
+  // Mock current user ID
+  const currentUserId = "current-user-id";
+
+  // ── FETCHING LOGIC ─────────────────────────────────────────────────────────────
+
+const loadNotifications = useCallback(async () => {
+  setLoading(true);
+  try {
+    const params = new URLSearchParams({
+      limit: pageSize.toString(),
+      page: currentPage.toString(),
+    });
+    
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (typeFilter !== "all") params.set("type", typeFilter);
+    if (categoryFilter !== "all") params.set("category", categoryFilter);
+
+    const response = await fetchAPI(`/notifications?${params.toString()}`);
+
+    let notificationsData: Notification[] = [];
+  
+
+    // Handle different possible API shapes
+    if (response?.success && response?.data) {
+      // Most likely real shape
+      notificationsData = response.data.notifications || [];
+      
+    } else if (response?.notifications && Array.isArray(response.notifications)) {
+      // Old/expected shape
+      notificationsData = response.notifications;
+   
+    } else if (Array.isArray(response)) {
+      notificationsData = response;
+    } else {
+      console.warn("Unexpected notification response format:", response);
+      notificationsData = [];
+    }
+
+    setNotifications(notificationsData);
+
+    // Optional: if you want to use real pagination from backend
+    // if (metaData) {
+    //   setTotalCount(metaData.total);
+    //   // you could also store page, limit, etc. if needed
+    // }
+
+  } catch (error) {
+    console.error("Failed to fetch notifications", error);
+    toast.error("Failed to load notifications");
+  } finally {
+    setLoading(false);
+  }
+}, [currentPage, pageSize, statusFilter, typeFilter, categoryFilter]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+
+// Fetch lookup data only when the Compose Dialog opens
+useEffect(() => {
+  if (isComposeDialogOpen) {
+    setIsLoadingLookup(true);
+
+    Promise.all([
+      fetchAPI("/users?limit=100"),
+      fetchAPI("/roles"),
+      fetchAPI("/departments?limit=100"),
+    ])
+      .then(([usersRes, rolesRes, deptsRes]) => {
+        // --- CORRECTED DATA EXTRACTION ---
+
+        // 1. Users: The array is inside 'data.users'
+        const usersList = usersRes?.data?.users || [];
+
+        // 2. Roles: The array IS 'data' directly (it is not nested!)
+        const rolesList = rolesRes?.data || [];
+
+        // 3. Departments: Assuming similar structure to users (nested in data.departments)
+        const deptsList = deptsRes?.data?.departments || [];
+
+        setLookupData({
+          users: usersList as User[],
+          roles: rolesList as Role[],
+          departments: deptsList as Department[],
+        });
+      })
+      .catch((error) => {
+        console.error("Failed to load dropdown data:", error);
+        toast.error("Failed to load users/roles/departments");
+      })
+      .finally(() => {
+        setIsLoadingLookup(false);
+      });
+  }
+}, [isComposeDialogOpen]);
+
+  useEffect(() => {
+
+    const socketUrl = process.env.NODE_ENV === "development"
+      ? "http://localhost:3001"
+      : '/'
+
+    const socket = io(socketUrl, {
+      path: '/socket.io',
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      transports: ['websocket', 'polling'],
+      withCredentials: true,
+    });
+
+    socket.on('connect', () => {
+      console.log('Socket.IO connected');
+      socket.emit('join-superadmin');
+    });
+
+    socket.on('critical-notification', (newNotif) => {
+      console.log('Received critical notification:', newNotif);
+
+      setNotifications((prev) => [newNotif, ...prev]);
+
+      toast(newNotif.title, {
+        description: newNotif.message,
+        duration: newNotif.category === 'Emergency' ? Infinity : 10000,
+      })
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('Socket connection error:' , err.message);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('Socket disconnected : ', reason);
+    })
+
+    return () => {
+      socket.disconnect();
+    };
+
+  }, []);
+
+  // ── FILTERS ─────────────────────────────────────────────────────────────────────
+
   const filteredNotifications = useMemo(() => {
     return notifications.filter((notification) => {
       return (
-        (notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          notification.message
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          notification.sender.userName
-            ?.toLowerCase()
-            .includes(searchTerm.toLowerCase())) &&
-        (statusFilter === "all" ||
-          notification.status.toLowerCase() === statusFilter) &&
-        (typeFilter === "all" ||
-          notification.type.toLowerCase() === typeFilter) &&
-        (categoryFilter === "all" ||
-          notification.category.toLowerCase() === categoryFilter)
+        notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        notification.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        notification.sender.userName?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     });
-  }, [notifications, searchTerm, statusFilter, typeFilter, categoryFilter]);
+  }, [notifications, searchTerm]); // Status/Type filtering moved to API call
 
-  // Calculate stats
+  // ── STATS ─────────────────────────────────────────────────────────────────────
+
   const stats = useMemo(
     () => ({
       totalNotifications: notifications.length,
       unreadCount: notifications.filter((n) => n.status === "Unread").length,
-      criticalCount: notifications.filter((n) => n.severity === "Critical")
-        .length,
-      emergencyCount: notifications.filter((n) => n.category === "Emergency")
-        .length,
-      acknowledgedCount: notifications.filter(
-        (n) => n.status === "Acknowledged"
-      ).length,
+      criticalCount: notifications.filter((n) => n.severity === "Critical").length,
+      emergencyCount: notifications.filter((n) => n.category === "Emergency").length,
+      acknowledgedCount: notifications.filter((n) => n.status === "Acknowledged").length,
       actionableCount: notifications.filter((n) => n.actionable).length,
     }),
     [notifications]
   );
 
-  // Form validation
-  const validateForm = (): FormErrors => {
-    const errors: FormErrors = {};
-    if (!formData.type) errors.type = "Type is required";
-    if (!formData.category) errors.category = "Category is required";
-    if (!formData.title.trim()) errors.title = "Title is required";
-    if (!formData.message.trim()) errors.message = "Message is required";
-    if (!formData.priority) errors.priority = "Priority is required";
-    if (!formData.severity) errors.severity = "Severity is required";
-    if (!formData.recipientType)
-      errors.recipientType = "Recipient type is required";
-    if (
-      formData.recipientType !== "Broadcast" &&
-      !formData.recipientDetails.trim()
-    )
-      errors.recipientDetails = "Recipient details are required";
-    return errors;
-  };
+  // ── HANDLERS ─────────────────────────────────────────────────────────────────────
 
-  // Handlers
   const handleViewDetails = (notification: Notification) => {
     setSelectedNotification(notification);
     setIsDetailsDialogOpen(true);
@@ -287,7 +446,7 @@ export default function Notifications() {
       priority: notification.priority,
       severity: notification.severity,
       recipientType: notification.recipientType,
-      recipientDetails: getRecipientSummary(notification),
+      recipientDetails: getRecipientSummary(notification), // Simplified for edit
       actionable: notification.actionable,
       scheduledFor: notification.scheduledFor
         ? new Date(notification.scheduledFor).toISOString().slice(0, 16)
@@ -297,44 +456,74 @@ export default function Notifications() {
     setIsComposeDialogOpen(true);
   };
 
-  const handleMarkAsRead = (notificationId: string) => {
-    setNotifications((prev) =>
-      prev.map((notification) =>
-        notification.id === notificationId
-          ? {
-              ...notification,
-              status: "Read",
-              readBy: [
-                ...notification.readBy,
-                {
-                  userId: currentUserId,
-                  userName: "Current User",
-                  readAt: new Date().toISOString(),
-                },
-              ],
-            }
-          : notification
-      )
-    );
-    toast("Notification marked as read", "success");
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification.id === notificationId
+            ? {
+                ...notification,
+                status: "Read",
+                readBy: [
+                  ...notification.readBy,
+                  {
+                    userId: currentUserId,
+                    userName: "Current User",
+                    readAt: new Date().toISOString(),
+                  },
+                ],
+              }
+            : notification
+        )
+      );
+
+      // API Call
+      await fetchAPI(`/notifications/${notificationId}`, {
+        method: "PATCH",
+        body: { is_read: true },
+      });
+      
+      toast.success("Notification marked as read");
+    } catch (error) {
+      console.error("Error marking read:", error);
+      toast.error("Failed to mark as read");
+    }
   };
 
-  const handleArchiveNotification = (notificationId: string) => {
-    setNotifications((prev) =>
-      prev.map((notification) =>
-        notification.id === notificationId
-          ? { ...notification, status: "Dismissed" }
-          : notification
-      )
-    );
-    toast("Notification archived", "success");
+  const handleArchiveNotification = async (notificationId: string) => {
+    try {
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification.id === notificationId
+            ? { ...notification, status: "Dismissed" }
+            : notification
+        )
+      );
+      await fetchAPI(`/notifications/${notificationId}`, {
+        method: "PATCH",
+        body: { is_read: true, status: "Dismissed" } 
+      });
+      toast.success("Notification archived");
+    } catch (error) {
+      console.error("Error archiving:", error);
+      toast.error("Failed to archive");
+    }
   };
 
-  const handleDeleteNotification = (notificationId: string) => {
-    setNotifications((prev) =>
-      prev.filter((notification) => notification.id !== notificationId)
-    );
-    toast("Notification deleted", "success");
+  const handleDeleteNotification = async (notificationId: string) => {
+    if (!confirm("Are you sure you want to delete this notification?")) return;
+
+    try {
+      await fetchAPI(`/notifications/${notificationId}`, {
+        method: "DELETE",
+      });
+
+      setNotifications((prev) => prev.filter((notification) => notification.id !== notificationId));
+      toast.success("Notification deleted");
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+      toast.error("Failed to delete notification");
+    }
   };
 
   const handleFormChange = (field: keyof FormData, value: string | boolean) => {
@@ -348,95 +537,70 @@ export default function Notifications() {
     }
   };
 
+  const validateForm = (): FormErrors => {
+    const errors: FormErrors = {};
+    if (!formData.type) errors.type = "Type is required";
+    if (!formData.category) errors.category = "Category is required";
+    if (!formData.title.trim()) errors.title = "Title is required";
+    if (!formData.message.trim()) errors.message = "Message is required";
+    if (!formData.priority) errors.priority = "Priority is required";
+    if (!formData.severity) errors.severity = "Severity is required";
+    if (!formData.recipientType) errors.recipientType = "Recipient type is required";
+    if (
+      formData.recipientType !== "Broadcast" &&
+      !formData.recipientDetails.trim()
+    )
+      errors.recipientDetails = "Recipient details are required";
+    return errors;
+  };
+
   const handleSaveNotification = async () => {
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
-      toast("Please fix the form errors", "error");
+      toast.error("Please fix the form errors");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const newNotification: Notification = {
-        id: selectedNotification?.id || crypto.randomUUID(),
+      const payload = {
         title: formData.title,
         message: formData.message,
-        type: formData.type as Notification["type"],
-        category: formData.category as Notification["category"],
-        severity: formData.severity as Notification["severity"],
-        priority: formData.priority as Notification["priority"],
-        status: "Unread",
-        recipientType: formData.recipientType as Notification["recipientType"],
-        recipients:
-          formData.recipientType === "Broadcast"
-            ? []
-            : [
-                {
-                  userName: formData.recipientDetails,
-                  userId: crypto.randomUUID(),
-                },
-              ],
-        sender: {
-          userId: currentUserId,
-          userName: "Current User",
-          system: false,
-        },
+        type: formData.type,
+        category: formData.category,
+        severity: formData.severity,
+        priority: formData.priority, 
+        recipientType: formData.recipientType,
+        recipientDetails: formData.recipientDetails,
         actionable: formData.actionable,
-        actions: formData.actionable
-          ? [
-              {
-                id: crypto.randomUUID(),
-                label: "Take Action",
-                action: "generic_action",
-                parameters: {},
-              },
-            ]
-          : [],
-        scheduledFor: formData.scheduledFor
-          ? new Date(formData.scheduledFor).toISOString()
-          : undefined,
-        expiresAt: undefined,
-        tags: [],
-        readBy: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        scheduledFor: formData.scheduledFor ? new Date(formData.scheduledFor).toISOString() : undefined,
       };
 
       if (selectedNotification) {
-        // Update existing notification
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === selectedNotification.id ? newNotification : n
-          )
-        );
-        toast("Notification updated successfully", "success");
+        
+        await fetchAPI(`/notifications/${selectedNotification.id}`, {
+          method: "PATCH",
+          body: payload, 
+        });
+        toast.success("Notification updated successfully");
       } else {
-        // Create new notification
-        setNotifications((prev) => [...prev, newNotification]);
-        toast("Notification sent successfully", "success");
+       
+        await fetchAPI("/notifications", {
+          method: "POST",
+          body: payload,
+        });
+        toast.success("Notification sent successfully");
       }
 
-      // TODO: Backend API call
-      // await api.createOrUpdateNotification(newNotification);
-
+   
+      await loadNotifications();
       setIsComposeDialogOpen(false);
       setSelectedNotification(null);
-      setFormData({
-        type: "",
-        category: "",
-        title: "",
-        message: "",
-        priority: "",
-        severity: "",
-        recipientType: "",
-        recipientDetails: "",
-        actionable: false,
-        scheduledFor: "",
-      });
+      setFormErrors({});
     } catch (error) {
-      toast("Failed to save notification", "error");
       console.error("Error saving notification:", error);
+      toast.error("Failed to save notification");
     } finally {
       setIsSubmitting(false);
     }
@@ -444,23 +608,20 @@ export default function Notifications() {
 
   const handleActionSubmit = () => {
     if (selectedNotification && selectedAction) {
-      console.log(
-        `Executing action: ${selectedAction.action}`,
-        selectedAction.parameters
-      );
-      // TODO: Backend API call to execute action
-      // await api.executeAction(selectedNotification.id, selectedAction.id, parameters);
-      toast(`Action "${selectedAction.label}" executed`, "success");
+      console.log(`Executing action: ${selectedAction.action}`, selectedAction.parameters);
+      toast.success(`Action "${selectedAction.label}" executed`);
       setIsActionDialogOpen(false);
       setSelectedAction(null);
     }
   };
 
+  // ── HELPERS ─────────────────────────────────────────────────────────────────────
+
   const getStatusBadge = (status: Notification["status"]) => {
     const variants: Record<
       Notification["status"],
       {
-        variant: "default" | "secondary" | "outline" | "destructive";
+        variant: VariantProps<typeof badgeVariants>["variant"];
         icon: React.ReactNode;
       }
     > = {
@@ -511,12 +672,13 @@ export default function Notifications() {
     return `${notification.recipients.length} recipients`;
   };
 
-  const totalPages =
-    pageSize > 0 ? Math.ceil(filteredNotifications.length / pageSize) : 1;
-  const paginatedDocuments = filteredNotifications.slice(
+  const totalPages = Math.ceil(filteredNotifications.length / pageSize);
+  const paginatedNotifications = filteredNotifications.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
+
+  // ── RENDER ─────────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
@@ -593,7 +755,6 @@ export default function Notifications() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-8"
-                aria-label="Search notifications"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -602,11 +763,9 @@ export default function Notifications() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="unread">Unread</SelectItem>
-                <SelectItem value="read">Read</SelectItem>
-                <SelectItem value="acknowledged">Acknowledged</SelectItem>
-                <SelectItem value="resolved">Resolved</SelectItem>
-                <SelectItem value="dismissed">Dismissed</SelectItem>
+                <SelectItem value="Unread">Unread</SelectItem>
+                <SelectItem value="Read">Read</SelectItem>
+                <SelectItem value="Acknowledged">Acknowledged</SelectItem>
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -615,11 +774,11 @@ export default function Notifications() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="info">Info</SelectItem>
-                <SelectItem value="success">Success</SelectItem>
-                <SelectItem value="warning">Warning</SelectItem>
-                <SelectItem value="error">Error</SelectItem>
-                <SelectItem value="alert">Alert</SelectItem>
+                <SelectItem value="Info">Info</SelectItem>
+                <SelectItem value="Success">Success</SelectItem>
+                <SelectItem value="Warning">Warning</SelectItem>
+                <SelectItem value="Error">Error</SelectItem>
+                <SelectItem value="Alert">Alert</SelectItem>
               </SelectContent>
             </Select>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -628,127 +787,247 @@ export default function Notifications() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="trip">Trip</SelectItem>
-                <SelectItem value="vehicle">Vehicle</SelectItem>
-                <SelectItem value="driver">Driver</SelectItem>
-                <SelectItem value="document">Document</SelectItem>
-                <SelectItem value="system">System</SelectItem>
-                <SelectItem value="finance">Finance</SelectItem>
-                <SelectItem value="emergency">Emergency</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
+                <SelectItem value="Trip">Trip</SelectItem>
+                <SelectItem value="Vehicle">Vehicle</SelectItem>
+                <SelectItem value="Driver">Driver</SelectItem>
+                <SelectItem value="Document">Document</SelectItem>
+                <SelectItem value="System">System</SelectItem>
+                <SelectItem value="Finance">Finance</SelectItem>
+                <SelectItem value="Emergency">Emergency</SelectItem>
+                <SelectItem value="Maintenance">Maintenance</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto">
-            <Table className="w-full">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[35%] min-w-[200px]">
-                    Notification Details
-                  </TableHead>
-                  <TableHead className="w-[20%] min-w-[150px]">
-                    Recipients
-                  </TableHead>
-                  <TableHead className="w-[20%] min-w-[150px]">
-                    Sender & Timing
-                  </TableHead>
-                  <TableHead className="w-[15%] min-w-[100px]">
-                    Status
-                  </TableHead>
-                  <TableHead className="w-[10%] min-w-[80px] text-right">
-                    Actions
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedDocuments.map((notification) => (
-                  <TableRow key={notification.id}>
-                    <TableCell className="break-words max-w-[300px]">
-                      <div className="font-medium">{notification.title}</div>
-                      <div className="text-sm text-muted-foreground truncate max-w-[250px]">
-                        {notification.message}
-                      </div>
-                      {notification.relatedEntity && (
-                        <div className="text-xs text-muted-foreground flex items-center">
-                          <Link className="h-3 w-3 mr-1" />
-                          {notification.relatedEntity.type}:{" "}
-                          {notification.relatedEntity.name}
-                        </div>
-                      )}
-                      <div className="text-xs text-muted-foreground">
-                        ID: {notification.id}
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="break-words">
-                      <div className="space-y-1">
-                        <div className="text-sm flex items-center">
-                          {notification.recipientType === "Broadcast" ? (
-                            <Users className="h-3 w-3 mr-1" />
-                          ) : (
-                            <User className="h-3 w-3 mr-1" />
-                          )}
-                          {notification.recipientType}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {getRecipientSummary(notification)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Read by: {notification.readBy.length}
-                        </div>
-                        {notification.acknowledgedBy && (
-                          <div className="text-xs text-green-600">
-                            Acknowledged by:{" "}
-                            {notification.acknowledgedBy.userName}
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+              Loading notifications...
+            </div>
+          ) : (
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table className="w-full">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[35%] min-w-[200px]">
+                        Notification Details
+                      </TableHead>
+                      <TableHead className="w-[20%] min-w-[150px]">
+                        Recipients
+                      </TableHead>
+                      <TableHead className="w-[20%] min-w-[150px]">
+                        Sender & Timing
+                      </TableHead>
+                      <TableHead className="w-[15%] min-w-[100px]">
+                        Status
+                      </TableHead>
+                      <TableHead className="w-[10%] min-w-20 text-right">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedNotifications.map((notification) => (
+                      <TableRow key={notification.id}>
+                        <TableCell className="wrap-break-words max-w-[300px]">
+                          <div className="font-medium">{notification.title}</div>
+                          <div className="text-sm text-muted-foreground truncate max-w-[250px]">
+                            {notification.message}
                           </div>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="break-words">
-                      <div className="space-y-1">
-                        <div className="text-sm">
-                          {notification.sender.system
-                            ? "System"
-                            : notification.sender.userName}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Created: {formatDate(notification.createdAt)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Updated: {formatDate(notification.updatedAt)}
-                        </div>
-                        {notification.scheduledFor && (
-                          <div className="text-xs text-blue-600">
-                            Scheduled: {formatDate(notification.scheduledFor)}
-                          </div>
-                        )}
-                        {notification.expiresAt && (
-                          <div className="text-xs text-orange-600">
-                            Expires: {formatDate(notification.expiresAt)}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <div className="space-y-1">
-                        {getStatusBadge(notification.status)}
-                        {notification.actions &&
-                          notification.actions.length > 0 && (
-                            <div className="text-xs text-muted-foreground">
-                              {notification.actions.length} action(s)
+                          {notification.relatedEntity && (
+                            <div className="text-xs text-muted-foreground flex items-center">
+                              <Link className="h-3 w-3 mr-1" />
+                              {notification.relatedEntity.type}:{" "}
+                              {notification.relatedEntity.name}
                             </div>
                           )}
-                      </div>
-                    </TableCell>
+                          <div className="text-xs text-muted-foreground">
+                            ID: {notification.id.substring(0, 8)}...
+                          </div>
+                        </TableCell>
 
-                    <TableCell className="text-right">
+                        <TableCell className="wrap-break-words">
+                          <div className="space-y-1">
+                            <div className="text-sm flex items-center">
+                              {notification.recipientType === "Broadcast" ? (
+                                <Users className="h-3 w-3 mr-1" />
+                              ) : (
+                                <User className="h-3 w-3 mr-1" />
+                              )}
+                              {notification.recipientType}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {getRecipientSummary(notification)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Read by: {notification.readBy.length}
+                            </div>
+                            {notification.acknowledgedBy && (
+                              <div className="text-xs text-green-600">
+                                Acknowledged by:{" "}
+                                {notification.acknowledgedBy.userName}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="wrap-break-words">
+                          <div className="space-y-1">
+                            <div className="text-sm">
+                              {notification.sender.system
+                                ? "System"
+                                : notification.sender.userName}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Created: {formatDate(notification.createdAt)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Updated: {formatDate(notification.updatedAt)}
+                            </div>
+                            {notification.scheduledFor && (
+                              <div className="text-xs text-blue-600">
+                                Scheduled: {formatDate(notification.scheduledFor)}
+                              </div>
+                            )}
+                            {notification.expiresAt && (
+                              <div className="text-xs text-orange-600">
+                                Expires: {formatDate(notification.expiresAt)}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="space-y-1">
+                            {getStatusBadge(notification.status)}
+                            {notification.actions &&
+                              notification.actions.length > 0 && (
+                                <div className="text-xs text-muted-foreground">
+                                  {notification.actions.length} action(s)
+                                </div>
+                              )}
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleViewDetails(notification)}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+
+                              {notification.status === "Unread" && (
+                                <DropdownMenuItem
+                                  onClick={() => handleMarkAsRead(notification.id)}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Mark as Read
+                                </DropdownMenuItem>
+                              )}
+
+                              <DropdownMenuItem
+                                onClick={() => handleEditNotification(notification)}
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Notification
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleArchiveNotification(notification.id)
+                                }
+                              >
+                                <Archive className="h-4 w-4 mr-2" />
+                                Archive
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() =>
+                                  handleDeleteNotification(notification.id)
+                                }
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {paginatedNotifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className="border border-border rounded-xl p-4 shadow-sm bg-background space-y-2"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="font-medium text-sm">
+                        {notification.title}
+                      </div>
+                      {getStatusBadge(notification.status)}
+                    </div>
+
+                    <div className="text-xs text-muted-foreground">
+                      {notification.message}
+                    </div>
+
+                    {notification.relatedEntity && (
+                      <div className="text-xs text-muted-foreground flex items-center">
+                        <Link className="h-3 w-3 mr-1" />
+                        {notification.relatedEntity.type}:{" "}
+                        {notification.relatedEntity.name}
+                      </div>
+                    )}
+
+                    <div className="text-xs text-muted-foreground">
+                      Recipient: {notification.recipientType}
+                    </div>
+
+                    <div className="text-xs text-muted-foreground">
+                      Sender:{" "}
+                      {notification.sender.system
+                        ? "System"
+                        : notification.sender.userName}
+                    </div>
+
+                    <div className="text-xs text-muted-foreground">
+                      Created: {formatDate(notification.createdAt)}
+                    </div>
+
+                    {notification.scheduledFor && (
+                      <div className="text-xs text-blue-600">
+                        Scheduled: {formatDate(notification.scheduledFor)}
+                      </div>
+                    )}
+                    {notification.expiresAt && (
+                      <div className="text-xs text-orange-600">
+                        Expires: {formatDate(notification.expiresAt)}
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center pt-2">
+                      <div className="text-xs text-muted-foreground">
+                        Read by {notification.readBy.length}
+                      </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button variant="ghost" size="icon">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -773,7 +1052,7 @@ export default function Notifications() {
                             onClick={() => handleEditNotification(notification)}
                           >
                             <Edit className="h-4 w-4 mr-2" />
-                            Edit Notification
+                            Edit
                           </DropdownMenuItem>
 
                           <DropdownMenuItem
@@ -796,127 +1075,16 @@ export default function Notifications() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="md:hidden space-y-4">
-            {paginatedDocuments.map((notification) => (
-              <div
-                key={notification.id}
-                className="border border-border rounded-xl p-4 shadow-sm bg-background space-y-2"
-              >
-                <div className="flex justify-between items-center">
-                  <div className="font-medium text-sm">
-                    {notification.title}
-                  </div>
-                  {getStatusBadge(notification.status)}
-                </div>
-
-                <div className="text-xs text-muted-foreground">
-                  {notification.message}
-                </div>
-
-                {notification.relatedEntity && (
-                  <div className="text-xs text-muted-foreground flex items-center">
-                    <Link className="h-3 w-3 mr-1" />
-                    {notification.relatedEntity.type}:{" "}
-                    {notification.relatedEntity.name}
-                  </div>
-                )}
-
-                <div className="text-xs text-muted-foreground">
-                  Recipient: {notification.recipientType}
-                </div>
-
-                <div className="text-xs text-muted-foreground">
-                  Sender:{" "}
-                  {notification.sender.system
-                    ? "System"
-                    : notification.sender.userName}
-                </div>
-
-                <div className="text-xs text-muted-foreground">
-                  Created: {formatDate(notification.createdAt)}
-                </div>
-
-                {notification.scheduledFor && (
-                  <div className="text-xs text-blue-600">
-                    Scheduled: {formatDate(notification.scheduledFor)}
-                  </div>
-                )}
-                {notification.expiresAt && (
-                  <div className="text-xs text-orange-600">
-                    Expires: {formatDate(notification.expiresAt)}
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center pt-2">
-                  <div className="text-xs text-muted-foreground">
-                    Read by {notification.readBy.length}
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleViewDetails(notification)}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Details
-                      </DropdownMenuItem>
-
-                      {notification.status === "Unread" && (
-                        <DropdownMenuItem
-                          onClick={() => handleMarkAsRead(notification.id)}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Mark as Read
-                        </DropdownMenuItem>
-                      )}
-
-                      <DropdownMenuItem
-                        onClick={() => handleEditNotification(notification)}
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem
-                        onClick={() =>
-                          handleArchiveNotification(notification.id)
-                        }
-                      >
-                        <Archive className="h-4 w-4 mr-2" />
-                        Archive
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() =>
-                          handleDeleteNotification(notification.id)
-                        }
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
               </div>
-            ))}
-          </div>
+            </>
+          )}
 
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
-            <div className="flex items-center gap-2 text-sm">
+             <div className="flex items-center gap-2 text-sm">
               <span className="text-muted-foreground">Show</span>
               <Select
                 value={pageSize.toString()}
@@ -937,7 +1105,7 @@ export default function Notifications() {
                 </SelectContent>
               </Select>
               <span className="text-muted-foreground">
-                of {filteredNotifications.length} documents
+                of {filteredNotifications.length} notifications
               </span>
             </div>
 
@@ -963,33 +1131,13 @@ export default function Notifications() {
                 >
                   Prev
                 </Button>
-
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let num;
-                  if (totalPages <= 5) num = i + 1;
-                  else if (currentPage <= 3) num = i + 1;
-                  else if (currentPage >= totalPages - 2)
-                    num = totalPages - 4 + i;
-                  else num = currentPage - 2 + i;
-                  return num;
-                }).map((num) => (
-                  <Button
-                    key={num}
-                    variant={currentPage === num ? "default" : "outline"}
-                    size="icon"
-                    onClick={() => setCurrentPage(num)}
-                    className="w-9 h-9"
-                  >
-                    {num}
-                  </Button>
-                ))}
-
+                <Button variant="outline" size="icon" disabled>
+                  {currentPage}
+                </Button>
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
-                  }
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
                 >
                   Next
@@ -1058,61 +1206,13 @@ export default function Notifications() {
                       <span className="font-medium">Status:</span>{" "}
                       {selectedNotification.status}
                     </div>
-                    <div>
-                      <span className="font-medium">Actionable:</span>{" "}
-                      {selectedNotification.actionable ? "Yes" : "No"}
-                    </div>
-                    <div>
-                      <span className="font-medium">Recipient Type:</span>{" "}
-                      {selectedNotification.recipientType}
-                    </div>
                   </div>
                   <div className="text-sm mt-2">
                     <span className="font-medium">Message:</span>
-                    <div className="mt-1 p-4 rounded-lg bg-muted text-muted-foreground break-words shadow-sm">
+                    <div className="mt-1 p-4 rounded-lg bg-muted text-muted-foreground wrap-break-words shadow-sm">
                       {selectedNotification.message}
                     </div>
                   </div>
-                </section>
-                <section className="space-y-2">
-                  <h4 className="font-semibold text-lg border-b border-border pb-1">
-                    Recipients ({selectedNotification.recipients.length})
-                  </h4>
-                  {selectedNotification.recipients.length > 0 ? (
-                    <div className="space-y-2">
-                      {selectedNotification.recipients.map(
-                        (recipient, index) => (
-                          <div
-                            key={index}
-                            className="text-sm border border-border rounded-lg p-3 bg-muted text-foreground shadow-sm"
-                          >
-                            {recipient.userName && (
-                              <div>
-                                <span className="font-medium">User:</span>{" "}
-                                {recipient.userName}
-                              </div>
-                            )}
-                            {recipient.roleName && (
-                              <div>
-                                <span className="font-medium">Role:</span>{" "}
-                                {recipient.roleName}
-                              </div>
-                            )}
-                            {recipient.departmentName && (
-                              <div>
-                                <span className="font-medium">Department:</span>{" "}
-                                {recipient.departmentName}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">
-                      No specific recipients
-                    </div>
-                  )}
                 </section>
                 <section className="space-y-2">
                   <h4 className="font-semibold text-lg border-b border-border pb-1">
@@ -1137,27 +1237,6 @@ export default function Notifications() {
                     )}
                   </div>
                 </section>
-                {selectedNotification.relatedEntity && (
-                  <section className="space-y-2">
-                    <h4 className="font-semibold text-lg border-b border-border pb-1">
-                      Related Entity
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-foreground">
-                      <div>
-                        <span className="font-medium">Type:</span>{" "}
-                        {selectedNotification.relatedEntity.type}
-                      </div>
-                      <div>
-                        <span className="font-medium">ID:</span>{" "}
-                        {selectedNotification.relatedEntity.id}
-                      </div>
-                      <div>
-                        <span className="font-medium">Name:</span>{" "}
-                        {selectedNotification.relatedEntity.name}
-                      </div>
-                    </div>
-                  </section>
-                )}
                 {selectedNotification.actions?.length ? (
                   <section className="space-y-2">
                     <h4 className="font-semibold text-lg border-b border-border pb-1">
@@ -1173,79 +1252,11 @@ export default function Notifications() {
                           <div className="text-muted-foreground">
                             Action: {action.action}
                           </div>
-                          {action.parameters && (
-                            <div className="text-muted-foreground">
-                              Parameters: {JSON.stringify(action.parameters)}
-                            </div>
-                          )}
                         </div>
                       ))}
                     </div>
                   </section>
                 ) : null}
-                {selectedNotification.readBy?.length > 0 && (
-                  <section className="space-y-2">
-                    <h4 className="font-semibold text-lg border-b border-border pb-1">
-                      Read By ({selectedNotification.readBy.length})
-                    </h4>
-                    <div className="space-y-1 text-sm">
-                      {selectedNotification.readBy.map((readBy, index) => (
-                        <div
-                          key={index}
-                          className="flex justify-between border-b border-border py-1"
-                        >
-                          <span>{readBy.userName}</span>
-                          <span className="text-muted-foreground">
-                            {formatDate(readBy.readAt)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-                {selectedNotification.acknowledgedBy && (
-                  <section className="space-y-2">
-                    <h4 className="font-semibold text-lg border-b border-border pb-1">
-                      Acknowledgment
-                    </h4>
-                    <div className="text-sm border border-border rounded-lg p-4 bg-muted shadow-sm">
-                      <div>
-                        <span className="font-medium">Acknowledged by:</span>{" "}
-                        {selectedNotification.acknowledgedBy.userName}
-                      </div>
-                      <div>
-                        <span className="font-medium">Date:</span>{" "}
-                        {formatDate(
-                          selectedNotification.acknowledgedBy.acknowledgedAt
-                        )}
-                      </div>
-                      {selectedNotification.acknowledgedBy.comments && (
-                        <div>
-                          <span className="font-medium">Comments:</span>{" "}
-                          {selectedNotification.acknowledgedBy.comments}
-                        </div>
-                      )}
-                    </div>
-                  </section>
-                )}
-                {selectedNotification.tags?.length > 0 && (
-                  <section className="space-y-2">
-                    <h4 className="font-semibold text-lg border-b border-border pb-1">
-                      Tags
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedNotification.tags.map((tag, index) => (
-                        <Badge
-                          key={index}
-                          variant="outline"
-                          className="text-xs px-2 py-1 bg-muted text-foreground rounded-full"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </section>
-                )}
                 <section className="space-y-2">
                   <h4 className="font-semibold text-lg border-b border-border pb-1">
                     Timing Information
@@ -1263,12 +1274,6 @@ export default function Notifications() {
                       <div>
                         <span className="font-medium">Scheduled For:</span>{" "}
                         {formatDate(selectedNotification.scheduledFor)}
-                      </div>
-                    )}
-                    {selectedNotification.expiresAt && (
-                      <div>
-                        <span className="font-medium">Expires At:</span>{" "}
-                        {formatDate(selectedNotification.expiresAt)}
                       </div>
                     )}
                   </div>
@@ -1424,50 +1429,106 @@ export default function Notifications() {
                 )}
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Recipients</Label>
-              <div className="space-y-2">
-                <Select
-                  value={formData.recipientType}
-                  onValueChange={(value) =>
-                    handleFormChange("recipientType", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select recipient type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="User">Specific User</SelectItem>
-                    <SelectItem value="Role">Role</SelectItem>
-                    <SelectItem value="Department">Department</SelectItem>
-                    <SelectItem value="Broadcast">All Users</SelectItem>
-                  </SelectContent>
-                </Select>
-                {formErrors.recipientType && (
-                  <p className="text-xs text-destructive">
-                    {formErrors.recipientType}
-                  </p>
-                )}
-                {formData.recipientType !== "Broadcast" && (
-                  <>
-                    <Input
-                      placeholder="Enter recipient details"
-                      value={formData.recipientDetails}
-                      onChange={(e) =>
-                        handleFormChange("recipientDetails", e.target.value)
-                      }
-                      className="bg-muted text-foreground border-border"
-                      aria-invalid={!!formErrors.recipientDetails}
-                    />
-                    {formErrors.recipientDetails && (
-                      <p className="text-xs text-destructive">
-                        {formErrors.recipientDetails}
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+<div className="space-y-2">
+  <Label>Recipients</Label>
+  <div className="space-y-2">
+    {/* 1. Select Recipient TYPE */}
+    <Select
+      value={formData.recipientType}
+      onValueChange={(value) => {
+        handleFormChange("recipientType", value);
+        // Clear details when switching types
+        handleFormChange("recipientDetails", "");
+      }}
+    >
+      <SelectTrigger>
+        <SelectValue placeholder="Select recipient type" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="User">Specific User</SelectItem>
+        <SelectItem value="Role">Role</SelectItem>
+        <SelectItem value="Department">Department</SelectItem>
+        <SelectItem value="Broadcast">All Users (Broadcast)</SelectItem>
+      </SelectContent>
+    </Select>
+    {formErrors.recipientType && (
+      <p className="text-xs text-destructive">{formErrors.recipientType}</p>
+    )}
+
+    {/* 2. Dynamic Recipient DETAILS Dropdowns */}
+    
+    {isLoadingLookup ? (
+      <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
+        <Loader2 className="animate-spin mr-2 h-4 w-4" /> Loading options...
+      </div>
+    ) : (
+      <>
+        {/* USER SELECT */}
+        {formData.recipientType === "User" && (
+          <Select
+            value={formData.recipientDetails}
+            onValueChange={(value) => handleFormChange("recipientDetails", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a User" />
+            </SelectTrigger>
+            <SelectContent>
+              {lookupData.users.length > 0 ? (
+                lookupData.users.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.first_name} {user.last_name} ({user.email})
+                  </SelectItem>
+                ))
+              ) : (
+                <div className="p-2 text-sm text-muted-foreground">
+                  No users found
+                </div>
+              )}
+            </SelectContent>
+          </Select>
+        )}
+
+        {/* ROLE SELECT */}
+        {formData.recipientType === "Role" && (
+          <Select
+            value={formData.recipientDetails}
+            onValueChange={(value) => handleFormChange("recipientDetails", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a Role" />
+            </SelectTrigger>
+            <SelectContent>
+              {lookupData.roles.map((role) => (
+                <SelectItem key={role.id} value={role.code}>
+                  {role.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {/* DEPARTMENT SELECT */}
+        {formData.recipientType === "Department" && (
+          <Select
+            value={formData.recipientDetails}
+            onValueChange={(value) => handleFormChange("recipientDetails", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a Department" />
+            </SelectTrigger>
+            <SelectContent>
+              {lookupData.departments.map((dept) => (
+                <SelectItem key={dept.id} value={dept.id}>
+                  {dept.name} {dept.code && `(${dept.code})`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </>
+    )}
+  </div>
+</div>
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="actionable"
@@ -1513,11 +1574,16 @@ export default function Notifications() {
                   : "Send Notification"
               }
             >
-              {isSubmitting
-                ? "Saving..."
-                : selectedNotification
-                ? "Update Notification"
-                : "Send Notification"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : selectedNotification ? (
+                "Update Notification"
+              ) : (
+                "Send Notification"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

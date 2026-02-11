@@ -32,6 +32,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
+    "socket.io": "^4.8.3",
     "uuid": "^13.0.0",
     "winston": "^3.18.3",
     "zod": "^4.1.13"
@@ -44,6 +45,7 @@
     "@types/express": "^5.0.5",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
+    "@types/socket.io": "^3.0.1",
     "dotenv-cli": "^11.0.0",
     "nodemon": "^3.1.11",
     "prisma": "5.14.0",

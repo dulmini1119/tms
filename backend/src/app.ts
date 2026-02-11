@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimit.js';
+import { auditLog } from './middleware/auditLog.js';
 import logger from './utils/logger.js';
 import config from './config/environment.js';
 
@@ -29,12 +30,13 @@ import tripCostRoutes  from './modules/trip-costs/trip-costs.routes.js';
 import invoiceRoutes from './modules/invoice/invoice.routes.js';
 import gpsLogsRoutes from './modules/gpslogs/gpslogs.routes.js';
 import expiryAlertRoutes from './modules/expiry-alerts/expiry-alerts.routes.js';
-// ADD THIS LINE — CRITICAL!
+import notificationsRoutes from './modules/notifications/notifications.routes.js';
+import auditLogsRoutes from './modules/audit-logs/audit-logs.routes.js'
+
 import { authenticate } from './middleware/auth.js';
 
 const app: Application = express();
 
-// CORS
 const corsOptions = {
   origin: (origin: string | undefined, callback: Function) => {
     if (!origin || config.cors.allowedOrigins.includes(origin) || config.app.env === 'development') {
@@ -49,7 +51,7 @@ const corsOptions = {
 
 app.use(helmet());
 app.use(cors(corsOptions));
-app.use(cookieParser());           // ← correct
+app.use(cookieParser());          
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -63,20 +65,16 @@ if (config.app.env === 'development') {
 }
 
 app.use(apiLimiter);
+app.use(auditLog());
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
 
-// ROUTES
-app.use('/auth', authRoutes);                                    // PUBLIC
-app.use('/users', authenticate, usersRoutes);                    // PROTECTED
-app.use('/roles', authenticate, rolesRoutes);                    // PROTECTED
+app.use('/auth', authRoutes);                                   
+app.use('/users', authenticate, usersRoutes);                    
+app.use('/roles', authenticate, rolesRoutes);                    
 app.use('/permissions', authenticate, permissionRoutes); 
 app.use('/departments', authenticate, departmentRoutes);  
 app.use('/business-units',authenticate,businessUnitsRoute)
-app.use('/cab-services', authenticate, cabServiceRoutes); // PROTECTED
+app.use('/cab-services', authenticate, cabServiceRoutes); 
 app.use('/cab-agreements', authenticate, cabAgreementsRoutes); 
 app.use('/vehicles', authenticate,vehicleRoutes)
 app.use('/vehicle-documents', authenticate,vehicledocumentsRoutes);
@@ -84,12 +82,14 @@ app.use('/trip-requests', authenticate, tripRequestRoutes);
 app.use('/trip-approvals', authenticate, tripApprovalRoutes)
 app.use('/trip-assignments', authenticate, tripAssignmentRoutes)
 app.use('/employee/dashboard', authenticate, employeeDashboardRoutes);
-app.use('/trip-logs', authenticate,  tripLogRoutes); // PROTECTED
+app.use('/trip-logs', authenticate,  tripLogRoutes); 
 app.use('/trip-costs', authenticate,  tripCostRoutes); 
-app.use('/invoices', authenticate, invoiceRoutes); // PROTECTED
+app.use('/invoices', authenticate, invoiceRoutes); 
 app.use('/gps-logs', authenticate, gpsLogsRoutes)
 app.use('/expiry-alerts', authenticate, expiryAlertRoutes);
-// 404 & Error handlers
+app.use('/notifications', authenticate, notificationsRoutes); 
+app.use('/audit-logs', authenticate, auditLogsRoutes);
+
 app.use(notFoundHandler);
 app.use(errorHandler);
 

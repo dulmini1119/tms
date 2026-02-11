@@ -611,6 +611,9 @@ model notifications {
   expires_at        DateTime? @db.Timestamp(6)
   created_at        DateTime? @default(now()) @db.Timestamp(6)
   users             users?    @relation(fields: [recipient_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  priority          String?   @db.VarChar(20)
+  scheduled_for     DateTime? @db.Timestamp(6)
+  actionable        Boolean   @default(false)
 
   @@index([created_at], map: "idx_notifications_created")
   @@index([is_read], map: "idx_notifications_read")

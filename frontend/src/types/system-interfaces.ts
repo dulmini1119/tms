@@ -167,64 +167,62 @@ export interface Notification {
 }
 
 // Audit Logs and System Activity
+export interface Metadata {
+  ipAddress: string | null;
+  userAgent: string | null;
+  sessionId: string | null;
+  requestId: string | null | undefined;
+  // These fields are optional because the DB doesn't have them,
+  // but the Service provides defaults for them.
+  browser?: string;
+  operatingSystem?: string;
+  device?: string;
+  location?: {
+    country?: string;
+    city?: string;
+    coordinates?: {
+      latitude: number;
+      longitude: number;
+    };
+  };
+}
+
 export interface AuditLog {
   id: string;
-  timestamp: string;
-  userId?: string;
-  userName?: string;
-  userRole?: string;
+  timestamp: string | null;
+  userId: string | null;
+  userName: string | null;
+  userRole: string | null;
+  
+  // Using 'string' here because the DB stores exact strings ("Create", "users", etc.).
+  // This avoids Type Errors if the DB value casing differs from a hardcoded Union.
   action: string;
-  actionType:
-    | "Create"
-    | "Read"
-    | "Update"
-    | "Delete"
-    | "Login"
-    | "Logout"
-    | "Export"
-    | "Import"
-    | "Approve"
-    | "Reject";
-  module:
-    | "Dashboard"
-    | "Users"
-    | "Roles"
-    | "Vehicles"
-    | "Trips"
-    | "Documents"
-    | "Settings"
-    | "Reports"
-    | "Authentication";
-  entityType?: "User" | "Vehicle" | "Trip" | "Document" | "Setting" | "Report";
-  entityId?: string;
-  entityName?: string;
-  description: string;
-  changes?: {
+  actionType: string;
+  module: string;
+  
+  entityType: string | null;
+  entityId: string | null;
+  entityName: string | null;
+  description: string | null;
+  
+  // 'unknown' is the strict type-safe version of 'any' for values we don't know the type of yet.
+  changes: Array<{
     field: string;
     oldValue: unknown;
     newValue: unknown;
-  }[];
-  metadata: {
-    ipAddress: string;
-    userAgent: string;
-    browser?: string;
-    operatingSystem?: string;
-    device?: string;
-    location?: {
-      country: string;
-      city: string;
-      coordinates?: GPSLocation;
-    };
-    sessionId: string;
-    requestId?: string;
-  };
+  }> | null;
+
+  metadata: Metadata;
+  
   severity: "Info" | "Warning" | "Error" | "Critical";
   status: "Success" | "Failed" | "Pending";
-  duration?: number; // milliseconds
-  errorMessage?: string;
+  duration: number | null;
+  errorMessage: string | null;
+  
+  // These are strictly typed as provided by the Service (defaults).
   tags: string[];
   archived: boolean;
-  retentionDate: string;
+  retentionDate: string | null;
   createdAt: string;
 }
 

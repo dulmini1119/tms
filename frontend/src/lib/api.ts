@@ -48,6 +48,8 @@ export async function fetchAPI(
     console.error("API Error:", error);
     
     if (axios.isAxiosError(error)) {
+      console.error("Backend validation Error:", error.response?.data);
+      
       throw new Error(error.response?.data?.message || "An unexpected error occurred");
     }
     throw error;

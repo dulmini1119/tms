@@ -7,6 +7,22 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: "/audit-logs",
+        destination: "http://localhost:3001/audit-logs",
+      },
+      {
+        source:"/audit-logs/:path*",
+        destination: "http://localhost:3001/audit-logs",
+      },
+      {
+        source: "/notifications",
+        destination: "http://localhost:3001/notifications",
+      },
+      {
+        source: "/notifications/:path*",
+        destination: "http://localhost:3001/notifications/:path*",
+      },
+      {
         source: "/expiry-alerts",
         destination: "http://localhost:3001/expiry-alerts",
       },
@@ -162,6 +178,15 @@ const nextConfig: NextConfig = {
       {
         source: "/permissions/:path*",
         destination: "http://localhost:3001/permissions/:path*",
+      },
+      // Add these two entries (at the end is fine)
+      {
+        source: "/socket.io",
+        destination: "http://localhost:3001/socket.io",
+      },
+      {
+        source: "/socket.io/:path*",
+        destination: "http://localhost:3001/socket.io/:path*",
       },
 
       // ── FALLBACK: ANY OTHER /api/* routes (optional safety) ──

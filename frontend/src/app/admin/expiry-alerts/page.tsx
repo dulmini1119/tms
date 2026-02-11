@@ -112,7 +112,7 @@ interface SelectUser {
   first_name: string;
   last_name: string;
   email: string;
-  roles?: string[]; 
+  roles?: string[];
 }
 export default function ExpiryAlerts() {
   const [alerts, setAlerts] = useState<ExpiryAlert[]>([]);
@@ -135,47 +135,41 @@ export default function ExpiryAlerts() {
 
   const [availableUsers, setAvailableUsers] = useState<SelectUser[]>([]);
 
+  // 3. Fetch users
+  const loadUsers = async () => {
+    try {
+      const response = await fetchAPI("/users?limit=100");
 
-// 3. Fetch users
-const loadUsers = async () => {
-  try {
-    const response = await fetchAPI("/users");
-    
-    let usersList: SelectUser[] = [];
+      let usersList: SelectUser[] = [];
 
-    // ✅ CORRECTLY EXTRACT 'users' FROM THE RESPONSE
-    if (response?.users && Array.isArray(response.users)) {
-      usersList = response.users;
-    } else if (Array.isArray(response)) {
-      // Fallback
-      usersList = response;
+      if (response?.data?.users && Array.isArray(response.data.users)) {
+        usersList = response.data.users;
+      } else if (response?.users && Array.isArray(response.users)) {
+        usersList = response.users;
+      }
+
+      setAvailableUsers(usersList);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      setAvailableUsers([]);
     }
+  };
 
-    // Debugging log
-    console.log("First user data:", usersList[0]);
+  useEffect(() => {
+    loadUsers();
+  }, []);
 
-    setAvailableUsers(usersList);
-  } catch (err) {
-    console.error("Failed to load users", err);
-  }
-};
+  const allowedRoles = new Set(["SUPERADMIN", "VEHICLEADMIN", "DRIVER"]);
 
-useEffect(() => {
-  loadUsers();
-}, []);
+  const usersToAssign = useMemo(() => {
+    return availableUsers.filter((user) => {
+      if (!user.roles || !Array.isArray(user.roles)) {
+        return false;
+      }
 
-
-const allowedRoles = new Set(["superadmin", "vehicleadmin", "driver"]);
-
-const usersToAssign = useMemo(() => {
-  return availableUsers.filter((user) => {
-    if (!user.roles || !Array.isArray(user.roles)) return false;
-
-    // ✅ FIX: Compare strings directly.
-    // The Service sends 'DRIVER', so we convert to lowercase to match the Set.
-    return user.roles.some((roleCode) => allowedRoles.has(roleCode.toLowerCase()));
-  });
-}, [availableUsers]);
+      return user.roles.some((roleCode) => allowedRoles.has(roleCode));
+    });
+  }, [availableUsers]);
 
   const loadAlerts = async () => {
     try {
@@ -211,7 +205,6 @@ const usersToAssign = useMemo(() => {
         currency: item.currency || undefined,
         vendor: item.vendor || undefined,
 
-        // Map Nested Object
         renewalProcess: {
           processStarted: !!item.renewal_process_started,
           documentsSubmitted: !!item.renewal_documents_submitted,
@@ -223,7 +216,7 @@ const usersToAssign = useMemo(() => {
         remindersSent: item.reminders_sent || 0,
         lastReminderDate: item.last_reminder_date || undefined,
         notes: item.notes || undefined,
-        attachments: item.attachments || [], // DB might not have this, so default empty
+        attachments: item.attachments || [],
         createdAt: item.created_at,
         updatedAt: item.updated_at,
         resolvedAt: item.resolved_at || undefined,
@@ -411,7 +404,9 @@ const usersToAssign = useMemo(() => {
       alert.status,
       alert.priority,
       new Date(alert.expiryDate).toLocaleDateString(),
-      alert.assignedTo || "N/A",
+      alert.assignedUser
+        ? `${alert.assignedUser.firstName} ${alert.assignedUser.lastName}`
+        : "Unassigned",
     ]);
 
     const csvContent = [
@@ -506,7 +501,9 @@ const usersToAssign = useMemo(() => {
           </Button>
 
           <Button onClick={handleSyncAlerts} disabled={syncing}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`}
+            />
             {syncing ? "Syncing..." : "Sync Alerts"}
           </Button>
         </div>
@@ -655,33 +652,41 @@ const usersToAssign = useMemo(() => {
                     <TableCell>{getStatusBadge(alert.status)}</TableCell>
                     <TableCell>
                       <div className="space-y-2">
-                        
                         {/* 1. Renewal Status Badge */}
                         <div className="flex items-center justify-between">
-                           <span className="text-xs text-muted-foreground">
-                              Status: 
-                           </span>
-                           <Badge 
-                             variant={alert.renewalProcess.processStarted ? "default" : "outline"}
-                             className="text-[10px] px-1.5 py-0.5"
-                           >
-                             {alert.renewalProcess.processStarted ? "In Process" : "Not Started"}
-                           </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Status:
+                          </span>
+                          <Badge
+                            variant={
+                              alert.renewalProcess.processStarted
+                                ? "default"
+                                : "outline"
+                            }
+                            className="text-[10px] px-1.5 py-0.5"
+                          >
+                            {alert.renewalProcess.processStarted
+                              ? "In Process"
+                              : "Not Started"}
+                          </Badge>
                         </div>
 
                         {/* 2. Assigned User Display */}
                         {alert.assignedUser ? (
                           <div className="flex items-center text-xs text-muted-foreground bg-muted/50 p-1.5 rounded">
                             <User className="h-3 w-3 mr-1.5" />
-                            {alert.assignedUser.firstName} {alert.assignedUser.lastName}
+                            {alert.assignedUser.firstName}{" "}
+                            {alert.assignedUser.lastName}
                           </div>
                         ) : alert.assignedTo ? (
-                           // Fallback if user relation not found but ID exists
-                           <div className="text-xs text-orange-600 italic">
-                              Assigned (ID: {alert.assignedTo.substring(0, 6)}...)
-                           </div>
+                          // Fallback if user relation not found but ID exists
+                          <div className="text-xs text-orange-600 italic">
+                            Assigned (ID: {alert.assignedTo.substring(0, 6)}...)
+                          </div>
                         ) : (
-                           <div className="text-xs text-gray-500 italic">Unassigned</div>
+                          <div className="text-xs text-gray-500 italic">
+                            Unassigned
+                          </div>
                         )}
 
                         {/* 3. Reminders Sent Count */}
@@ -694,7 +699,6 @@ const usersToAssign = useMemo(() => {
                             {alert.remindersSent || 0}
                           </span>
                         </div>
-
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -816,23 +820,32 @@ const usersToAssign = useMemo(() => {
                 <div className="mt-2 text-sm space-y-2 bg-muted/30 p-3 rounded">
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Status</span>
-                    <Badge 
-                       variant={alert.renewalProcess.processStarted ? "default" : "outline"}
-                       className="text-[10px]"
+                    <Badge
+                      variant={
+                        alert.renewalProcess.processStarted
+                          ? "default"
+                          : "outline"
+                      }
+                      className="text-[10px]"
                     >
-                      {alert.renewalProcess.processStarted ? "In Process" : "Not Started"}
+                      {alert.renewalProcess.processStarted
+                        ? "In Process"
+                        : "Not Started"}
                     </Badge>
                   </div>
 
                   <Separator className="my-1" />
 
                   <div className="flex justify-between items-center">
-                    <div className="text-muted-foreground text-xs">Assigned To</div>
+                    <div className="text-muted-foreground text-xs">
+                      Assigned To
+                    </div>
                     <div className="flex items-center text-xs font-medium">
                       {alert.assignedUser ? (
                         <>
                           <User className="h-3 w-3 mr-1" />
-                          {alert.assignedUser.firstName} {alert.assignedUser.lastName}
+                          {alert.assignedUser.firstName}{" "}
+                          {alert.assignedUser.lastName}
                         </>
                       ) : (
                         <span className="text-gray-500 italic">Unassigned</span>
@@ -980,48 +993,146 @@ const usersToAssign = useMemo(() => {
 
       {/* Details Dialog */}
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Alert Details</DialogTitle>
           </DialogHeader>
+
           {selectedAlert && (
-            <div className="space-y-4 py-4 text-sm">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4 py-4 overflow-y-auto">
+              <div className="space-y-6 py-4 text-sm">
+                {/* ===== BASIC INFORMATION ===== */}
                 <div>
-                  <span className="text-muted-foreground">Entity:</span>{" "}
-                  {selectedAlert.entityName}
+                  <h4 className="mb-3 text-sm font-semibold text-foreground">
+                    Basic Information
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-muted-foreground">Entity Type</span>
+                      <div className="font-medium">
+                        {selectedAlert.entityType}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-muted-foreground">Entity Name</span>
+                      <div className="font-medium">
+                        {selectedAlert.entityName}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-muted-foreground">Document</span>
+                      <div className="font-medium">
+                        {selectedAlert.documentName}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-muted-foreground">Priority</span>
+                      <div className="font-medium">
+                        {selectedAlert.priority}
+                      </div>
+                    </div>
+                  </div>
                 </div>
+
+                {/* ===== EXPIRY DETAILS ===== */}
                 <div>
-                  <span className="text-muted-foreground">Document:</span>{" "}
-                  {selectedAlert.documentName}
+                  <h4 className="mb-3 text-sm font-semibold text-foreground">
+                    Expiry Information
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-muted-foreground">Expiry Date</span>
+                      <div className="font-medium">
+                        {formatDate(selectedAlert.expiryDate)}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-muted-foreground">
+                        Days Remaining
+                      </span>
+                      <div
+                        className={`font-medium ${getDaysColor(
+                          selectedAlert.daysToExpiry,
+                        )}`}
+                      >
+                        {selectedAlert.daysToExpiry < 0
+                          ? `Overdue by ${Math.abs(selectedAlert.daysToExpiry)} days`
+                          : `${selectedAlert.daysToExpiry} days`}
+                      </div>
+                    </div>
+                  </div>
                 </div>
+
+                {/* ===== RENEWAL & RESPONSIBILITY ===== */}
                 <div>
-                  <span className="text-muted-foreground">Expiry:</span>{" "}
-                  {formatDate(selectedAlert.expiryDate)}
+                  <h4 className="mb-3 text-sm font-semibold text-foreground">
+                    Renewal & Responsibility
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-muted-foreground">
+                        Renewal Status
+                      </span>
+                      <div className="font-medium">
+                        {selectedAlert.renewalProcess.processStarted
+                          ? "In Process"
+                          : "Not Started"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-muted-foreground">Assigned To</span>
+                      <div className="font-medium">
+                        {selectedAlert.assignedUser
+                          ? `${selectedAlert.assignedUser.firstName} ${selectedAlert.assignedUser.lastName}`
+                          : "Unassigned"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-muted-foreground">
+                        Reminders Sent
+                      </span>
+                      <div className="font-medium">
+                        {selectedAlert.remindersSent || 0}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-muted-foreground">
+                        Current Status
+                      </span>
+                      <div className="font-medium">{selectedAlert.status}</div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Days Left:</span>{" "}
-                  {selectedAlert.daysToExpiry}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Status:</span>{" "}
-                  {selectedAlert.status}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Priority:</span>{" "}
-                  {selectedAlert.priority}
-                </div>
+
+                {/* ===== NOTES ===== */}
+                {selectedAlert.notes && (
+                  <div>
+                    <h4 className="mb-2 text-sm font-semibold text-foreground">
+                      Notes
+                    </h4>
+                    <div className="rounded-md bg-muted p-3 text-sm">
+                      {selectedAlert.notes}
+                    </div>
+                  </div>
+                )}
               </div>
-              {selectedAlert.notes && (
-                <div className="bg-muted p-3 rounded">
-                  <span className="font-medium">Notes:</span>{" "}
-                  {selectedAlert.notes}
-                </div>
-              )}
             </div>
           )}
+
           <DialogFooter>
-            <Button onClick={() => setIsDetailsDialogOpen(false)}>Close</Button>
+            <Button
+              variant="outline"
+              onClick={() => setIsDetailsDialogOpen(false)}
+            >
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

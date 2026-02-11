@@ -1671,3 +1671,212 @@
 {"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-05T09:42:54.391Z"}
 {"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-05T09:42:54.391Z"}
 {"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-05T09:42:54.391Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T02:57:32.555Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T02:57:32.560Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T02:57:32.561Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T02:57:32.561Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T02:57:32.562Z"}
+{"level":"info","message":"User logged in: superadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-02-10T03:21:03.292Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T04:44:51.946Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T04:44:51.950Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T04:44:51.951Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T04:44:51.951Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T04:44:51.951Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T05:13:31.180Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T05:13:31.187Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T05:13:31.187Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T05:13:31.189Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T05:13:31.189Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T05:15:06.338Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T05:15:06.343Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T05:15:06.344Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T05:15:06.344Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T05:15:06.345Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T05:29:50.066Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T05:29:50.071Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T05:29:50.072Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T05:29:50.073Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T05:29:50.073Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T06:38:36.153Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T06:38:36.162Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T06:38:36.162Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T06:38:36.163Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T06:38:36.163Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-10T06:38:36.164Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T06:55:54.894Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T06:55:54.901Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T06:55:54.901Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T06:55:54.901Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T06:55:54.902Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-10T06:55:54.902Z"}
+{"level":"info","message":"New client connected: XG9eIhnPiMYDO7O6AAAB","service":"tms-backend","timestamp":"2026-02-10T07:21:26.127Z"}
+{"level":"info","message":"Client XG9eIhnPiMYDO7O6AAAB joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T07:21:26.275Z"}
+{"level":"info","message":"Client disconnected: XG9eIhnPiMYDO7O6AAAB","service":"tms-backend","timestamp":"2026-02-10T07:35:16.914Z"}
+{"level":"info","message":"New client connected: 3m_tLOre6ZkNBPzVAAAD","service":"tms-backend","timestamp":"2026-02-10T07:35:18.530Z"}
+{"level":"info","message":"Client 3m_tLOre6ZkNBPzVAAAD joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T07:35:18.537Z"}
+{"level":"info","message":"Client disconnected: 3m_tLOre6ZkNBPzVAAAD","service":"tms-backend","timestamp":"2026-02-10T07:38:07.515Z"}
+{"level":"info","message":"New client connected: 18P3p86aZB6b9D1hAAAF","service":"tms-backend","timestamp":"2026-02-10T07:38:09.194Z"}
+{"level":"info","message":"Client 18P3p86aZB6b9D1hAAAF joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T07:38:09.205Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T07:57:30.301Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T07:57:30.310Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T07:57:30.311Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T07:57:30.311Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T07:57:30.312Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-10T07:57:30.312Z"}
+{"level":"info","message":"New client connected: C_WAWjtqxf93zwCtAAAB","service":"tms-backend","timestamp":"2026-02-10T07:57:30.335Z"}
+{"level":"info","message":"Client C_WAWjtqxf93zwCtAAAB joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T07:57:30.336Z"}
+{"level":"info","message":"Client disconnected: C_WAWjtqxf93zwCtAAAB","service":"tms-backend","timestamp":"2026-02-10T07:58:36.824Z"}
+{"level":"info","message":"New client connected: cf5Ufgl7_mC0th_lAAAD","service":"tms-backend","timestamp":"2026-02-10T07:59:39.972Z"}
+{"level":"info","message":"Client cf5Ufgl7_mC0th_lAAAD joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T07:59:39.987Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T07:59:55.991Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T07:59:56.002Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T07:59:56.002Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T07:59:56.003Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T07:59:56.003Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-10T07:59:56.004Z"}
+{"level":"info","message":"New client connected: Yse7bKvHulDVGaqAAAAB","service":"tms-backend","timestamp":"2026-02-10T07:59:56.060Z"}
+{"level":"info","message":"Client Yse7bKvHulDVGaqAAAAB joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T07:59:56.062Z"}
+{"level":"info","message":"Client disconnected: Yse7bKvHulDVGaqAAAAB","service":"tms-backend","timestamp":"2026-02-10T08:00:14.026Z"}
+{"level":"info","message":"New client connected: 6w9HhLr3ZbToS8z7AAAD","service":"tms-backend","timestamp":"2026-02-10T08:00:15.778Z"}
+{"level":"info","message":"Client 6w9HhLr3ZbToS8z7AAAD joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T08:00:15.844Z"}
+{"level":"info","message":"Client disconnected: 6w9HhLr3ZbToS8z7AAAD","service":"tms-backend","timestamp":"2026-02-10T08:16:08.682Z"}
+{"level":"info","message":"New client connected: vMqzHU9SLBi9kSulAAAF","service":"tms-backend","timestamp":"2026-02-10T08:16:10.698Z"}
+{"level":"info","message":"Client vMqzHU9SLBi9kSulAAAF joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T08:16:10.700Z"}
+{"level":"info","message":"Client disconnected: vMqzHU9SLBi9kSulAAAF","service":"tms-backend","timestamp":"2026-02-10T08:17:13.321Z"}
+{"level":"info","message":"New client connected: 9osE8E3SfdNRu0S9AAAH","service":"tms-backend","timestamp":"2026-02-10T08:41:39.828Z"}
+{"level":"info","message":"Client 9osE8E3SfdNRu0S9AAAH joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T08:41:39.834Z"}
+{"level":"info","message":"Client disconnected: 9osE8E3SfdNRu0S9AAAH","service":"tms-backend","timestamp":"2026-02-10T08:45:24.501Z"}
+{"level":"info","message":"\nSIGINT received. Starting graceful shutdown...","service":"tms-backend","timestamp":"2026-02-10T08:45:28.635Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T08:45:58.162Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T08:45:58.169Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T08:45:58.170Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T08:45:58.170Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T08:45:58.171Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-10T08:45:58.171Z"}
+{"level":"info","message":"User logged in: superadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-02-10T08:46:24.302Z"}
+{"level":"info","message":"New client connected: czN1xhAkE6tlGGI2AAAB","service":"tms-backend","timestamp":"2026-02-10T08:46:38.670Z"}
+{"level":"info","message":"Client czN1xhAkE6tlGGI2AAAB joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T08:46:38.685Z"}
+{"level":"info","message":"Client disconnected: czN1xhAkE6tlGGI2AAAB","service":"tms-backend","timestamp":"2026-02-10T08:46:52.597Z"}
+{"level":"info","message":"New client connected: XetmnwkUBUoQ2yrXAAAD","service":"tms-backend","timestamp":"2026-02-10T08:46:54.116Z"}
+{"level":"info","message":"Client XetmnwkUBUoQ2yrXAAAD joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T08:46:54.168Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T08:55:26.426Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T08:55:26.434Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T08:55:26.434Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T08:55:26.434Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T08:55:26.435Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-10T08:55:26.435Z"}
+{"level":"info","message":"New client connected: QLh3MNtBej4iCT0fAAAB","service":"tms-backend","timestamp":"2026-02-10T08:55:26.718Z"}
+{"level":"info","message":"Client QLh3MNtBej4iCT0fAAAB joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T08:55:26.721Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T08:58:33.088Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T08:58:33.099Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T08:58:33.099Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T08:58:33.100Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T08:58:33.100Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-10T08:58:33.101Z"}
+{"level":"info","message":"New client connected: W9anvz7CJMyOtQBNAAAB","service":"tms-backend","timestamp":"2026-02-10T08:58:33.729Z"}
+{"level":"info","message":"Client W9anvz7CJMyOtQBNAAAB joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T08:58:33.732Z"}
+{"level":"info","message":"Client disconnected: W9anvz7CJMyOtQBNAAAB","service":"tms-backend","timestamp":"2026-02-10T09:02:58.642Z"}
+{"level":"info","message":"New client connected: N-VyQ5KQJjdlUJ9LAAAD","service":"tms-backend","timestamp":"2026-02-10T09:03:00.386Z"}
+{"level":"info","message":"Client N-VyQ5KQJjdlUJ9LAAAD joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:03:00.579Z"}
+{"level":"info","message":"Client disconnected: N-VyQ5KQJjdlUJ9LAAAD","service":"tms-backend","timestamp":"2026-02-10T09:06:29.484Z"}
+{"level":"info","message":"New client connected: 3uB48q_EAViL5TU_AAAF","service":"tms-backend","timestamp":"2026-02-10T09:06:31.151Z"}
+{"level":"info","message":"Client 3uB48q_EAViL5TU_AAAF joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:06:31.292Z"}
+{"level":"info","message":"Client disconnected: 3uB48q_EAViL5TU_AAAF","service":"tms-backend","timestamp":"2026-02-10T09:25:25.412Z"}
+{"level":"info","message":"New client connected: HO0sZNUQxGXhhPOpAAAH","service":"tms-backend","timestamp":"2026-02-10T09:25:25.638Z"}
+{"level":"info","message":"Client HO0sZNUQxGXhhPOpAAAH joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:25:25.644Z"}
+{"level":"info","message":"Client disconnected: HO0sZNUQxGXhhPOpAAAH","service":"tms-backend","timestamp":"2026-02-10T09:25:31.205Z"}
+{"level":"info","message":"New client connected: N7c0AKMU7ywDriElAAAJ","service":"tms-backend","timestamp":"2026-02-10T09:25:33.102Z"}
+{"level":"info","message":"Client N7c0AKMU7ywDriElAAAJ joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:25:33.232Z"}
+{"level":"info","message":"Client disconnected: N7c0AKMU7ywDriElAAAJ","service":"tms-backend","timestamp":"2026-02-10T09:25:42.428Z"}
+{"level":"info","message":"New client connected: 9YqIha88Vd8IQ5bxAAAL","service":"tms-backend","timestamp":"2026-02-10T09:25:52.113Z"}
+{"level":"info","message":"Client 9YqIha88Vd8IQ5bxAAAL joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:25:52.236Z"}
+{"level":"info","message":"Client disconnected: 9YqIha88Vd8IQ5bxAAAL","service":"tms-backend","timestamp":"2026-02-10T09:32:32.765Z"}
+{"level":"info","message":"New client connected: HkCu-0xTpBNJXLmiAAAN","service":"tms-backend","timestamp":"2026-02-10T09:33:39.724Z"}
+{"level":"info","message":"Client HkCu-0xTpBNJXLmiAAAN joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:33:39.739Z"}
+{"level":"info","message":"Client disconnected: HkCu-0xTpBNJXLmiAAAN","service":"tms-backend","timestamp":"2026-02-10T09:33:43.061Z"}
+{"level":"info","message":"New client connected: zICzC6TYGeZ0-KuIAAAP","service":"tms-backend","timestamp":"2026-02-10T09:34:03.342Z"}
+{"level":"info","message":"Client zICzC6TYGeZ0-KuIAAAP joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:34:03.359Z"}
+{"level":"info","message":"Client disconnected: zICzC6TYGeZ0-KuIAAAP","service":"tms-backend","timestamp":"2026-02-10T09:34:08.607Z"}
+{"level":"info","message":"New client connected: suVBDIwi7rVIlepxAAAR","service":"tms-backend","timestamp":"2026-02-10T09:34:37.285Z"}
+{"level":"info","message":"Client suVBDIwi7rVIlepxAAAR joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:34:37.374Z"}
+{"level":"info","message":"Client disconnected: suVBDIwi7rVIlepxAAAR","service":"tms-backend","timestamp":"2026-02-10T09:34:41.450Z"}
+{"level":"info","message":"New client connected: eTLylWFkTPl1AjzsAAAT","service":"tms-backend","timestamp":"2026-02-10T09:41:20.484Z"}
+{"level":"info","message":"Client eTLylWFkTPl1AjzsAAAT joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:41:20.525Z"}
+{"level":"info","message":"Client disconnected: eTLylWFkTPl1AjzsAAAT","service":"tms-backend","timestamp":"2026-02-10T09:47:44.875Z"}
+{"level":"info","message":"New client connected: gYTalvf9Yex4daudAAAV","service":"tms-backend","timestamp":"2026-02-10T09:47:46.861Z"}
+{"level":"info","message":"Client gYTalvf9Yex4daudAAAV joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:47:46.865Z"}
+{"level":"info","message":"Client disconnected: gYTalvf9Yex4daudAAAV","service":"tms-backend","timestamp":"2026-02-10T09:48:03.655Z"}
+{"level":"info","message":"New client connected: 32AHNSO_RM6zh2-ZAAAX","service":"tms-backend","timestamp":"2026-02-10T09:48:11.228Z"}
+{"level":"info","message":"Client 32AHNSO_RM6zh2-ZAAAX joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:48:11.473Z"}
+{"level":"info","message":"Client disconnected: 32AHNSO_RM6zh2-ZAAAX","service":"tms-backend","timestamp":"2026-02-10T09:51:30.433Z"}
+{"level":"info","message":"New client connected: DWMYztZXiGcDf3vCAAAZ","service":"tms-backend","timestamp":"2026-02-10T09:52:12.910Z"}
+{"level":"info","message":"Client DWMYztZXiGcDf3vCAAAZ joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:52:12.912Z"}
+{"level":"info","message":"Client disconnected: DWMYztZXiGcDf3vCAAAZ","service":"tms-backend","timestamp":"2026-02-10T09:55:30.453Z"}
+{"level":"info","message":"New client connected: UjgA0hsUE23Hn8n2AAAb","service":"tms-backend","timestamp":"2026-02-10T09:57:30.690Z"}
+{"level":"info","message":"Client UjgA0hsUE23Hn8n2AAAb joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T09:57:30.692Z"}
+{"level":"info","message":"Client disconnected: UjgA0hsUE23Hn8n2AAAb","service":"tms-backend","timestamp":"2026-02-10T10:07:20.029Z"}
+{"level":"info","message":"New client connected: JUwq3SFgUMbCJgtEAAAd","service":"tms-backend","timestamp":"2026-02-10T10:12:56.702Z"}
+{"level":"info","message":"Client JUwq3SFgUMbCJgtEAAAd joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T10:12:56.703Z"}
+{"level":"info","message":"Client disconnected: JUwq3SFgUMbCJgtEAAAd","service":"tms-backend","timestamp":"2026-02-10T10:16:04.510Z"}
+{"level":"info","message":"New client connected: QtzBkeWyC5PL_5w1AAAf","service":"tms-backend","timestamp":"2026-02-10T10:16:06.166Z"}
+{"level":"info","message":"Client QtzBkeWyC5PL_5w1AAAf joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T10:16:06.266Z"}
+{"level":"info","message":"Client disconnected: QtzBkeWyC5PL_5w1AAAf","service":"tms-backend","timestamp":"2026-02-10T10:17:10.787Z"}
+{"level":"info","message":"New client connected: ZC2aM5SyLZUdG-gFAAAh","service":"tms-backend","timestamp":"2026-02-10T10:17:11.362Z"}
+{"level":"info","message":"Client ZC2aM5SyLZUdG-gFAAAh joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T10:17:11.452Z"}
+{"level":"info","message":"Client disconnected: ZC2aM5SyLZUdG-gFAAAh","service":"tms-backend","timestamp":"2026-02-10T10:22:32.365Z"}
+{"level":"info","message":"New client connected: 7F8QEkkr1XUHjpsBAAAj","service":"tms-backend","timestamp":"2026-02-10T10:23:37.851Z"}
+{"level":"info","message":"Client 7F8QEkkr1XUHjpsBAAAj joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T10:23:37.864Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T10:56:35.825Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T10:56:35.835Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T10:56:35.836Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T10:56:35.836Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T10:56:35.837Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-10T10:56:35.837Z"}
+{"level":"info","message":"New client connected: BDXipkCw_2_fdhVNAAAB","service":"tms-backend","timestamp":"2026-02-10T10:56:36.034Z"}
+{"level":"info","message":"Client BDXipkCw_2_fdhVNAAAB joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T10:56:36.038Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-10T11:00:02.295Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-10T11:00:02.304Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-10T11:00:02.305Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-10T11:00:02.305Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-10T11:00:02.306Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-10T11:00:02.306Z"}
+{"level":"info","message":"New client connected: QBlqqYRx9sm_-mjAAAAB","service":"tms-backend","timestamp":"2026-02-10T11:00:02.742Z"}
+{"level":"info","message":"Client QBlqqYRx9sm_-mjAAAAB joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T11:00:02.744Z"}
+{"level":"info","message":"Client disconnected: QBlqqYRx9sm_-mjAAAAB","service":"tms-backend","timestamp":"2026-02-10T11:00:06.314Z"}
+{"level":"info","message":"New client connected: VA_LGCaNIYw0inGdAAAD","service":"tms-backend","timestamp":"2026-02-10T11:00:06.885Z"}
+{"level":"info","message":"Client VA_LGCaNIYw0inGdAAAD joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T11:00:06.889Z"}
+{"level":"info","message":"Client disconnected: VA_LGCaNIYw0inGdAAAD","service":"tms-backend","timestamp":"2026-02-10T11:00:57.315Z"}
+{"level":"info","message":"New client connected: hwwUVAIpS2IMO1fkAAAF","service":"tms-backend","timestamp":"2026-02-10T11:00:57.846Z"}
+{"level":"info","message":"Client hwwUVAIpS2IMO1fkAAAF joined superadmins room","service":"tms-backend","timestamp":"2026-02-10T11:00:57.980Z"}
+{"level":"info","message":"Client disconnected: hwwUVAIpS2IMO1fkAAAF","service":"tms-backend","timestamp":"2026-02-10T11:01:32.689Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-11T02:44:56.805Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-11T02:44:56.814Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-11T02:44:56.815Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-11T02:44:56.816Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-11T02:44:56.816Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-11T02:44:56.817Z"}
+{"level":"info","message":"User logged in: superadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-02-11T02:55:11.421Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-11T03:26:07.022Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-11T03:26:07.030Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-11T03:26:07.030Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-11T03:26:07.031Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-11T03:26:07.032Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-11T03:26:07.034Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-11T06:09:28.435Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-11T06:09:28.442Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-11T06:09:28.443Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-11T06:09:28.443Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-11T06:09:28.444Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-11T06:09:28.445Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-11T06:45:40.428Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-11T06:45:40.437Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-11T06:45:40.437Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-11T06:45:40.438Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-11T06:45:40.438Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-11T06:45:40.438Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-11T06:45:57.819Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-11T06:45:57.828Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-11T06:45:57.828Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-11T06:45:57.828Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-11T06:45:57.829Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-11T06:45:57.829Z"}
