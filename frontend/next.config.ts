@@ -15,6 +15,14 @@ const nextConfig: NextConfig = {
         destination: "http://localhost:3001/audit-logs",
       },
       {
+        source: "/system-settings",
+        destination: "http://localhost:3001/system-settings",
+      },
+      {
+        source: "/system-settings/:path*",
+        destination: "http://localhost:3001/system-settings/:path*",
+      },
+      {
         source: "/notifications",
         destination: "http://localhost:3001/notifications",
       },
@@ -94,6 +102,14 @@ const nextConfig: NextConfig = {
       {
         source: "/vehicle-documents/:path*",
         destination: "http://localhost:3001/vehicle-documents/:path*",
+      },
+      {
+        source: "/driver-documents",
+        destination: "http://localhost:3001/driver-documents",
+      },
+      {
+        source: "/driver-documents/:path*",
+        destination: "http://localhost:3001/driver-documents/:path*",
       },
       {
         source: "/vehicles",

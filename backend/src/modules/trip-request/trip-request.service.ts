@@ -156,14 +156,25 @@ export const getAllTripRequests = async (filters: any) => {
   const take = parseInt(pageSize);
   const where: any = {};
 
-  // if(filters.users?.role === 'EMPLOYEE') {
-  //   where.requested_by_user_id = filters.users.id;
-  // }
+  // Auth middleware sets `position`, not `role`.
+  // Normalize both to support existing callers and avoid over-filtering admins.
+  const userRole = String(
+    filters.user?.role || filters.user?.position || "",
+  )
+    .toUpperCase()
+    .replace(/[\s-]/g, "_");
 
-  if (!["ADMIN", "SUPERADMIN"].includes(filters.user?.role)) {
-  where.requested_by_user_id = filters.user.id;
-}
-console.log("Loggeed User", filters.user);
+  const adminRoles = new Set([
+    "ADMIN",
+    "SUPERADMIN",
+    "SUPER_ADMIN",
+    "VEHICLE_ADMIN",
+    "VEHICLEADMIN",
+  ]);
+
+  if (!adminRoles.has(userRole)) {
+    where.requested_by_user_id = filters.user.id;
+  }
 
   if (searchTerm) {
     where.OR = [

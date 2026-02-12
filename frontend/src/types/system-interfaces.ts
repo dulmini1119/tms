@@ -198,6 +198,7 @@ export interface AuditLog {
   // This avoids Type Errors if the DB value casing differs from a hardcoded Union.
   action: string;
   actionType: string;
+  displayAction: string;
   module: string;
   
   entityType: string | null;
@@ -224,6 +225,12 @@ export interface AuditLog {
   archived: boolean;
   retentionDate: string | null;
   createdAt: string;
+}
+
+export interface GroupAuditLog {
+  requestId: string;
+  mainLog: AuditLog;
+  details: AuditLog[];
 }
 
 // System Settings and Configuration

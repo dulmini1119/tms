@@ -2,17 +2,39 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-// no .ts
+import cookieParser from 'cookie-parser';
+import path from 'path';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimit.js';
+import { auditLog } from './middleware/auditLog.js';
 import logger from './utils/logger.js';
 import config from './config/environment.js';
 // Import routes
-import authRoutes from './modules/auth/auth.routes';
-import usersRoutes from './modules/users/users.routes';
-// Import other module routes here as you create them
+import authRoutes from './modules/auth/auth.routes.js';
+import usersRoutes from './modules/users/users.routes.js';
+import permissionRoutes from './modules/permissions/permission.routes.js';
+import rolesRoutes from './modules/roles/roles.routes.js';
+import departmentRoutes from './modules/departments/departments.routes.js';
+import businessUnitsRoute from './modules/business-units/business-units.routes.js';
+import cabServiceRoutes from './modules/cab-service/cab-service.routes.js';
+import cabAgreementsRoutes from './modules/cab-agreements/cab-agreements.routes.js';
+import vehicleRoutes from './modules/vehicles/vehicles.routes.js';
+import vehicledocumentsRoutes from './modules/vehicle-documents/vehicle-documents.routes.js';
+import driverDocumentsRoutes from './modules/driver-documents/driver-documents.routes.js';
+import tripRequestRoutes from './modules/trip-request/trip-request.routes.js';
+import tripApprovalRoutes from './modules/trip-approvals/trip-approvals.routes.js';
+import tripAssignmentRoutes from './modules/trip-assignments/trip-assignments.routes.js';
+import employeeDashboardRoutes from './modules/employee-dashboard/employee-dashboard.routes.js';
+import tripLogRoutes from './modules/trip-logs/trip-logs.routes.js';
+import tripCostRoutes from './modules/trip-costs/trip-costs.routes.js';
+import invoiceRoutes from './modules/invoice/invoice.routes.js';
+import gpsLogsRoutes from './modules/gpslogs/gpslogs.routes.js';
+import expiryAlertRoutes from './modules/expiry-alerts/expiry-alerts.routes.js';
+import notificationsRoutes from './modules/notifications/notifications.routes.js';
+import auditLogsRoutes from './modules/audit-logs/audit-logs.routes.js';
+import systemSettingsRoutes from './modules/system-settings/system-settings.routes.js';
+import { authenticate } from './middleware/auth.js';
 const app = express();
-// CORS configuration
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || config.cors.allowedOrigins.includes(origin) || config.app.env === 'development') {
@@ -23,51 +45,49 @@ const corsOptions = {
         }
     },
     credentials: true,
-    maxAge: 86400, // 24 hours
+    maxAge: 86400,
 };
-// Middleware
-app.use(helmet()); // Security headers
-app.use(cors(corsOptions)); // CORS
-app.use(express.json({ limit: '10mb' })); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Parse URL-encoded bodies
+app.use(helmet());
+app.use(cors(corsOptions));
+app.use(cookieParser());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 // Logging
 if (config.app.env === 'development') {
     app.use(morgan('dev'));
 }
 else {
     app.use(morgan('combined', {
-        stream: {
-            write: (message) => logger.info(message.trim()),
-        },
+        stream: { write: (message) => logger.info(message.trim()) },
     }));
 }
-// Rate limiting
-app.use(`/api/${config.app.apiVersion}`, apiLimiter);
-// Health check
-app.get('/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        environment: config.app.env,
-        version: config.app.apiVersion,
-    });
-});
-// API Routes
-const apiPrefix = `/api/${config.app.apiVersion}`;
-app.use(`${apiPrefix}/auth`, authRoutes);
-app.use(`${apiPrefix}/users`, usersRoutes);
-// Add other module routes here
-// app.use(`${apiPrefix}/organizations`, organizationsRoutes);
-// app.use(`${apiPrefix}/cab-services`, cabServicesRoutes);
-// app.use(`${apiPrefix}/vehicles`, vehiclesRoutes);
-// app.use(`${apiPrefix}/trips`, tripsRoutes);
-// app.use(`${apiPrefix}/trip-costs`, tripCostsRoutes);
-// app.use(`${apiPrefix}/alerts`, alertsRoutes);
-// app.use(`${apiPrefix}/notifications`, notificationsRoutes);
-// app.use(`${apiPrefix}/settings`, settingsRoutes);
-// 404 handler
+app.use(apiLimiter);
+app.use(auditLog());
+app.use('/auth', authRoutes);
+app.use('/users', authenticate, usersRoutes);
+app.use('/roles', authenticate, rolesRoutes);
+app.use('/permissions', authenticate, permissionRoutes);
+app.use('/departments', authenticate, departmentRoutes);
+app.use('/business-units', authenticate, businessUnitsRoute);
+app.use('/cab-services', authenticate, cabServiceRoutes);
+app.use('/cab-agreements', authenticate, cabAgreementsRoutes);
+app.use('/vehicles', authenticate, vehicleRoutes);
+app.use('/vehicle-documents', authenticate, vehicledocumentsRoutes);
+app.use('/driver-documents', authenticate, driverDocumentsRoutes);
+app.use('/trip-requests', authenticate, tripRequestRoutes);
+app.use('/trip-approvals', authenticate, tripApprovalRoutes);
+app.use('/trip-assignments', authenticate, tripAssignmentRoutes);
+app.use('/employee/dashboard', authenticate, employeeDashboardRoutes);
+app.use('/trip-logs', authenticate, tripLogRoutes);
+app.use('/trip-costs', authenticate, tripCostRoutes);
+app.use('/invoices', authenticate, invoiceRoutes);
+app.use('/gps-logs', authenticate, gpsLogsRoutes);
+app.use('/expiry-alerts', authenticate, expiryAlertRoutes);
+app.use('/notifications', authenticate, notificationsRoutes);
+app.use('/audit-logs', authenticate, auditLogsRoutes);
+app.use('/system-settings', authenticate, systemSettingsRoutes);
 app.use(notFoundHandler);
-// Global error handler (must be last)
 app.use(errorHandler);
 export default app;
 //# sourceMappingURL=app.js.map

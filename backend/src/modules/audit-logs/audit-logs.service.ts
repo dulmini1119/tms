@@ -4,10 +4,29 @@ import logger from "../../utils/logger.js";
 
 const prisma = new PrismaClient();
 
+const toTitleCase = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/(^|\s)\S/g, (char) => char.toUpperCase());
+
+const normalizeActionType = (action: string | null | undefined) => {
+  if (!action) return "Read";
+  return toTitleCase(action);
+};
+
+const buildDisplayAction = (log: any, actionType: string) => {
+  const moduleName = log.module || "system";
+  const target = log.entity_name || log.entity_type || moduleName;
+  return `${actionType} ${target}`;
+};
+
 // Helper to map DB row to Frontend Interface
 const mapDbToFrontend = (log: any) => {
   const normalizedStatus: "Success" | "Failed" | "Pending" =
     log.status === "Failed" || log.status === "Pending" ? log.status : "Success";
+  
+  const normalizedActionType = normalizeActionType(log.action);
+  const displayAction = buildDisplayAction(log, normalizedActionType);
 
   return {
     id: log.id,
@@ -16,8 +35,11 @@ const mapDbToFrontend = (log: any) => {
     userName: log.user_name,
     userRole: log.user_role,
     
-    actionType: log.action || "Read",
-    action: log.description || log.action || "Read",
+    actionType: normalizedActionType, // e.g., "Create"
+    
+    // ✅ FIX: Use description (detailed) first, then fallback to generated displayAction
+    action: log.description || displayAction, 
+    
     module: log.module,
     
     entityType: log.entity_type,
@@ -33,7 +55,6 @@ const mapDbToFrontend = (log: any) => {
     
     errorMessage: log.error_message,
     
-    // Metadata
     metadata: {
       ipAddress: log.ip_address,
       sessionId: log.session_id,

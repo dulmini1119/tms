@@ -1,204 +1,372 @@
-"use client"
-import React from 'react';
+"use client";
 
-import { 
-  Users, 
-  Car, 
-  Route, 
-  FileCheck, 
-  AlertTriangle, 
-  Clock,
-  CheckCircle,
-} from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  Car,
+  CheckCircle2,
+  Clock3,
+  RefreshCw,
+  Route,
+  Users,
+  XCircle,
+} from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-const statsData = [
-  {
-    title: "Total Users",
-    value: "1,247",
-    change: "+12%",
-    icon: Users,
-    trend: "up"
+type DashboardStats = {
+  totalUsers: number;
+  activeUsers: number;
+  totalVehicles: number;
+  availableVehicles: number;
+  totalTrips: number;
+  pendingTrips: number;
+  expiringAlerts: number;
+  failedAudits: number;
+};
+
+type AlertItem = {
+  id: string;
+  entityName: string;
+  documentName: string;
+  status: string;
+  priority: string;
+  daysToExpiry: number;
+};
+
+type ActivityItem = {
+  id: string;
+  action: string;
+  actor: string;
+  module: string;
+  status: string;
+  timestamp: string;
+};
+
+type DashboardData = {
+  stats: DashboardStats;
+  tripStatusData: Array<{ name: string; value: number }>;
+  vehicleTypeData: Array<{ name: string; value: number }>;
+  alerts: AlertItem[];
+  activities: ActivityItem[];
+};
+
+type BackendAlert = {
+  id: string;
+  entity_name?: string;
+  document_name?: string;
+  status?: string;
+  priority?: string;
+  days_to_expiry?: number | string | null;
+};
+
+type BackendAuditLog = {
+  id: string;
+  action?: string;
+  userName?: string;
+  module?: string;
+  status?: string;
+  timestamp?: string;
+  createdAt?: string;
+};
+
+const chartColors = ["#0ea5e9", "#f59e0b", "#22c55e", "#ef4444", "#8b5cf6", "#14b8a6"];
+
+const initialData: DashboardData = {
+  stats: {
+    totalUsers: 0,
+    activeUsers: 0,
+    totalVehicles: 0,
+    availableVehicles: 0,
+    totalTrips: 0,
+    pendingTrips: 0,
+    expiringAlerts: 0,
+    failedAudits: 0,
   },
-  {
-    title: "Total Vehicles",
-    value: "89",
-    change: "+3%",
-    icon: Car,
-    trend: "up"
-  },
-  {
-    title: "Active Trips",
-    value: "23",
-    change: "-5%",
-    icon: Route,
-    trend: "down"
-  },
-  {
-    title: "Pending Approvals",
-    value: "7",
-    change: "+2",
-    icon: FileCheck,
-    trend: "up"
+  tripStatusData: [],
+  vehicleTypeData: [],
+  alerts: [],
+  activities: [],
+};
+
+const parseJsonSafe = async (response: Response) => {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
   }
-];
+};
 
-const tripRequestsData = [
-  { month: 'Jan', requests: 45, completed: 42 },
-  { month: 'Feb', requests: 52, completed: 48 },
-  { month: 'Mar', requests: 61, completed: 58 },
-  { month: 'Apr', requests: 58, completed: 55 },
-  { month: 'May', requests: 67, completed: 63 },
-  { month: 'Jun', requests: 71, completed: 68 }
-];
+const toCountMap = (values: string[]) => {
+  return values.reduce<Record<string, number>>((acc, value) => {
+    const normalized = value?.trim() ? value : "Unknown";
+    acc[normalized] = (acc[normalized] ?? 0) + 1;
+    return acc;
+  }, {});
+};
 
-const vehicleUsageData = [
-  { vehicle: 'Sedan', hours: 120 },
-  { vehicle: 'SUV', hours: 98 },
-  { vehicle: 'Hatchback', hours: 87 },
-  { vehicle: 'Van', hours: 65 },
-  { vehicle: 'Truck', hours: 43 }
-];
-
-const alerts = [
-  {
-    id: 1,
-    type: "warning",
-    title: "License Expiring",
-    description: "Vehicle MH-12-AB-1234 license expires in 5 days",
-    time: "2 hours ago"
-  },
-  {
-    id: 2,
-    type: "error",
-    title: "Insurance Expired",
-    description: "Driver John Doe's insurance has expired",
-    time: "4 hours ago"
-  },
-  {
-    id: 3,
-    type: "info",
-    title: "Pending Approval",
-    description: "Trip request from Marketing Dept needs approval",
-    time: "6 hours ago"
-  }
-];
-
-const recentActivity = [
-  {
-    id: 1,
-    action: "Trip Completed",
-    user: "John Smith",
-    details: "Mumbai to Pune trip completed successfully",
-    time: "10 minutes ago"
-  },
-  {
-    id: 2,
-    action: "Vehicle Added",
-    user: "Admin",
-    details: "New Honda City added to fleet",
-    time: "2 hours ago"
-  },
-  {
-    id: 3,
-    action: "Driver Assigned",
-    user: "Sarah Johnson",
-    details: "Driver assigned to trip TR-001",
-    time: "4 hours ago"
-  },
-  {
-    id: 4,
-    action: "Document Uploaded",
-    user: "Mike Wilson",
-    details: "Insurance document uploaded for MH-12-AB-5678",
-    time: "6 hours ago"
-  }
-];
+const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+  const normalized = status.toLowerCase();
+  if (normalized.includes("expired") || normalized.includes("failed")) return "destructive";
+  if (normalized.includes("pending") || normalized.includes("process")) return "secondary";
+  if (normalized.includes("active") || normalized.includes("success") || normalized.includes("renewed")) return "default";
+  return "outline";
+};
 
 export default function Dashboard() {
+  const [dashboardData, setDashboardData] = useState<DashboardData>(initialData);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  const getAuthHeaders = useCallback((): Record<string, string> => {
+    const token = localStorage.getItem("authToken") || localStorage.getItem("auth_token");
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return headers;
+  }, []);
+
+  const fetchWithAuth = useCallback(
+    async (url: string) => {
+      const response = await fetch(url, {
+        headers: getAuthHeaders(),
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error(`Request failed: ${url}`);
+      return parseJsonSafe(response);
+    },
+    [getAuthHeaders],
+  );
+
+  const loadDashboard = useCallback(async () => {
+    const settled = await Promise.allSettled([
+      fetchWithAuth("/users?page=1&limit=1"),
+      fetchWithAuth("/users?page=1&limit=1&status=Active"),
+      fetchWithAuth("/vehicles"),
+      fetchWithAuth("/trip-requests?page=1&pageSize=100"),
+      fetchWithAuth("/trip-requests?page=1&pageSize=1&status=Pending"),
+      fetchWithAuth("/expiry-alerts"),
+      fetchWithAuth("/audit-logs?page=1&limit=6"),
+      fetchWithAuth("/audit-logs?page=1&limit=1&status=Failed"),
+    ]);
+
+    const getValue = (index: number) => (settled[index].status === "fulfilled" ? settled[index].value : null);
+
+    const usersAll = getValue(0);
+    const usersActive = getValue(1);
+    const vehiclesRes = getValue(2);
+    const tripsRes = getValue(3);
+    const pendingTripsRes = getValue(4);
+    const alertsRes = getValue(5);
+    const auditsRes = getValue(6);
+    const failedAuditsRes = getValue(7);
+
+    const totalUsers = Number(usersAll?.data?.pagination?.total ?? 0);
+    const activeUsers = Number(usersActive?.data?.pagination?.total ?? 0);
+
+    const vehicles = Array.isArray(vehiclesRes?.data)
+      ? vehiclesRes.data
+      : Array.isArray(vehiclesRes)
+        ? vehiclesRes
+        : [];
+
+    const totalVehicles = vehicles.length;
+    const availableVehicles = vehicles.filter(
+      (v: { availability_status?: string }) =>
+        (v.availability_status || "").toLowerCase() === "available",
+    ).length;
+
+    const trips = Array.isArray(tripsRes?.data) ? tripsRes.data : [];
+    const totalTrips = Number(tripsRes?.meta?.total ?? trips.length ?? 0);
+    const pendingTrips = Number(pendingTripsRes?.meta?.total ?? 0);
+
+    const tripStatusCounts = toCountMap(
+      trips.map((trip: { status?: string }) => trip.status || "Unknown"),
+    );
+    const tripStatusData = Object.entries(tripStatusCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+
+    const vehicleTypeCounts = toCountMap(
+      vehicles.map((vehicle: { vehicle_type?: string }) => vehicle.vehicle_type || "Unknown"),
+    );
+    const vehicleTypeData = Object.entries(vehicleTypeCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+
+    const alertRows: BackendAlert[] = Array.isArray(alertsRes) ? alertsRes : [];
+
+    const alerts = alertRows
+      .map((alert) => ({
+        id: alert.id,
+        entityName: alert.entity_name || "Unknown",
+        documentName: alert.document_name || "Unknown document",
+        status: alert.status || "Unknown",
+        priority: alert.priority || "Low",
+        daysToExpiry: Number(alert.days_to_expiry ?? 0),
+      }))
+      .sort((a, b) => a.daysToExpiry - b.daysToExpiry)
+      .slice(0, 6);
+
+    const expiringAlerts = alertRows.filter((a) =>
+      ["expired", "expiring_soon", "under_process"].includes((a.status || "").toLowerCase()),
+    ).length;
+
+    const auditLogs: BackendAuditLog[] = Array.isArray(auditsRes?.data?.logs) ? auditsRes.data.logs : [];
+
+    const activities = auditLogs.length
+      ? auditLogs.map((log) => ({
+          id: log.id,
+          action: log.action || "Activity",
+          actor: log.userName || "System",
+          module: log.module || "system",
+          status: log.status || "Success",
+          timestamp: log.timestamp || log.createdAt || new Date().toISOString(),
+        }))
+      : [];
+
+    const failedAudits = Number(failedAuditsRes?.data?.meta?.total ?? 0);
+
+    setDashboardData({
+      stats: {
+        totalUsers,
+        activeUsers,
+        totalVehicles,
+        availableVehicles,
+        totalTrips,
+        pendingTrips,
+        expiringAlerts,
+        failedAudits,
+      },
+      tripStatusData,
+      vehicleTypeData,
+      alerts,
+      activities,
+    });
+
+    const failedCount = settled.filter((s) => s.status === "rejected").length;
+    setError(failedCount > 0 ? "Some dashboard data could not be loaded." : null);
+    setLastUpdated(new Date().toISOString());
+  }, [fetchWithAuth]);
+
+  useEffect(() => {
+    const run = async () => {
+      setLoading(true);
+      await loadDashboard();
+      setLoading(false);
+    };
+    run();
+  }, [loadDashboard]);
+
+  const summaryCards = useMemo(
+    () => [
+      { title: "Total Users", value: dashboardData.stats.totalUsers, sub: `${dashboardData.stats.activeUsers} active`, icon: Users },
+      { title: "Fleet Vehicles", value: dashboardData.stats.totalVehicles, sub: `${dashboardData.stats.availableVehicles} available`, icon: Car },
+      { title: "Trip Requests", value: dashboardData.stats.totalTrips, sub: `${dashboardData.stats.pendingTrips} pending`, icon: Route },
+      { title: "Expiry Alerts", value: dashboardData.stats.expiringAlerts, sub: `${dashboardData.stats.failedAudits} failed audits`, icon: AlertTriangle },
+    ],
+    [dashboardData.stats],
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadDashboard();
+    setRefreshing(false);
+  };
+
   return (
     <div className="space-y-4">
-      <div className='p-3'>
-        <h1 className='text-2xl'>DASHBOARD</h1>
+      <div className="flex items-center justify-between p-3">
+        <div>
+          <h1 className="text-2xl">DASHBOARD</h1>
+          <p className="text-xs text-muted-foreground">
+            Central admin overview for users, vehicles, trips, alerts, and audit activity
+          </p>
+        </div>
+        <Button variant="outline" onClick={onRefresh} disabled={refreshing || loading}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
-      {/* Stats Cards */}
+      {error && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-sm text-amber-600">
+              <AlertTriangle className="h-4 w-4" />
+              {error}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {statsData.map((stat, index) => (
-          <Card key={index}>
+        {summaryCards.map((card) => (
+          <Card key={card.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {stat.title}
-              </CardTitle>
-              <stat.icon className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+              <card.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">
-                <span className={stat.trend === 'up' ? 'text-green-600' : 'text-red-600'}>
-                  {stat.change}
-                </span>{' '}
-                from last month
-              </p>
+              <div className="text-2xl font-bold">{loading ? "..." : card.value.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">{loading ? "Loading..." : card.sub}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* Trip Requests Chart */}
-        <Card className="col-span-4">
+        <Card className="lg:col-span-4">
           <CardHeader>
-            <CardTitle>Trip Requests Over Time</CardTitle>
-            <CardDescription>
-              Monthly trip requests and completion rates
-            </CardDescription>
+            <CardTitle>Trip Status Distribution</CardTitle>
+            <CardDescription>Breakdown of recent trip request statuses</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={tripRequestsData}>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={dashboardData.tripStatusData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Line 
-                  type="monotone" 
-                  dataKey="requests" 
-                  stroke="#8884d8" 
-                  strokeWidth={2}
-                  name="Requests"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="completed" 
-                  stroke="#82ca9d" 
-                  strokeWidth={2}
-                  name="Completed"
-                />
-              </LineChart>
+                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                  {dashboardData.tripStatusData.map((entry, index) => (
+                    <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Vehicle Usage Chart */}
-        <Card className="col-span-3">
+        <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>Vehicle Usage</CardTitle>
-            <CardDescription>
-              Hours of usage by vehicle type
-            </CardDescription>
+            <CardTitle>Vehicle Type Distribution</CardTitle>
+            <CardDescription>Current fleet grouped by vehicle type</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={vehicleUsageData}>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={dashboardData.vehicleTypeData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="vehicle" />
-                <YAxis />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Bar dataKey="hours" fill="#8884d8" />
+                <Bar dataKey="value" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -206,94 +374,91 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Alerts Panel */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>System Alerts</CardTitle>
-              <CardDescription>
-                Important notifications requiring attention
-              </CardDescription>
+              <CardDescription>Top expiry and renewal alerts requiring attention</CardDescription>
             </div>
-            <Button variant="outline" size="sm">
-              View All
-            </Button>
+            <a href="/admin/expiry-alerts">
+              <Button variant="outline" size="sm">
+                View All
+              </Button>
+            </a>
           </CardHeader>
           <CardContent className="space-y-4">
-            {alerts.map((alert) => (
-              <div key={alert.id} className="flex items-start space-x-3">
-                <div className="shrink-0">
-                  {alert.type === 'error' && (
-                    <AlertTriangle className="h-5 w-5 text-red-500" />
+            {dashboardData.alerts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No active alerts.</p>
+            ) : (
+              dashboardData.alerts.map((alert) => (
+                <div key={alert.id} className="flex items-start gap-3">
+                  {alert.daysToExpiry < 0 ? (
+                    <XCircle className="mt-0.5 h-5 w-5 text-red-500" />
+                  ) : alert.daysToExpiry <= 30 ? (
+                    <Clock3 className="mt-0.5 h-5 w-5 text-amber-500" />
+                  ) : (
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 text-blue-500" />
                   )}
-                  {alert.type === 'warning' && (
-                    <Clock className="h-5 w-5 text-yellow-500" />
-                  )}
-                  {alert.type === 'info' && (
-                    <CheckCircle className="h-5 w-5 text-blue-500" />
-                  )}
-                </div>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{alert.title}</p>
-                    <Badge
-                      variant={alert.type === 'error' ? 'destructive' : 
-                              alert.type === 'warning' ? 'secondary' : 'default'}
-                      className="text-xs"
-                    >
-                      {alert.type}
-                    </Badge>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium">{alert.entityName}</p>
+                      <Badge variant={getStatusBadgeVariant(alert.status)}>{alert.status}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{alert.documentName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {alert.daysToExpiry < 0
+                        ? `Overdue by ${Math.abs(alert.daysToExpiry)} days`
+                        : `${alert.daysToExpiry} days remaining`}{" "}
+                      | Priority: {alert.priority}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {alert.description}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {alert.time}
-                  </p>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>
-                Latest actions in the system
-              </CardDescription>
+              <CardDescription>Latest events from the audit trail</CardDescription>
             </div>
-            <Button variant="outline" size="sm">
-              View All
-            </Button>
+            <a href="/admin/audit-logs">
+              <Button variant="outline" size="sm">
+                View All
+              </Button>
+            </a>
           </CardHeader>
           <CardContent className="space-y-4">
-            {recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-start space-x-3">
-                <div className="shrink-0">
-                  <div className="h-2 w-2 bg-primary rounded-full mt-2"></div>
-                </div>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{activity.action}</p>
+            {dashboardData.activities.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No recent activity.</p>
+            ) : (
+              dashboardData.activities.map((activity) => (
+                <div key={activity.id} className="flex items-start gap-3">
+                  <div className="mt-2 h-2 w-2 rounded-full bg-primary" />
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium">{activity.action}</p>
+                      <Badge variant={getStatusBadgeVariant(activity.status)}>{activity.status}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {activity.actor} | {activity.module}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      {activity.time}
+                      {new Date(activity.timestamp).toLocaleString()}
                     </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    by {activity.user}
-                  </p>
-                  <p className="text-sm">
-                    {activity.details}
-                  </p>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {lastUpdated && (
+        <p className="px-3 text-xs text-muted-foreground">Last updated: {new Date(lastUpdated).toLocaleString()}</p>
+      )}
     </div>
   );
 }

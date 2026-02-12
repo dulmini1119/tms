@@ -2,14 +2,19 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.js';
 import prisma from '../config/database.js';
 import logger from '../utils/logger.js';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Audit Log Middleware
  * Logs all API operations with normalized action/status values.
  */
+
+
 export const auditLog = (moduleName?: string) => {
   return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     if (shouldSkipRequest(req)) return next();
+
+    const requestId = uuidv4(); // Generate unique request_id for this API call
 
     const originalSend = res.send;
     const originalJson = res.json;
@@ -69,6 +74,7 @@ export const auditLog = (moduleName?: string) => {
             status,
             error_message: errorMessage,
             description: buildDescription(action, module, entityType, entityId),
+            request_id: requestId, // <-- attach request_id
           },
         });
 
@@ -81,6 +87,7 @@ export const auditLog = (moduleName?: string) => {
     next();
   };
 };
+
 
 function determineAction(method: string, path: string): string {
   if (path.startsWith('/auth/login')) return 'Login';

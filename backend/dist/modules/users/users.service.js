@@ -1,15 +1,17 @@
 import bcrypt from "bcrypt";
-import prisma from "../../config/database";
-import { AppError } from "../../middleware/errorHandler";
-import { ERROR_CODES, HTTP_STATUS } from "../../utils/constants";
-import logger from "../../utils/logger";
+import prisma from "../../config/database.js";
+import { AppError } from "../../middleware/errorHandler.js";
+import { ERROR_CODES, HTTP_STATUS } from "../../utils/constants.js";
+import logger from "../../utils/logger.js";
 const SALT_ROUNDS = 10;
 export class UsersService {
+    /**
+     * Get all users with optional filters and pagination
+     */
     async getUsers(filters) {
-        const { page, limit, search, role, status, departmentId, businessUnitId, sortBy, sortOrder, } = filters;
-        const where = {
-            deleted_at: null,
-        };
+        const { page = 1, limit = 10, search, status, organizationId, sortBy = "created_at", sortOrder = "desc", role, // Destructure the role from filters
+         } = filters;
+        const where = { deleted_at: null };
         if (search) {
             where.OR = [
                 { email: { contains: search, mode: "insensitive" } },
@@ -20,10 +22,30 @@ export class UsersService {
         }
         if (status)
             where.status = status;
-        if (departmentId)
-            where.department_id = departmentId;
-        if (businessUnitId)
-            where.business_unit_id = businessUnitId;
+        if (organizationId)
+            where.business_unit_id = organizationId;
+        // --- START OF CORRECTED ROLE FILTERING LOGIC ---
+        if (role) {
+            // Find the role in the database by its CODE (e.g., "VEHICLE_ADMIN")
+            const roleRecord = await prisma.roles.findFirst({
+                where: { code: role }, // <-- CORRECT: Searching by 'code'
+                select: { id: true },
+            });
+            if (roleRecord) {
+                // Find all user_roles entries that match this role's ID
+                const userRoles = await prisma.user_roles.findMany({
+                    where: { role_id: roleRecord.id },
+                    select: { user_id: true },
+                });
+                // Add a condition to the 'where' clause to only include users whose ID is in this list
+                where.id = { in: userRoles.map((ur) => ur.user_id) };
+            }
+            else {
+                // If the role code doesn't exist, return no users
+                where.id = { in: [] };
+            }
+        }
+        // --- END OF CORRECTED LOGIC ---
         const [users, total] = await Promise.all([
             prisma.users.findMany({
                 where,
@@ -33,14 +55,22 @@ export class UsersService {
                     first_name: true,
                     last_name: true,
                     phone: true,
-                    status: true,
-                    department_id: true,
-                    business_unit_id: true,
                     employee_id: true,
+                    status: true,
                     position: true,
-                    last_login: true,
                     created_at: true,
                     updated_at: true,
+                    user_roles_user_roles_user_idTousers: {
+                        select: {
+                            role: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    code: true,
+                                },
+                            },
+                        },
+                    },
                 },
                 orderBy: { [sortBy]: sortOrder },
                 skip: (page - 1) * limit,
@@ -48,8 +78,26 @@ export class UsersService {
             }),
             prisma.users.count({ where }),
         ]);
+        // Map roles properly
+        const cleanUsers = users.map((u) => {
+            const rolesRel = u.user_roles_user_roles_user_idTousers;
+            const roles = rolesRel.map((r) => r.role.code.toUpperCase());
+            const primaryRole = rolesRel.length > 0 ? rolesRel[0].role.code : u.position ?? "VIEWER";
+            return {
+                id: u.id,
+                first_name: u.first_name,
+                last_name: u.last_name,
+                email: u.email,
+                phone: u.phone || null,
+                employee_id: u.employee_id,
+                status: u.status,
+                last_login: u.updated_at,
+                position: primaryRole,
+                roles: roles.length > 0 ? roles : [primaryRole],
+            };
+        });
         return {
-            users,
+            users: cleanUsers,
             pagination: {
                 page,
                 limit,
@@ -58,20 +106,42 @@ export class UsersService {
             },
         };
     }
+    /**
+     * Get user by ID
+     */
     async getUserById(userId) {
         const user = await prisma.users.findUnique({
             where: { id: userId },
+            include: {
+                user_roles_user_roles_user_idTousers: {
+                    include: { role: true },
+                },
+            },
         });
         if (!user) {
             throw new AppError(ERROR_CODES.NOT_FOUND, "User not found", HTTP_STATUS.NOT_FOUND);
         }
-        return user;
+        const { user_roles_user_roles_user_idTousers, ...userData } = user;
+        const primaryRole = user_roles_user_roles_user_idTousers.length > 0
+            ? user_roles_user_roles_user_idTousers[0].role.code
+            : "VIEWER";
+        return {
+            ...userData,
+            roles: user_roles_user_roles_user_idTousers.map((ur) => ur.role.code),
+            position: primaryRole,
+        };
     }
+    /**
+     * Create new user
+     */
     async createUser(data) {
+        if (!data.employeeId) {
+            throw new AppError(ERROR_CODES.BAD_REQUEST, "Employee ID is required", HTTP_STATUS.BAD_REQUEST);
+        }
         const email = data.email.toLowerCase();
         const [existingUser, existingEmployee] = await Promise.all([
             prisma.users.findUnique({ where: { email } }),
-            prisma.users.findUnique({ where: { employee_id: data.employee_id } }),
+            prisma.users.findUnique({ where: { employee_id: data.employeeId } }),
         ]);
         if (existingUser) {
             throw new AppError(ERROR_CODES.ALREADY_EXISTS, "User with this email already exists", HTTP_STATUS.CONFLICT);
@@ -84,48 +154,74 @@ export class UsersService {
             data: {
                 email,
                 password_hash,
-                first_name: data.first_name,
-                last_name: data.last_name,
+                first_name: data.firstName,
+                last_name: data.lastName,
                 phone: data.phone,
-                department_id: data.department_id,
-                business_unit_id: data.business_unit_id,
+                employee_id: data.employeeId,
+                business_unit_id: data.organizationId,
                 position: data.position,
-                employee_id: data.employee_id,
                 status: "Active",
             },
         });
         logger.info(`User created: ${user.email}`);
+        // Assign role
+        if (data.position) {
+            const normalizedRoleCode = data.position?.toUpperCase(); // e.g., "HOD"
+            const role = await prisma.roles.findUnique({
+                where: { code: normalizedRoleCode },
+            });
+            if (role) {
+                await prisma.user_roles.create({
+                    data: {
+                        user_id: user.id,
+                        role_id: role.id,
+                    },
+                });
+            }
+        }
         const { password_hash: _, ...cleanUser } = user;
         return cleanUser;
     }
+    /**
+     * Update user
+     */
     async updateUser(userId, data) {
         const existingUser = await this.getUserById(userId);
-        if (data.email && data.email !== existingUser.email) {
+        if (data.email && data.email.toLowerCase() !== existingUser.email) {
             const emailExists = await prisma.users.findUnique({
                 where: { email: data.email.toLowerCase() },
             });
-            if (emailExists)
+            if (emailExists) {
                 throw new AppError(ERROR_CODES.ALREADY_EXISTS, "Email already in use", HTTP_STATUS.CONFLICT);
+            }
         }
-        if (data.employee_id && data.employee_id !== existingUser.employee_id) {
+        if (data.employeeId && data.employeeId !== existingUser.employee_id) {
             const employeeExists = await prisma.users.findUnique({
-                where: { employee_id: data.employee_id },
+                where: { employee_id: data.employeeId },
             });
-            if (employeeExists)
+            if (employeeExists) {
                 throw new AppError(ERROR_CODES.ALREADY_EXISTS, "Employee ID already in use", HTTP_STATUS.CONFLICT);
+            }
         }
         const updatedUser = await prisma.users.update({
             where: { id: userId },
             data: {
-                ...data,
                 email: data.email?.toLowerCase(),
+                first_name: data.firstName ?? existingUser.first_name,
+                last_name: data.lastName ?? existingUser.last_name,
+                phone: data.phone ?? existingUser.phone,
+                status: data.status ?? existingUser.status,
+                employee_id: data.employeeId ?? existingUser.employee_id,
+                position: data.position ?? existingUser.position,
             },
         });
         const { password_hash: _, ...cleanUser } = updatedUser;
         return cleanUser;
     }
+    /**
+     * Soft delete user
+     */
     async deleteUser(userId) {
-        // Ensure user exists
         await this.getUserById(userId);
         await prisma.users.update({
             where: { id: userId },
@@ -133,79 +229,6 @@ export class UsersService {
         });
         logger.info(`User soft deleted: ${userId}`);
         return { message: "User deleted successfully" };
-    }
-    async getUserPermissions(userId) {
-        const user = await prisma.users.findUnique({
-            where: { id: userId },
-            include: {
-                user_roles_user_roles_assigned_byTousers: {
-                    include: {
-                        roles: {
-                            include: {
-                                role_permissions: {
-                                    include: {
-                                        permissions: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        });
-        if (!user)
-            throw new AppError(ERROR_CODES.NOT_FOUND, "User not found", HTTP_STATUS.NOT_FOUND);
-        const permissions = user.user_roles_user_roles_assigned_byTousers.flatMap((userRole) => userRole.roles.role_permissions.map((rp) => rp.permissions.code));
-        return { permissions: [...new Set(permissions)] };
-    }
-    async updateUserPermissions(userId, permissionIds) {
-        // 1. Get user roles
-        const userRoles = await prisma.user_roles.findMany({
-            where: { user_id: userId },
-        });
-        if (userRoles.length === 0) {
-            throw new AppError(ERROR_CODES.NOT_FOUND, "User has no assigned roles", HTTP_STATUS.NOT_FOUND);
-        }
-        // For now, we update ALL roles assigned to this user
-        for (const userRole of userRoles) {
-            const roleId = userRole.role_id;
-            // 2. Delete old permissions for this role
-            await prisma.role_permissions.deleteMany({
-                where: { role_id: roleId },
-            });
-            // 3. Insert new permissions
-            await prisma.role_permissions.createMany({
-                data: permissionIds.map((permissionId) => ({
-                    role_id: roleId,
-                    permission_id: permissionId,
-                })),
-            });
-        }
-        return { message: "Permissions updated successfully" };
-    }
-    async assignUserRole(userId, roleId) {
-        await this.getUserById(userId);
-        const role = await prisma.roles.findUnique({ where: { id: roleId } });
-        if (!role)
-            throw new AppError(ERROR_CODES.NOT_FOUND, "Role not found", HTTP_STATUS.NOT_FOUND);
-        const existing = await prisma.user_roles.findUnique({
-            where: { user_id_role_id: { user_id: userId, role_id: roleId } },
-        });
-        if (existing)
-            throw new AppError(ERROR_CODES.ALREADY_EXISTS, "User already has this role", HTTP_STATUS.CONFLICT);
-        await prisma.user_roles.create({
-            data: { user_id: userId, role_id: roleId },
-        });
-        return { message: "Role assigned successfully" };
-    }
-    async removeUserRole(userId, roleId) {
-        await this.getUserById(userId);
-        const res = await prisma.user_roles.deleteMany({
-            where: { user_id: userId, role_id: roleId },
-        });
-        if (res.count === 0)
-            throw new AppError(ERROR_CODES.NOT_FOUND, "User does not have this role", HTTP_STATUS.NOT_FOUND);
-        return { message: "Role removed successfully" };
     }
 }
 //# sourceMappingURL=users.service.js.map

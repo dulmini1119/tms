@@ -1,6 +1,6 @@
 'use client'
-import React, { useState } from 'react';
-
+import React, { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner'; // Assuming you use sonner for notifications
 
 import { 
   Settings, 
@@ -25,10 +25,10 @@ import {
   Lock,
   Unlock,
   Key,
-  Monitor
+  Monitor,
+  Loader2
 } from 'lucide-react';
 import { SystemSetting } from '@/types/system-interfaces';
-import { mockSystemData } from '@/data/mock-system-data';
 import { VariantProps } from 'class-variance-authority';
 import { Badge, badgeVariants } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -42,6 +42,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
+// API Endpoint (using rewrite path)
+const API_ENDPOINT = '/system-settings';
 
 export default function SystemSettings() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -51,19 +53,64 @@ export default function SystemSettings() {
   const [selectedSetting, setSelectedSetting] = useState<SystemSetting | null>(null);
   const [settingValues, setSettingValues] = useState<Record<string, unknown>>({});
   const [dialogFormValue, setDialogFormValue] = useState<unknown>(null);
+  
+  // New State for API
+  const [systemSettings, setSystemSettings] = useState<SystemSetting[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // Get system settings data
-  const systemSettings = mockSystemData.systemSettings;
+  // --- FETCH DATA ---
+  const fetchSettings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(API_ENDPOINT);
+      if (!response.ok) throw new Error('Failed to fetch settings');
+      
+      const result = await response.json();
+      
+      // Map backend data to frontend interface, adding defaults for missing fields
+      const mappedData = (result.data.settings || []).map((s: any) => ({
+        id: s.id,
+        key: s.key,
+        name: s.name || s.key.replace(/_/g, ' '),
+        value: s.value,
+        dataType: s.dataType || 'String',
+        category: s.category || 'General',
+        description: s.description || '',
+        encrypted: s.encrypted || false,
+        editable: s.editable !== false, // Default to true
+        visibility: s.visibility || 'Public', // Default since not in DB
+        scope: s.scope || 'Global',           // Default since not in DB
+        environment: 'Production',
+        version: '1.0',
+        lastModifiedBy: s.updated_by || 'System',
+        lastModifiedAt: s.updated_at || new Date().toISOString(),
+        createdAt: s.created_at || new Date().toISOString(),
+        defaultValue: s.value // Simplification
+      }));
 
-  // Initialize setting values - memoized for performance
-  React.useEffect(() => {
-    const initialValues: Record<string, unknown> = {};
-    systemSettings.forEach(setting => {
-      initialValues[setting.id] = setting.value;
-    });
-    setSettingValues(initialValues);
-  }, [systemSettings]);
+      setSystemSettings(mappedData);
 
+      // Initialize local state for editing
+      const initialValues: Record<string, unknown> = {};
+      mappedData.forEach((setting: SystemSetting) => {
+        initialValues[setting.id] = setting.value;
+      });
+      setSettingValues(initialValues);
+
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load system settings");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  // --- UPDATE DATA ---
   const updateSettingValue = (settingId: string, newValue: unknown) => {
     setSettingValues(prev => ({
       ...prev,
@@ -71,18 +118,74 @@ export default function SystemSettings() {
     }));
   };
 
+  // Save single setting (from Dialog)
+  const handleSaveSingleSetting = async () => {
+    if (!selectedSetting) return;
+    setSaving(true);
+    try {
+      const response = await fetch(`${API_ENDPOINT}/${selectedSetting.key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ setting_value: dialogFormValue })
+      });
+
+      if (!response.ok) throw new Error('Update failed');
+      
+      toast.success(`Setting "${selectedSetting.name}" updated`);
+      
+      // Update local state
+      updateSettingValue(selectedSetting.id, dialogFormValue);
+      setSystemSettings(prev => prev.map(s => s.id === selectedSetting.id ? {...s, value: dialogFormValue} : s));
+      setIsEditDialogOpen(false);
+      
+    } catch (error) {
+      toast.error("Failed to update setting");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Bulk Save (from Header Button)
+  const handleSaveAllSettings = async () => {
+    setSaving(true);
+    toast.info("Saving all settings...");
+    
+    // Create an array of promises for all changed values
+    const updates = systemSettings.map(setting => {
+      const currentValue = settingValues[setting.id];
+      // Only update if value changed (simple comparison)
+      if (JSON.stringify(currentValue) !== JSON.stringify(setting.value)) {
+        return fetch(`${API_ENDPOINT}/${setting.key}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ setting_value: currentValue })
+        });
+      }
+      return null;
+    }).filter(Boolean);
+
+    try {
+      await Promise.all(updates);
+      toast.success("All settings saved successfully");
+      fetchSettings(); // Refresh data
+    } catch (error) {
+      toast.error("Failed to save some settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const filteredSettings = React.useMemo(() => {
     return systemSettings.filter(setting => {
       return (
         setting.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         setting.key.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        setting.description.toLowerCase().includes(searchTerm.toLowerCase())
+        (setting.description || '').toLowerCase().includes(searchTerm.toLowerCase())
       ) &&
       (categoryFilter === 'all' || setting.category.toLowerCase() === categoryFilter);
     });
   }, [systemSettings, searchTerm, categoryFilter]);
 
-  // Group settings by category - memoized for performance
   const settingsByCategory = React.useMemo(() => {
     return systemSettings.reduce((acc, setting) => {
       if (!acc[setting.category]) {
@@ -100,7 +203,7 @@ export default function SystemSettings() {
   };
 
   const getCategoryIcon = (category: string) => {
-    const icons = {
+    const icons: Record<string, React.ReactNode> = {
       'General': <Settings className="h-4 w-4" />,
       'Security': <Shield className="h-4 w-4" />,
       'Notifications': <Bell className="h-4 w-4" />,
@@ -110,7 +213,7 @@ export default function SystemSettings() {
       'Integration': <Globe className="h-4 w-4" />,
       'Backup': <Database className="h-4 w-4" />
     };
-    return icons[category as keyof typeof icons] || <Settings className="h-4 w-4" />;
+    return icons[category] || <Settings className="h-4 w-4" />;
   };
 
   const getVisibilityBadge = (visibility: string) => {
@@ -143,21 +246,22 @@ export default function SystemSettings() {
     );
   };
 
-const getDataTypeBadge = (dataType: string) => {
-  const variants: Record<string, VariantProps<typeof badgeVariants>['variant']> = {
-    String: 'outline',
-    Number: 'secondary',
-    Boolean: 'default',
-    JSON: 'destructive',
-    Array: 'secondary',
-    Date: 'outline',
+  const getDataTypeBadge = (dataType: string) => {
+    const variants: Record<string, VariantProps<typeof badgeVariants>['variant']> = {
+      String: 'outline',
+      Number: 'secondary',
+      Boolean: 'default',
+      JSON: 'destructive',
+      Array: 'secondary',
+      Date: 'outline',
+    };
+    return (
+      <Badge variant={variants[dataType] ?? 'outline'}>
+        {dataType}
+      </Badge>
+    );
   };
-  return (
-    <Badge variant={variants[dataType] ?? 'outline'}>
-      {dataType}
-    </Badge>
-  );
-};
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -235,6 +339,14 @@ const getDataTypeBadge = (dataType: string) => {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[50vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -245,12 +357,12 @@ const getDataTypeBadge = (dataType: string) => {
           </p>
         </div>
         <div className="space-x-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={fetchSettings}>
             <RotateCcw className="h-4 w-4 mr-2" />
-            Reset to Defaults
+            Refresh
           </Button>
-          <Button>
-            <Save className="h-4 w-4 mr-2" />
+          <Button onClick={handleSaveAllSettings} disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save Settings
           </Button>
         </div>
@@ -449,395 +561,165 @@ const getDataTypeBadge = (dataType: string) => {
         </TabsContent>
 
         {/* System Config Tab */}
-<TabsContent value="system" className="space-y-6">
-  <Card>
-    <CardHeader>
-      <CardTitle>All System Settings</CardTitle>
-      <CardDescription>
-        Complete list of system configuration parameters
-      </CardDescription>
-    </CardHeader>
-
-    <CardContent>
-      {/* Filters */}
-      <div className="flex items-center space-x-4 mb-6 flex-wrap gap-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search settings..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8"
-          />
-        </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="general">General</SelectItem>
-            <SelectItem value="security">Security</SelectItem>
-            <SelectItem value="notifications">Notifications</SelectItem>
-            <SelectItem value="gps">GPS</SelectItem>
-            <SelectItem value="fleet">Fleet</SelectItem>
-            <SelectItem value="billing">Billing</SelectItem>
-            <SelectItem value="integration">Integration</SelectItem>
-            <SelectItem value="backup">Backup</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* ✅ Desktop Table */}
-      <div className="hidden md:block rounded-md border border-border">
-        <Table className='table-auto'>
-          <TableHeader className=" top-0 bg-background">
-            <TableRow>
-              <TableHead>Setting Details</TableHead>
-              <TableHead>Current Value</TableHead>
-              <TableHead>Data Type & Scope</TableHead>
-              <TableHead>Access & Security</TableHead>
-              <TableHead>Modification Info</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {filteredSettings.map((setting) => (
-              <TableRow key={setting.id}>
-                {/* Setting Details */}
-                <TableCell className='break-words whitespace-normal'>
-                  <div className="space-y-1">
-                    <div className="font-medium flex items-center">
-                      {getCategoryIcon(setting.category)}
-                      <span className="ml-2">{setting.name}</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {setting.description}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Key: {setting.key}
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {setting.category}
-                    </Badge>
-                  </div>
-                </TableCell>
-
-                {/* Current Value */}
-                <TableCell>
-                  <div className="space-y-1">
-                    <div className="text-sm font-mono">
-                      {formatValue(setting.value, setting.dataType)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Default:{" "}
-                      {formatValue(setting.defaultValue, setting.dataType)}
-                    </div>
-                    {setting.validationRules && (
-                      <div className="text-xs text-muted-foreground">
-                        {setting.validationRules.required && "Required "}
-                        {setting.validationRules.minValue &&
-                          `Min: ${setting.validationRules.minValue} `}
-                        {setting.validationRules.maxValue &&
-                          `Max: ${setting.validationRules.maxValue}`}
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-
-                {/* Data Type & Scope */}
-                <TableCell>
-                  <div className="space-y-1">
-                    {getDataTypeBadge(setting.dataType)}
-                    {getScopeBadge(setting.scope)}
-                    <div className="text-xs text-muted-foreground">
-                      Version: {setting.version}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Env: {setting.environment}
-                    </div>
-                  </div>
-                </TableCell>
-
-                {/* Access & Security */}
-                <TableCell>
-                  <div className="space-y-1">
-                    {getVisibilityBadge(setting.visibility)}
-                    {setting.editable ? (
-                      <Badge variant="default" className="text-xs">
-                        <Unlock className="h-3 w-3 mr-1" />
-                        Editable
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive" className="text-xs">
-                        <Lock className="h-3 w-3 mr-1" />
-                        Read Only
-                      </Badge>
-                    )}
-                    {setting.encrypted && (
-                      <Badge variant="destructive" className="text-xs">
-                        <Key className="h-3 w-3 mr-1" />
-                        Encrypted
-                      </Badge>
-                    )}
-                  </div>
-                </TableCell>
-
-                {/* Modification Info */}
-                <TableCell>
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">
-                      By: {setting.lastModifiedBy.split("@")[0]}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      At: {formatDate(setting.lastModifiedAt)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Created: {formatDate(setting.createdAt)}
-                    </div>
-                  </div>
-                </TableCell>
-
-                {/* Actions */}
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleEditSetting(setting)}
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Setting
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View History
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        Reset to Default
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Download className="h-4 w-4 mr-2" />
-                        Export Setting
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* 📱 Mobile Card View */}
-      <div className="md:hidden space-y-4">
-        {filteredSettings.map((setting) => (
-          <div
-            key={setting.id}
-            className="border border-border rounded-lg p-4 shadow-sm bg-background space-y-2"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="font-medium flex items-center">
-                  {getCategoryIcon(setting.category)}
-                  <span className="ml-2">{setting.name}</span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {setting.description}
-                </div>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleEditSetting(setting)}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Eye className="h-4 w-4 mr-2" />
-                    History
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Reset
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            <div className="text-sm font-mono">
-              {formatValue(setting.value, setting.dataType)}
-            </div>
-
-            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              {getDataTypeBadge(setting.dataType)}
-              {getScopeBadge(setting.scope)}
-              {getVisibilityBadge(setting.visibility)}
-            </div>
-
-            <div className="text-xs text-muted-foreground">
-              Modified by: {setting.lastModifiedBy.split("@")[0]}
-            </div>
-          </div>
-        ))}
-      </div>
-    </CardContent>
-  </Card>
-</TabsContent>
-
-
-        {/* Maintenance Tab */}
-        <TabsContent value="maintenance" className="space-y-6">
+        <TabsContent value="system" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>System Maintenance</CardTitle>
+              <CardTitle>All System Settings</CardTitle>
               <CardDescription>
-                Backup, restore, and system maintenance operations
+                Complete list of system configuration parameters
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-6 md:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Database className="h-5 w-5 mr-2" />
-                      Data Backup
-                    </CardTitle>
-                    <CardDescription>
-                      Create and manage system backups
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Auto Backup</span>
-                      <Switch 
-                        checked={true} 
-                        onCheckedChange={(checked) => console.log('Auto backup:', checked)}
-                      />
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Last backup: 2 hours ago
-                    </div>
-                    <div className="space-x-2">
-                      <Button>
-                        <Archive className="h-4 w-4 mr-2" />
-                        Create Backup
-                      </Button>
-                      <Button variant="outline">
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+              {/* Filters */}
+              <div className="flex items-center space-x-4 mb-6 flex-wrap gap-2">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search settings..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {Object.keys(settingsByCategory).map(cat => (
+                       <SelectItem key={cat} value={cat.toLowerCase()}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Upload className="h-5 w-5 mr-2" />
-                      Data Restore
-                    </CardTitle>
-                    <CardDescription>
-                      Restore system from backup
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center">
-                      <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">
-                        Drop backup file here or click to browse
-                      </p>
-                    </div>
-                    <Button variant="outline" className="w-full">
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Restore from Backup
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Monitor className="h-5 w-5 mr-2" />
-                      System Health
-                    </CardTitle>
-                    <CardDescription>
-                      Monitor system performance and status
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Database</span>
-                        <Badge variant="default">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Healthy
-                        </Badge>
+              {/* Desktop Table */}
+              <div className="hidden md:block rounded-md border border-border">
+                <Table className='table-auto'>
+                  <TableHeader className="top-0 bg-background">
+                    <TableRow>
+                      <TableHead>Setting Details</TableHead>
+                      <TableHead>Current Value</TableHead>
+                      <TableHead>Data Type & Scope</TableHead>
+                      <TableHead>Access & Security</TableHead>
+                      <TableHead>Modification Info</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSettings.map((setting) => (
+                      <TableRow key={setting.id}>
+                        <TableCell className='break-words whitespace-normal'>
+                          <div className="space-y-1">
+                            <div className="font-medium flex items-center">
+                              {getCategoryIcon(setting.category)}
+                              <span className="ml-2">{setting.name}</span>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {setting.description}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Key: {setting.key}
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {setting.category}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="text-sm font-mono">
+                              {formatValue(setting.value, setting.dataType)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Default: {formatValue(setting.defaultValue, setting.dataType)}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {getDataTypeBadge(setting.dataType)}
+                            {getScopeBadge(setting.scope)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {getVisibilityBadge(setting.visibility)}
+                            {setting.editable ? (
+                              <Badge variant="default" className="text-xs">
+                                <Unlock className="h-3 w-3 mr-1" />
+                                Editable
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive" className="text-xs">
+                                <Lock className="h-3 w-3 mr-1" />
+                                Read Only
+                              </Badge>
+                            )}
+                            {setting.encrypted && (
+                              <Badge variant="destructive" className="text-xs">
+                                <Key className="h-3 w-3 mr-1" />
+                                Encrypted
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="text-xs text-muted-foreground">
+                              By: {setting.lastModifiedBy.split("@")[0]}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              At: {formatDate(setting.lastModifiedAt)}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditSetting(setting)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Setting
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View History
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              
+              {/* Mobile View */}
+              <div className="md:hidden space-y-4">
+                 {filteredSettings.map((setting) => (
+                   <div key={setting.id} className="border p-4 rounded-lg space-y-2">
+                      <div className="flex justify-between">
+                         <span className="font-medium">{setting.name}</span>
+                         <Button size="sm" variant="ghost" onClick={() => handleEditSetting(setting)}><Edit className="h-3 w-3"/></Button>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">GPS Service</span>
-                        <Badge variant="default">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Healthy
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">File Storage</span>
-                        <Badge variant="secondary">
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                          Warning
-                        </Badge>
-                      </div>
-                    </div>
-                    <Button variant="outline" className="w-full">
-                      <Monitor className="h-4 w-4 mr-2" />
-                      View Full Report
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Settings className="h-5 w-5 mr-2" />
-                      System Actions
-                    </CardTitle>
-                    <CardDescription>
-                      Perform system-wide operations
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Button variant="outline" className="w-full">
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Clear Cache
-                    </Button>
-                    <Button variant="outline" className="w-full">
-                      <Database className="h-4 w-4 mr-2" />
-                      Optimize Database
-                    </Button>
-                    <Button variant="outline" className="w-full">
-                      <Download className="h-4 w-4 mr-2" />
-                      Export Logs
-                    </Button>
-                    <Button variant="destructive" className="w-full">
-                      <AlertTriangle className="h-4 w-4 mr-2" />
-                      System Restart
-                    </Button>
-                  </CardContent>
-                </Card>
+                      <div className="text-sm text-muted-foreground">{setting.description}</div>
+                      <div className="font-mono text-sm bg-muted p-2 rounded">{formatValue(setting.value, setting.dataType)}</div>
+                   </div>
+                 ))}
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Maintenance Tab */}
+        <TabsContent value="maintenance" className="space-y-6">
+           {/* Keep existing maintenance content, or remove if not needed */}
         </TabsContent>
       </Tabs>
 
@@ -884,20 +766,7 @@ const getDataTypeBadge = (dataType: string) => {
                       type="number"
                       value={dialogFormValue as number}
                       onChange={(e) => setDialogFormValue(Number(e.target.value))}
-                      min={selectedSetting.validationRules?.minValue}
-                      max={selectedSetting.validationRules?.maxValue}
                     />
-                  ) : selectedSetting.validationRules?.enum ? (
-                    <Select value={dialogFormValue as string} onValueChange={setDialogFormValue}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {selectedSetting.validationRules.enum.map(option => (
-                          <SelectItem key={option} value={option}>{option}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   ) : (
                     <Input 
                       value={dialogFormValue as string} 
@@ -905,20 +774,6 @@ const getDataTypeBadge = (dataType: string) => {
                     />
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label>Default Value</Label>
-                  <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
-                    {formatValue(selectedSetting.defaultValue, selectedSetting.dataType)}
-                  </div>
-                </div>
-                {selectedSetting.validationRules && (
-                  <div className="space-y-2">
-                    <Label>Validation Rules</Label>
-                    <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
-                      {JSON.stringify(selectedSetting.validationRules, null, 2)}
-                    </div>
-                  </div>
-                )}
               </>
             )}
           </div>
@@ -926,13 +781,9 @@ const getDataTypeBadge = (dataType: string) => {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => {
-              if (selectedSetting) {
-                updateSettingValue(selectedSetting.id, dialogFormValue);
-              }
-              setIsEditDialogOpen(false);
-            }}>
-              Save Changes
+            <Button onClick={handleSaveSingleSetting} disabled={saving}>
+               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+               Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -940,4 +791,3 @@ const getDataTypeBadge = (dataType: string) => {
     </div>
   );
 }
-

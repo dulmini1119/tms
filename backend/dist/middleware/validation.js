@@ -1,5 +1,5 @@
-import { ERROR_CODES, HTTP_STATUS } from '../utils/constants';
-import ApiResponse from '../utils/response';
+import { ERROR_CODES, HTTP_STATUS } from '../utils/constants.js';
+import ApiResponse from '../utils/response.js';
 /**
  * Validate request body against Joi schema
  */
@@ -18,7 +18,7 @@ export const validateBody = (schema) => {
             }, {});
             return ApiResponse.error(res, ERROR_CODES.VALIDATION_ERROR, 'Validation failed', HTTP_STATUS.UNPROCESSABLE_ENTITY, details);
         }
-        req.body = value;
+        req.validatedBody = value;
         next();
     };
 };
@@ -40,7 +40,7 @@ export const validateQuery = (schema) => {
             }, {});
             return ApiResponse.error(res, ERROR_CODES.VALIDATION_ERROR, 'Query validation failed', HTTP_STATUS.UNPROCESSABLE_ENTITY, details);
         }
-        req.query = value;
+        req.validatedQuery = value;
         next();
     };
 };
@@ -62,7 +62,7 @@ export const validateParams = (schema) => {
             }, {});
             return ApiResponse.error(res, ERROR_CODES.VALIDATION_ERROR, 'Parameter validation failed', HTTP_STATUS.UNPROCESSABLE_ENTITY, details);
         }
-        req.params = value;
+        req.validatedParams = value;
         next();
     };
 };

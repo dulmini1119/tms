@@ -19,7 +19,6 @@ import {
   Archive,
 } from "lucide-react";
 import { DriverDocument } from "@/types/system-interfaces";
-import { mockSystemData } from "@/data/mock-system-data";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -67,6 +66,38 @@ import { toast } from "sonner";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
+type BackendDriverOption = {
+  id: string;
+  name: string;
+  employee_id?: string | null;
+  license_number?: string | null;
+};
+
+type BackendDriverDocument = {
+  id: string;
+  entity_id: string;
+  document_type: string;
+  document_number?: string | null;
+  issue_date?: string | null;
+  expiry_date?: string | null;
+  issuing_authority?: string | null;
+  status?: string | null;
+  file_name: string;
+  file_path: string;
+  file_size?: string | null;
+  mime_type?: string | null;
+  notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  verified_at?: string | null;
+  driver?: {
+    id: string;
+    name?: string | null;
+    employee_id?: string | null;
+    license_number?: string | null;
+  } | null;
+};
+
 export default function DriverDocuments() {
   /* -------------------------- STATE -------------------------- */
   const [searchTerm, setSearchTerm] = useState("");
@@ -82,9 +113,8 @@ export default function DriverDocuments() {
     useState<DriverDocument | null>(null);
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-  const [DriverDocuments, setDriverDocuments] = useState<DriverDocument[]>(
-    mockSystemData.driverDocuments
-  );
+  const [DriverDocuments, setDriverDocuments] = useState<DriverDocument[]>([]);
+  const [driverOptions, setDriverOptions] = useState<BackendDriverOption[]>([]);
 
   // Type-safe document type mapping
   const documentTypeMap = {
@@ -97,14 +127,60 @@ export default function DriverDocuments() {
 
   type DocumentTypeKey = keyof typeof documentTypeMap;
 
-  // Category mapping
-  const categoryMap = {
-    Driving_License: "Identity",
-    Medical_Certificate: "Medical",
-    Police_Verification: "Legal",
-    Training_Certificate: "Training",
-    Insurance_Policy: "Insurance",
-  } as const;
+  const normalizeFilePath = (path?: string | null) => {
+    if (!path) return "";
+    const normalized = path.replace(/\\/g, "/");
+    return normalized.startsWith("/") ? normalized : `/${normalized}`;
+  };
+
+  const mapDocumentTypeToCategory = useCallback((documentType: string): DriverDocument["category"] => {
+    const lookup: Record<string, DriverDocument["category"]> = {
+      Driving_License: "Identity",
+      Medical_Certificate: "Medical",
+      Police_Verification: "Legal",
+      Training_Certificate: "Training",
+      Insurance_Policy: "Insurance",
+      Background_Check: "Verification",
+    };
+    return lookup[documentType] ?? "Verification";
+  }, []);
+
+  const toDriverDocument = useCallback((doc: BackendDriverDocument): DriverDocument => ({
+    id: doc.id,
+    driverId: doc.entity_id,
+    driverName: doc.driver?.name || "Unknown Driver",
+    driverEmployeeId: doc.driver?.employee_id || "N/A",
+    licenseNumber: doc.driver?.license_number || "N/A",
+    documentType: (doc.document_type as DriverDocument["documentType"]) || "Driving_License",
+    documentName: doc.document_number
+      ? `${doc.document_type.replace(/_/g, " ")} (${doc.document_number})`
+      : doc.document_type.replace(/_/g, " "),
+    documentNumber: doc.document_number || undefined,
+    issuingAuthority: doc.issuing_authority || "N/A",
+    issueDate: doc.issue_date || new Date().toISOString(),
+    expiryDate: doc.expiry_date || undefined,
+    status: (doc.status as DriverDocument["status"]) || "Pending_Verification",
+    priority: "Medium",
+    category: mapDocumentTypeToCategory(doc.document_type),
+    fileUrl: normalizeFilePath(doc.file_path),
+    fileName: doc.file_name,
+    fileSize: doc.file_size
+      ? `${(Number(doc.file_size) / 1024).toFixed(2)} KB`
+      : "N/A",
+    fileType: doc.mime_type?.split("/")[1]?.toUpperCase() || "PDF",
+    uploadedBy: "System",
+    uploadedAt: doc.created_at || new Date().toISOString(),
+    verifiedBy: undefined,
+    verifiedAt: doc.verified_at || undefined,
+    notes: doc.notes || undefined,
+    remindersSent: 0,
+    attachments: [],
+    auditTrail: [],
+    complianceScore: 0,
+    riskLevel: "Low",
+    createdAt: doc.created_at || new Date().toISOString(),
+    updatedAt: doc.updated_at || new Date().toISOString(),
+  }), [mapDocumentTypeToCategory]);
 
   /* Edit form */
   const [editFormData, setEditFormData] = useState<Partial<DriverDocument>>({
@@ -122,6 +198,37 @@ export default function DriverDocuments() {
     contactNumber: "",
     priority: "Low" as const,
   });
+
+  const fetchDriverOptions = useCallback(async () => {
+    try {
+      const res = await fetch("/driver-documents/drivers");
+      if (!res.ok) throw new Error("Failed to fetch drivers");
+      const data: BackendDriverOption[] = await res.json();
+      setDriverOptions(data);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load drivers");
+      setDriverOptions([]);
+    }
+  }, []);
+
+  const fetchDriverDocuments = useCallback(async () => {
+    try {
+      const res = await fetch("/driver-documents");
+      if (!res.ok) throw new Error("Failed to fetch driver documents");
+      const data: BackendDriverDocument[] = await res.json();
+      setDriverDocuments(data.map(toDriverDocument));
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load driver documents");
+      setDriverDocuments([]);
+    }
+  }, [toDriverDocument]);
+
+  useEffect(() => {
+    fetchDriverOptions();
+    fetchDriverDocuments();
+  }, [fetchDriverDocuments, fetchDriverOptions]);
 
   /* -------------------------- DERIVED DATA -------------------------- */
   const calculateDaysToExpiry = (expiryDate?: string): number | undefined => {
@@ -218,8 +325,10 @@ export default function DriverDocuments() {
     expiringSoon: DriverDocuments.filter((d) => d.status === "Expiring_Soon")
       .length,
     avgComplianceScore: Math.round(
-      DriverDocuments.reduce((s, d) => s + calculateComplianceScore(d), 0) /
-        DriverDocuments.length
+      DriverDocuments.length
+        ? DriverDocuments.reduce((s, d) => s + calculateComplianceScore(d), 0) /
+            DriverDocuments.length
+        : 0
     ),
     criticalRisk: DriverDocuments.filter(
       (d) => calculateRiskLevel(d) === "Critical"
@@ -270,7 +379,7 @@ export default function DriverDocuments() {
     }));
   };
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!selectedDocument) {
       toast.error("No document selected");
       return;
@@ -294,56 +403,35 @@ export default function DriverDocuments() {
       return;
     }
 
-    const updated: DriverDocument = {
-      ...selectedDocument,
-      documentName: editFormData.documentName!,
-      documentNumber: editFormData.documentNumber!,
-      issueDate: new Date(editFormData.issueDate!).toISOString(),
-      expiryDate: editFormData.expiryDate
-        ? new Date(editFormData.expiryDate).toISOString()
-        : undefined,
-      issuingAuthority: editFormData.issuingAuthority!,
-      notes: editFormData.notes || undefined,
-      verifiedBy: editFormData.verifiedBy || undefined,
-      verifiedAt: editFormData.verifiedAt || undefined,
-      renewalCost:
-        editFormData.renewalCost! > 0 ? editFormData.renewalCost : undefined,
-      currency: editFormData.currency || undefined,
-      vendor: editFormData.vendor || undefined,
-      contactNumber: editFormData.contactNumber || undefined,
-      priority:
-        (editFormData.priority as DriverDocument["priority"]) || "Medium",
+    try {
+      const payload = {
+        document_type: selectedDocument.documentType,
+        document_number: editFormData.documentNumber,
+        issue_date: editFormData.issueDate,
+        expiry_date: editFormData.expiryDate || null,
+        issuing_authority: editFormData.issuingAuthority,
+        status: selectedDocument.status,
+        notes: editFormData.notes || null,
+      };
 
-      fileName: selectedFile?.name || selectedDocument.fileName,
-      fileType:
-        selectedFile?.type.split("/")[1].toUpperCase() ||
-        selectedDocument.fileType,
-      fileSize: selectedFile
-        ? `${(selectedFile.size / 1024).toFixed(2)} KB`
-        : selectedDocument.fileSize,
-      fileUrl: selectedFile
-        ? URL.createObjectURL(selectedFile)
-        : selectedDocument.fileUrl,
+      const res = await fetch(`/driver-documents/${selectedDocument.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-      updatedAt: new Date().toISOString(),
-      auditTrail: [
-        ...selectedDocument.auditTrail,
-        {
-          action: "Document Edited",
-          performedBy: "Admin",
-          timestamp: new Date().toISOString(),
-          comments: "Updated via edit dialog",
-        },
-      ],
-    };
+      if (!res.ok) throw new Error("Failed to update document");
 
-    setDriverDocuments((prev) =>
-      prev.map((d) => (d.id === selectedDocument.id ? updated : d))
-    );
+      await fetchDriverDocuments();
 
-    toast.success(`${updated.documentName} updated`, {
-      description: `ID: ${updated.id}`,
-    });
+      toast.success(`${editFormData.documentName} updated`, {
+        description: `ID: ${selectedDocument.id}`,
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update document");
+      return;
+    }
 
     setIsDetailsDialogOpen(false);
     setIsEditMode(false);
@@ -364,34 +452,43 @@ export default function DriverDocuments() {
       contactNumber: "",
       priority: "Low",
     });
-  }, [editFormData, selectedDocument, selectedFile]);
+  }, [editFormData, selectedDocument, fetchDriverDocuments]);
 
-  const handleVerify = (document: DriverDocument) => {
-    const updated = {
-      ...document,
-      status: "Valid" as const,
-      verifiedBy: "Admin User",
-      verifiedAt: new Date().toISOString(),
-    };
-    setDriverDocuments((prev) =>
-      prev.map((d) => (d.id === document.id ? updated : d))
-    );
-    toast.success("Document verified");
+  const handleVerify = async (document: DriverDocument) => {
+    try {
+      const res = await fetch(`/driver-documents/${document.id}/verify`, {
+        method: "PATCH",
+      });
+      if (!res.ok) throw new Error("Failed to verify");
+      await fetchDriverDocuments();
+      toast.success("Document verified");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to verify document");
+    }
   };
 
-  const handleDelete = (document: DriverDocument) => {
+  const handleDelete = async (document: DriverDocument) => {
     if (!confirm("Are you sure you want to delete this document?")) return;
-    setDriverDocuments((prev) => prev.filter((d) => d.id !== document.id));
-    toast.success("Document deleted");
+    try {
+      const res = await fetch(`/driver-documents/${document.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+      setDriverDocuments((prev) => prev.filter((d) => d.id !== document.id));
+      toast.success("Document deleted");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete document");
+    }
   };
 
-  const handleUploadSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUploadSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
 
-    const driverName = fd.get("driverName") as string;
+    const driverId = fd.get("driverId") as string;
     const documentTypeKey = fd.get("documentType") as string;
-    const documentName = fd.get("documentName") as string;
     const documentNumber = fd.get("documentNumber") as string;
     const issueDate = fd.get("issueDate") as string;
     const expiryDate = fd.get("expiryDate") as string;
@@ -399,9 +496,8 @@ export default function DriverDocuments() {
     const notes = fd.get("notes") as string;
 
     const missing = [
-      driverName,
+      driverId,
       documentTypeKey,
-      documentName,
       documentNumber,
       issueDate,
       issuingAuthority,
@@ -418,68 +514,32 @@ export default function DriverDocuments() {
     }
 
     const mappedDocType = documentTypeMap[documentTypeKey as DocumentTypeKey];
-    const category = categoryMap[mappedDocType] || "Compliance";
 
-    const newDoc: DriverDocument = {
-      id: `doc-${Date.now()}`,
-      driverName,
-      driverEmployeeId: "EMP-" + Math.floor(Math.random() * 1000),
-      driverId: "DRV-" + Math.floor(Math.random() * 1000),
-      licenseNumber: "LIC-" + Math.floor(Math.random() * 10000),
-      documentName,
-      documentNumber: documentNumber || undefined,
-      documentType: mappedDocType,
-      category,
-      priority: "Medium",
-      status: "Pending_Verification",
-      issueDate: new Date(issueDate).toISOString(),
-      expiryDate: expiryDate ? new Date(expiryDate).toISOString() : undefined,
-      daysToExpiry: expiryDate ? calculateDaysToExpiry(expiryDate) : undefined,
-      validityPeriod: expiryDate
-        ? Math.round(
-            (new Date(expiryDate).getTime() - new Date(issueDate).getTime()) /
-              (1000 * 60 * 60 * 24 * 365)
-          )
-        : undefined,
-      issuingAuthority,
-      complianceScore: 0,
-      riskLevel: "Low",
-      score: undefined,
-      remindersSent: 0,
-      lastReminderDate: undefined,
-      fileName: selectedFile.name,
-      fileSize: `${(selectedFile.size / 1024).toFixed(2)} KB`,
-      fileType: "PDF",
-      fileUrl: URL.createObjectURL(selectedFile),
-      uploadedBy: "Current User",
-      uploadedAt: new Date().toISOString(),
-      verifiedBy: undefined,
-      verifiedAt: undefined,
-      verificationComments: undefined,
-      renewalCost: undefined,
-      currency: undefined,
-      vendor: undefined,
-      contactNumber: undefined,
-      notes,
-      certificationLevel: undefined,
-      medicalCenter: undefined,
-      trainingInstitute: undefined,
-      attachments: [],
-      auditTrail: [
-        {
-          action: "Document Uploaded",
-          performedBy: "Current User",
-          timestamp: new Date().toISOString(),
-        },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    const formData = new FormData();
+    formData.append("driver_id", driverId);
+    formData.append("document_type", mappedDocType);
+    formData.append("document_number", documentNumber);
+    formData.append("issue_date", issueDate);
+    if (expiryDate) formData.append("expiry_date", expiryDate);
+    formData.append("issuing_authority", issuingAuthority);
+    formData.append("notes", notes || "");
+    formData.append("documentFile", selectedFile);
 
-    setDriverDocuments((prev) => [...prev, newDoc]);
-    setIsUploadDialogOpen(false);
-    setSelectedFile(null);
-    toast.success("Document uploaded successfully");
+    try {
+      const res = await fetch("/driver-documents", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Failed to upload");
+
+      await fetchDriverDocuments();
+      setIsUploadDialogOpen(false);
+      setSelectedFile(null);
+      toast.success("Document uploaded successfully");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to upload document");
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1666,14 +1726,14 @@ export default function DriverDocuments() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Driver *</Label>
-                <Select name="driverName" required>
+                <Select name="driverId" required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select Driver" />
                   </SelectTrigger>
                   <SelectContent>
-                    {uniqueDrivers.map((v) => (
-                      <SelectItem key={v} value={v}>
-                        {v}
+                    {driverOptions.map((driver) => (
+                      <SelectItem key={driver.id} value={driver.id}>
+                        {driver.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

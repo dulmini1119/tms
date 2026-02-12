@@ -162,3 +162,23 @@ export const getAllVehicleDocuments = async (req: AuthRequest, res: Response) =>
     res.status(500).json({ message: "Failed to fetch documents." });
   }
 };
+
+export const updateVehicleDocument = async (
+  req: AuthRequest<{ id: string }>,
+  res: Response,
+) => {
+  try {
+    const doc = await VehicleDocumentsService.update(req.params.id, {
+      ...req.body,
+      updated_by: req.user!.id,
+    });
+
+    return res.json({
+      ...doc,
+      file_size: doc.file_size ? doc.file_size.toString() : null,
+    });
+  } catch (error) {
+    console.error("[UPDATE DOCUMENT ERROR]", error);
+    return res.status(500).json({ message: "Failed to update document." });
+  }
+};

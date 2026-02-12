@@ -551,8 +551,9 @@ const filteredDocuments = useMemo(() => {
       
       // Backend expects 'vehicle_id' (UUID). We assume the form value is the ID.
       // Ensure the Select value for "vehicle" is the vehicle ID, not just the reg number.
-      const vehicleId = fd.get("vehicle") as string;
+      const vehicleId = fd.get("vehicle_id") as string;
       
+      if (!vehicleId) throw new Error("Vehicle is required");
       if (!selectedFile) throw new Error("No file selected");
 
       // Add Metadata to FormData (as JSON string or individual fields based on your controller logic)
@@ -582,55 +583,52 @@ const filteredDocuments = useMemo(() => {
     }
   };
 
-  // ... (Keep Renew, Verify, Reminders handlers as they only update local state/status) ...
-  const handleRenewDocument = (doc: VehicleDocument) => {
-    setVehicleDocuments((prev) =>
-      prev.map((d) =>
-        d.id === doc.id
-          ? {
-              ...d,
-              status: "Under_Renewal",
-              updatedAt: new Date().toISOString(),
-              auditTrail: [
-                ...d.auditTrail,
-                {
-                  action: "Renewal Initiated",
-                  performedBy: "Admin",
-                  timestamp: new Date().toISOString(),
-                  comments: "Marked for renewal",
-                },
-              ],
-            }
-          : d
-      )
-    );
-    toast.success("Renewal initiated");
+  const handleRenewDocument = async (doc: VehicleDocument) => {
+    try {
+      const res = await fetch(`/vehicle-documents/${doc.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          document_type: doc.documentType,
+          document_number: doc.documentNumber,
+          issue_date: doc.issueDate,
+          expiry_date: doc.expiryDate,
+          issuing_authority: doc.issuingAuthority,
+          status: "Under_Renewal",
+          notes: doc.notes ?? null,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to mark for renewal");
+      await fetchDocuments();
+      toast.success("Renewal initiated");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update renewal status");
+    }
   };
 
-  const handleVerifyDocument = (doc: VehicleDocument) => {
-    setVehicleDocuments((prev) =>
-      prev.map((d) =>
-        d.id === doc.id
-          ? {
-              ...d,
-              status: "Valid",
-              verifiedBy: "Admin",
-              verifiedAt: new Date().toISOString(),
-              verificationComments: "Verified by admin",
-              auditTrail: [
-                ...d.auditTrail,
-                {
-                  action: "Document Verified",
-                  performedBy: "Admin",
-                  timestamp: new Date().toISOString(),
-                  comments: "Verification completed",
-                },
-              ],
-            }
-          : d
-      )
-    );
-    toast.success("Document verified");
+  const handleVerifyDocument = async (doc: VehicleDocument) => {
+    try {
+      const res = await fetch(`/vehicle-documents/${doc.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          document_type: doc.documentType,
+          document_number: doc.documentNumber,
+          issue_date: doc.issueDate,
+          expiry_date: doc.expiryDate,
+          issuing_authority: doc.issuingAuthority,
+          status: "Valid",
+          notes: doc.notes ?? null,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to verify document");
+      await fetchDocuments();
+      toast.success("Document verified");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to verify document");
+    }
   };
 
   const handleSendReminders = () => {

@@ -89,6 +89,30 @@ export class VehicleDocumentsService {
     });
   }
 
+  static async update(id: string, data: any) {
+    const payload: any = {
+      document_type: data.document_type,
+      document_number: data.document_number,
+      issue_date: data.issue_date ? new Date(data.issue_date) : null,
+      expiry_date: data.expiry_date ? new Date(data.expiry_date) : null,
+      issuing_authority: data.issuing_authority,
+      notes: data.notes ?? null,
+      status: data.status,
+      updated_at: new Date(),
+      updated_by: data.updated_by ?? null,
+    };
+
+    if (data.file_name) payload.file_name = data.file_name;
+    if (data.file_path) payload.file_path = data.file_path;
+    if (typeof data.file_size !== "undefined") payload.file_size = data.file_size;
+    if (data.mime_type) payload.mime_type = data.mime_type;
+
+    return prisma.documents.update({
+      where: { id },
+      data: payload,
+    });
+  }
+
   static async delete(id: string) {
     // Keep existing logic
     return prisma.documents.update({

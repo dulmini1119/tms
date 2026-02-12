@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
+import path from 'path';
 
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimit.js';
@@ -21,6 +22,7 @@ import cabServiceRoutes from './modules/cab-service/cab-service.routes.js';
 import cabAgreementsRoutes from './modules/cab-agreements/cab-agreements.routes.js';
 import vehicleRoutes from './modules/vehicles/vehicles.routes.js';
 import vehicledocumentsRoutes from './modules/vehicle-documents/vehicle-documents.routes.js';
+import driverDocumentsRoutes from './modules/driver-documents/driver-documents.routes.js';
 import tripRequestRoutes from './modules/trip-request/trip-request.routes.js';
 import tripApprovalRoutes from './modules/trip-approvals/trip-approvals.routes.js';
 import tripAssignmentRoutes from './modules/trip-assignments/trip-assignments.routes.js';
@@ -30,8 +32,9 @@ import tripCostRoutes  from './modules/trip-costs/trip-costs.routes.js';
 import invoiceRoutes from './modules/invoice/invoice.routes.js';
 import gpsLogsRoutes from './modules/gpslogs/gpslogs.routes.js';
 import expiryAlertRoutes from './modules/expiry-alerts/expiry-alerts.routes.js';
-import notificationsRoutes from './modules/notifications/notifications.routes.js';
+import notificationsRoutes from './modules/notifications/notifications.routes.js'; 
 import auditLogsRoutes from './modules/audit-logs/audit-logs.routes.js'
+import systemSettingsRoutes from './modules/system-settings/system-settings.routes.js';
 
 import { authenticate } from './middleware/auth.js';
 
@@ -54,6 +57,7 @@ app.use(cors(corsOptions));
 app.use(cookieParser());          
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Logging
 if (config.app.env === 'development') {
@@ -78,6 +82,7 @@ app.use('/cab-services', authenticate, cabServiceRoutes);
 app.use('/cab-agreements', authenticate, cabAgreementsRoutes); 
 app.use('/vehicles', authenticate,vehicleRoutes)
 app.use('/vehicle-documents', authenticate,vehicledocumentsRoutes);
+app.use('/driver-documents', authenticate, driverDocumentsRoutes);
 app.use('/trip-requests', authenticate, tripRequestRoutes);
 app.use('/trip-approvals', authenticate, tripApprovalRoutes)
 app.use('/trip-assignments', authenticate, tripAssignmentRoutes)
@@ -89,6 +94,7 @@ app.use('/gps-logs', authenticate, gpsLogsRoutes)
 app.use('/expiry-alerts', authenticate, expiryAlertRoutes);
 app.use('/notifications', authenticate, notificationsRoutes); 
 app.use('/audit-logs', authenticate, auditLogsRoutes);
+app.use('/system-settings', authenticate, systemSettingsRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

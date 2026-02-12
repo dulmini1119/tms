@@ -1,99 +1,68 @@
-import { UsersService } from './users.service';
-import ApiResponse from '../../utils/response';
+import { UsersService } from './users.service.js';
+import ApiResponse from '../../utils/response.js';
 export class UsersController {
-    constructor() {
-        /**
-         * Get all users
-         */
-        this.getUsers = async (req, res, next) => {
-            try {
-                const filters = req.query;
-                const result = await this.usersService.getUsers(filters);
-                ApiResponse.success(res, result);
+    usersService = new UsersService();
+    getUsers = async (req, res, next) => {
+        try {
+            const filters = { ...req.validatedQuery };
+            // THIS IS THE FINAL WINNING VERSION
+            if (filters.forDepartmentHead === 'true') {
+                // Ignore all other filters — only return real HODs
+                filters.position = 'HOD';
+                filters.status = 'Active'; // optional: only active HODs
+                delete filters.role;
+                delete filters.forDepartmentHead;
             }
-            catch (error) {
-                next(error);
-            }
-        };
-        /**
-         * Get user by ID
-         */
-        this.getUserById = async (req, res, next) => {
-            try {
-                const { userId } = req.params;
-                const user = await this.usersService.getUserById(userId);
-                ApiResponse.success(res, { user });
-            }
-            catch (error) {
-                next(error);
-            }
-        };
-        /**
-         * Create user
-         */
-        this.createUser = async (req, res, next) => {
-            try {
-                const user = await this.usersService.createUser(req.body);
-                ApiResponse.created(res, { user }, 'User created successfully');
-            }
-            catch (error) {
-                next(error);
-            }
-        };
-        /**
-         * Update user
-         */
-        this.updateUser = async (req, res, next) => {
-            try {
-                const { userId } = req.params;
-                const user = await this.usersService.updateUser(userId, req.body);
-                ApiResponse.success(res, { user }, 'User updated successfully');
-            }
-            catch (error) {
-                next(error);
-            }
-        };
-        /**
-         * Delete user
-         */
-        this.deleteUser = async (req, res, next) => {
-            try {
-                const { userId } = req.params;
-                const result = await this.usersService.deleteUser(userId);
-                ApiResponse.success(res, result);
-            }
-            catch (error) {
-                next(error);
-            }
-        };
-        /**
-         * Get user permissions
-         */
-        this.getUserPermissions = async (req, res, next) => {
-            try {
-                const { userId } = req.params;
-                const result = await this.usersService.getUserPermissions(userId);
-                ApiResponse.success(res, result);
-            }
-            catch (error) {
-                next(error);
-            }
-        };
-        /**
-         * Update user permissions
-         */
-        this.updateUserPermissions = async (req, res, next) => {
-            try {
-                const { userId } = req.params;
-                const { permissions } = req.body;
-                const result = await this.usersService.updateUserPermissions(userId, permissions);
-                ApiResponse.success(res, result, 'Permissions updated successfully');
-            }
-            catch (error) {
-                next(error);
-            }
-        };
-        this.usersService = new UsersService();
-    }
+            const result = await this.usersService.getUsers(filters);
+            return ApiResponse.success(res, {
+                users: result.users,
+                pagination: result.pagination
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    getUserById = async (req, res, next) => {
+        try {
+            const id = req.validatedParams?.id || req.params.id;
+            const user = await this.usersService.getUserById(id);
+            ApiResponse.success(res, { user });
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    createUser = async (req, res, next) => {
+        if (res.headersSent)
+            return;
+        try {
+            const user = await this.usersService.createUser(req.validatedBody);
+            ApiResponse.created(res, { user });
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    updateUser = async (req, res, next) => {
+        try {
+            const id = req.validatedParams?.id || req.params.id;
+            const user = await this.usersService.updateUser(id, req.validatedBody);
+            ApiResponse.success(res, { user }, 'User updated successfully');
+        }
+        catch (error) {
+            next(error);
+        }
+    };
+    deleteUser = async (req, res, next) => {
+        try {
+            const id = req.validatedParams?.id || req.params.id;
+            const result = await this.usersService.deleteUser(id);
+            ApiResponse.success(res, result);
+        }
+        catch (error) {
+            next(error);
+        }
+    };
 }
 //# sourceMappingURL=users.controller.js.map

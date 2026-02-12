@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import config from '../config/environment';
+import config from '../config/environment.js';
 // Helper function to sign token
 const signToken = (payload, secret, expiresIn) => {
     const options = { expiresIn: expiresIn };
@@ -17,7 +17,11 @@ export const verifyAccessToken = (token) => {
 export const verifyRefreshToken = (token) => {
     return jwt.verify(token, config.jwt.refreshSecret);
 };
+// Improved decodeToken: returns TokenPayload | RefreshTokenPayload | null
 export const decodeToken = (token) => {
-    return jwt.decode(token);
+    const decoded = jwt.decode(token);
+    if (!decoded || typeof decoded === 'string')
+        return null;
+    return decoded;
 };
 //# sourceMappingURL=jwt.js.map

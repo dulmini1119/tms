@@ -1,15 +1,19 @@
 import bcrypt from 'bcrypt';
-import prisma from '../../config/database';
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../../utils/jwt';
-import { AppError } from '../../middleware/errorHandler';
-import { ERROR_CODES, HTTP_STATUS } from '../../utils/constants';
-import logger from '../../utils/logger';
+import prisma from '../../config/database.js';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../../utils/jwt.js';
+import { AppError } from '../../middleware/errorHandler.js';
+import { ERROR_CODES, HTTP_STATUS } from '../../utils/constants.js';
+import logger from '../../utils/logger.js';
+import config from '../../config/environment.js';
 const SALT_ROUNDS = 10;
 export class AuthService {
     // ------------------------------------------------------
     // LOGIN
     // ------------------------------------------------------
-    async login(email, password) {
+    // ------------------------------------------------------
+    // LOGIN – FULLY WORKING WITH "Remember Me"
+    // ------------------------------------------------------
+    async login(email, password, rememberMe = false) {
         const user = await prisma.users.findUnique({
             where: { email: email.toLowerCase() },
         });
@@ -23,14 +27,26 @@ export class AuthService {
         if (!isPasswordValid) {
             throw new AppError(ERROR_CODES.INVALID_CREDENTIALS, 'Invalid email or password', HTTP_STATUS.UNAUTHORIZED);
         }
+        // === "Remember Me" Logic – Override config temporarily ===
+        const originalAccessExpiry = config.jwt.expiry;
+        const originalRefreshExpiry = config.jwt.refreshExpiry;
+        // Set dynamic expiry
+        config.jwt.expiry = rememberMe ? '30d' : originalAccessExpiry;
+        config.jwt.refreshExpiry = rememberMe ? '30d' : originalRefreshExpiry;
+        // === Generate tokens using your current jwt.ts (no changes needed) ===
         const accessToken = generateAccessToken({
             userId: user.id,
             email: user.email,
             role: user.position || 'USER',
         });
         const refreshToken = generateRefreshToken({ userId: user.id });
+        // === Restore original config (optional but clean) ===
+        config.jwt.expiry = originalAccessExpiry;
+        config.jwt.refreshExpiry = originalRefreshExpiry;
+        // === Store refresh token with correct expiry ===
+        const refreshTokenExpiresIn = rememberMe ? 30 * 24 * 60 * 60 : 7 * 24 * 60 * 60;
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 7);
+        expiresAt.setSeconds(expiresAt.getSeconds() + refreshTokenExpiresIn);
         await prisma.refreshToken.create({
             data: {
                 token: refreshToken,
@@ -38,6 +54,7 @@ export class AuthService {
                 expires_at: expiresAt,
             },
         });
+        // Update login stats
         await prisma.users.update({
             where: { id: user.id },
             data: {
@@ -45,7 +62,7 @@ export class AuthService {
                 login_count: (user.login_count || 0) + 1,
             },
         });
-        logger.info(`User logged in: ${user.email}`);
+        logger.info(`User logged in: ${user.email} | Remember Me: ${rememberMe}`);
         return {
             user: {
                 id: user.id,
@@ -59,7 +76,7 @@ export class AuthService {
             tokens: {
                 accessToken,
                 refreshToken,
-                expiresIn: 3600,
+                expiresIn: rememberMe ? 30 * 24 * 60 * 60 : 3600, // 30 days or 1 hour
             },
         };
     }
@@ -123,12 +140,27 @@ export class AuthService {
             if (!user || user.status !== 'Active') {
                 throw new AppError(ERROR_CODES.UNAUTHORIZED, 'User not found or inactive', HTTP_STATUS.UNAUTHORIZED);
             }
-            const accessToken = generateAccessToken({
+            const newAccessToken = generateAccessToken({
                 userId: user.id,
                 email: user.email,
                 role: user.position || 'USER',
             });
-            return { accessToken, expiresIn: 3600 };
+            const newRefreshToken = generateRefreshToken({ userId: user.id });
+            const expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + 30);
+            await prisma.refreshToken.create({
+                data: {
+                    token: newRefreshToken,
+                    userId: user.id,
+                    expires_at: expiresAt,
+                }
+            });
+            await prisma.refreshToken.delete({ where: { token: refreshToken } });
+            return {
+                accessToken: newAccessToken,
+                refreshToken: newRefreshToken,
+                expiresIn: 3600
+            };
         }
         catch (err) {
             if (err instanceof AppError)
