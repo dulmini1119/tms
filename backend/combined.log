@@ -2030,3 +2030,133 @@
 {"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-12T09:12:46.411Z"}
 {"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-12T09:12:56.859Z"}
 {"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-12T09:13:22.264Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-18T02:50:20.818Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-18T02:50:20.833Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-18T02:50:20.835Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-18T02:50:20.836Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-18T02:50:20.837Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-18T02:50:20.838Z"}
+{"level":"info","message":"User logged in: superadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-02-18T02:57:33.222Z"}
+{"level":"info","message":"Audit log created: Create on login by anonymous","service":"tms-backend","timestamp":"2026-02-18T02:57:33.261Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T02:57:39.836Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T02:57:39.925Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T02:57:39.965Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T02:57:39.999Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T02:57:40.388Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T02:57:40.523Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T02:59:44.817Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T02:59:44.819Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T02:59:51.944Z"}
+{"level":"info","message":"Audit log created: Read on all by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T02:59:59.341Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T02:59:59.344Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T02:59:59.346Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:06.556Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:06.558Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:06.561Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:12.762Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:19.790Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:24.072Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:24.248Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:29.626Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:39.381Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:39.391Z"}
+{"level":"info","message":"Audit log created: Read on drivers by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:45.955Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:45.967Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:00:53.020Z"}
+{"level":"info","message":"Audit log created: Create on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:02:21.046Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:02:21.100Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:02:28.060Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:02:28.062Z"}
+{"level":"info","message":"Audit log created: Create on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:03:23.583Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:03:23.620Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:03:30.768Z"}
+{"level":"info","message":"Audit log created: Create on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:04:11.492Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:04:11.517Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:04:16.933Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:04:16.937Z"}
+{"level":"info","message":"Audit log created: Create on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:05:33.547Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:05:33.630Z"}
+{"level":"info","message":"Audit log created: Read on drivers by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:05:39.567Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:05:39.569Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:05:50.702Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:05:50.703Z"}
+{"level":"info","message":"Audit log created: Read on drivers by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:06:03.138Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:06:03.141Z"}
+{"level":"info","message":"Audit log created: Read on me by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:09:13.728Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:09:13.736Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:09:14.067Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:09:28.967Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-18T03:10:45.990Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-18T03:10:46.009Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-18T03:10:46.011Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-18T03:10:46.012Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-18T03:10:46.012Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-18T03:10:46.013Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-18T03:11:05.112Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-18T03:11:05.123Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-18T03:11:05.123Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-18T03:11:05.124Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-18T03:11:05.124Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-18T03:11:05.125Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:12:57.828Z"}
+{"level":"info","message":"Audit log created: Read on drivers by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:12:57.833Z"}
+{"level":"error","message":"Prisma Error: \nInvalid `prisma.documents.create()` invocation in\nC:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\driver-documents\\driver-documents.service.ts:93:29\n\n  90 }\n  91 \n  92 static async create(data: any) {\n→ 93   return prisma.documents.create({\n         data: {\n           entity_type: \"DRIVER\",\n           entity_id: \"471cecb8-2577-4b22-bbed-ea31f8abd724\",\n           document_type: \"Medical_Certificate\",\n           document_number: \"DOC_M_001\",\n           issue_date: \"2026-02-16\",\n                       ~~~~~~~~~~~~\n           expiry_date: \"2026-04-20\",\n           issuing_authority: \"Authority of Department \",\n           file_name: \"20260112014241603_0001.pdf\",\n           file_path: \"/uploads/driver-documents/documentFile-1771384435241-888022157.pdf\",\n           file_size: 47200,\n           mime_type: \"application/pdf\",\n           status: \"Pending_Verification\",\n           notes: \"\",\n           created_by: \"a6ef516f-ad5b-47fa-9991-87a4d28aa1f0\",\n           updated_by: \"a6ef516f-ad5b-47fa-9991-87a4d28aa1f0\"\n         }\n       })\n\nInvalid value for argument `issue_date`: premature end of input. Expected ISO-8601 DateTime.","service":"tms-backend","target":"documents.create","timestamp":"2026-02-18T03:13:55.268Z"}
+{"level":"info","message":"Audit log created: Create on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:13:55.285Z"}
+{"level":"error","message":"Prisma Error: \nInvalid `prisma.documents.create()` invocation in\nC:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\driver-documents\\driver-documents.service.ts:93:29\n\n  90 }\n  91 \n  92 static async create(data: any) {\n→ 93   return prisma.documents.create({\n         data: {\n           entity_type: \"DRIVER\",\n           entity_id: \"471cecb8-2577-4b22-bbed-ea31f8abd724\",\n           document_type: \"Medical_Certificate\",\n           document_number: \"DOC_M_001\",\n           issue_date: \"2026-02-16\",\n                       ~~~~~~~~~~~~\n           expiry_date: \"2026-04-20\",\n           issuing_authority: \"Authority of Department \",\n           file_name: \"20260112014241603_0001.pdf\",\n           file_path: \"/uploads/driver-documents/documentFile-1771384445447-172639834.pdf\",\n           file_size: 47200,\n           mime_type: \"application/pdf\",\n           status: \"Pending_Verification\",\n           notes: \"\",\n           created_by: \"a6ef516f-ad5b-47fa-9991-87a4d28aa1f0\",\n           updated_by: \"a6ef516f-ad5b-47fa-9991-87a4d28aa1f0\"\n         }\n       })\n\nInvalid value for argument `issue_date`: premature end of input. Expected ISO-8601 DateTime.","service":"tms-backend","target":"documents.create","timestamp":"2026-02-18T03:14:05.456Z"}
+{"level":"info","message":"Audit log created: Create on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:14:05.464Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-18T03:14:45.709Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-18T03:14:45.719Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-18T03:14:45.720Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-18T03:14:45.721Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-18T03:14:45.721Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-18T03:14:45.722Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:30:37.174Z"}
+{"level":"info","message":"Audit log created: Read on drivers by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:30:37.178Z"}
+{"level":"info","message":"Audit log created: Create on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:31:34.476Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:31:34.522Z"}
+{"level":"info","message":"Audit log created: Read on me by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:31:52.889Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:31:53.086Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:31:53.569Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:32:16.154Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:32:20.404Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:32:25.576Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:32:30.244Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:32:35.883Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:32:49.361Z"}
+{"level":"info","message":"Audit log created: Read on me by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:32:52.976Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:32:52.988Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:32:52.995Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-18T03:34:54.788Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-18T03:34:54.796Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-18T03:34:54.797Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-18T03:34:54.797Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-18T03:34:54.798Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-18T03:34:54.798Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:38:36.932Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:38:41.233Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:38:41.468Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:38:54.159Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:38:54.162Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:38:57.730Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:38:57.733Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:45:02.047Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-18T03:45:11.871Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-18T03:45:11.888Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-18T03:45:11.891Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-18T03:45:11.892Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-18T03:45:11.896Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-18T03:45:11.900Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-18T03:45:20.245Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-18T03:45:20.254Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-18T03:45:20.255Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-18T03:45:20.255Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-18T03:45:20.255Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-18T03:45:20.256Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:49:29.703Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:49:41.812Z"}
+{"level":"info","message":"New client connected: ylFBH2a19Nlze_XQAAAB","service":"tms-backend","timestamp":"2026-02-18T03:50:00.977Z"}
+{"level":"info","message":"Client ylFBH2a19Nlze_XQAAAB joined superadmins room","service":"tms-backend","timestamp":"2026-02-18T03:50:00.988Z"}
+{"level":"info","message":"Audit log created: Read on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T03:50:01.182Z"}
+{"level":"info","message":"Client disconnected: ylFBH2a19Nlze_XQAAAB","service":"tms-backend","timestamp":"2026-02-18T03:50:08.228Z"}
+{"level":"info","message":"User logged in: vehicleadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-02-18T04:16:04.234Z"}
+{"level":"info","message":"Audit log created: Create on login by anonymous","service":"tms-backend","timestamp":"2026-02-18T04:16:04.247Z"}
