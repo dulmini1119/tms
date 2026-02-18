@@ -2922,3 +2922,22 @@
 {"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-18T11:00:08.362Z"}
 {"level":"info","message":"Audit log created: Create on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T11:02:49.674Z"}
 {"level":"info","message":"Audit log created: Update on bee6f1e7-eb84-4a7b-b182-96aba45d1427 by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T11:05:44.909Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-18T11:06:22.346Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-18T11:06:22.369Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-18T11:06:22.372Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-18T11:06:22.373Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-18T11:06:22.374Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-18T11:06:22.376Z"}
+{"level":"info","message":"Audit log created: Update on c8ce2734-215c-483c-ac8b-cb6a45b86eae by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T11:06:46.828Z"}
+{"level":"info","message":"Audit log created: Update on a1200026-ce04-4fc5-8fae-5e1f1629ba64 by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T11:07:00.741Z"}
+{"level":"info","message":"Audit log created: Update on a1200026-ce04-4fc5-8fae-5e1f1629ba64 by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T11:07:06.799Z"}
+{"level":"info","message":"User logged out","service":"tms-backend","timestamp":"2026-02-18T11:07:15.741Z"}
+{"level":"info","message":"Audit log created: Create on logout by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T11:07:15.758Z"}
+{"error":"Invalid email or password","ip":"::1","level":"error","message":"Error occurred:","method":"POST","path":"/auth/login","service":"tms-backend","stack":"Error: Invalid email or password\n    at AuthService.login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.service.ts:42:11)\n    at async login (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\auth\\auth.controllers.ts:32:20)","timestamp":"2026-02-18T11:07:38.137Z"}
+{"level":"info","message":"Audit log created: Login on auth by anonymous","service":"tms-backend","timestamp":"2026-02-18T11:07:38.149Z"}
+{"level":"info","message":"User logged in: vehicleadmin@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-02-18T11:07:51.663Z"}
+{"level":"info","message":"Audit log created: Create on login by anonymous","service":"tms-backend","timestamp":"2026-02-18T11:07:51.668Z"}
+{"level":"info","message":"User logged in: hod@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-02-18T11:08:36.857Z"}
+{"level":"info","message":"Audit log created: Create on login by anonymous","service":"tms-backend","timestamp":"2026-02-18T11:08:36.877Z"}
+{"level":"info","message":"User logged in: driver@lkcompany.com | Remember Me: false","service":"tms-backend","timestamp":"2026-02-18T11:09:12.709Z"}
+{"level":"info","message":"Audit log created: Create on login by anonymous","service":"tms-backend","timestamp":"2026-02-18T11:09:12.714Z"}
