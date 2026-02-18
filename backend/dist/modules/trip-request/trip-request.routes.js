@@ -9,6 +9,6 @@ router.get('/', authenticate, tripController.getAllTripRequests);
 router.get('/:id', authenticate, tripController.getTripRequestById);
 router.post('/', authenticate, tripController.createTripRequest);
 router.put('/:id', authenticate, requireOwnershipOrAdmin, restrictEditAfterApproval, tripController.updateTripRequest);
-router.delete('/:id', authenticate, requireOwnershipOrAdmin, tripController.deleteTripRequest);
+router.delete('/:id', authenticate, requireOwnershipOrAdmin, restrictEditAfterApproval, tripController.deleteTripRequest);
 export default router;
 //# sourceMappingURL=trip-request.routes.js.map

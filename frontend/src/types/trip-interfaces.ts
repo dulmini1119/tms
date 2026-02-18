@@ -139,6 +139,8 @@ export interface TripAssignment {
   id: string;
   tripRequestId: string;
   requestNumber: string;
+  fromLocation?: string | null;
+  toLocation?: string | null;
   assignedVehicle: Vehicle;
   assignedDriver: Driver;
   assignedBy: {

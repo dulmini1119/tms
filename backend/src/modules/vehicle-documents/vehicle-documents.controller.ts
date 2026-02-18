@@ -168,10 +168,20 @@ export const updateVehicleDocument = async (
   res: Response,
 ) => {
   try {
-    const doc = await VehicleDocumentsService.update(req.params.id, {
+    const payload: Record<string, unknown> = {
       ...req.body,
       updated_by: req.user!.id,
-    });
+    };
+
+    if (req.file) {
+      const filePath = path.join("uploads", "vehicle-documents", req.file.filename);
+      payload.file_name = req.file.originalname;
+      payload.file_path = filePath;
+      payload.file_size = req.file.size;
+      payload.mime_type = req.file.mimetype;
+    }
+
+    const doc = await VehicleDocumentsService.update(req.params.id, payload);
 
     return res.json({
       ...doc,
@@ -180,5 +190,68 @@ export const updateVehicleDocument = async (
   } catch (error) {
     console.error("[UPDATE DOCUMENT ERROR]", error);
     return res.status(500).json({ message: "Failed to update document." });
+  }
+};
+
+export const verifyVehicleDocument = async (
+  req: AuthRequest<{ id: string }>,
+  res: Response,
+) => {
+  try {
+    const doc = await VehicleDocumentsService.verify(
+      req.params.id,
+      req.user!.id,
+      req.body?.comments
+    );
+
+    if (!doc) return res.status(404).json({ message: "Document not found." });
+
+    return res.json({
+      ...doc,
+      file_size: doc.file_size ? doc.file_size.toString() : null,
+    });
+  } catch (error) {
+    console.error("[VERIFY DOCUMENT ERROR]", error);
+    return res.status(500).json({ message: "Failed to verify document." });
+  }
+};
+
+export const renewVehicleDocument = async (
+  req: AuthRequest<{ id: string }>,
+  res: Response,
+) => {
+  try {
+    const doc = await VehicleDocumentsService.renew(req.params.id, req.user!.id, req.body);
+    if (!doc) return res.status(404).json({ message: "Document not found." });
+
+    return res.json({
+      ...doc,
+      file_size: doc.file_size ? doc.file_size.toString() : null,
+    });
+  } catch (error) {
+    console.error("[RENEW DOCUMENT ERROR]", error);
+    return res.status(500).json({ message: "Failed to renew document." });
+  }
+};
+
+export const downloadVehicleDocument = async (
+  req: AuthRequest<{ id: string }>,
+  res: Response,
+) => {
+  try {
+    const doc = await VehicleDocumentsService.getById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Document not found." });
+
+    const safePath = (doc.file_path || "").replace(/^\/+/, "");
+    const absolutePath = path.join(process.cwd(), safePath);
+
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(404).json({ message: "Document file not found on server." });
+    }
+
+    return res.download(absolutePath, doc.file_name || "document");
+  } catch (error) {
+    console.error("[DOWNLOAD DOCUMENT ERROR]", error);
+    return res.status(500).json({ message: "Failed to download document." });
   }
 };

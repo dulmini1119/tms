@@ -99,6 +99,27 @@ export default function Users() {
     password: "",
   });
 
+  const normalize = (value: string) =>
+    value.toLowerCase().replace(/[\s_-]/g, "");
+
+  const mapPositionToRoleCode = (position: string) => {
+    const normalizedPosition = normalize(position || "");
+    const matched = roles.find((r) => normalize(r.code) === normalizedPosition);
+    if (matched) return matched.code;
+
+    // Fallback if roles are not loaded yet or code differs slightly
+    const fallbackMap: Record<string, string> = {
+      superadmin: "superadmin",
+      vehicleadmin: "vehicleadmin",
+      vehicleadministrator: "vehicleadmin",
+      manager: "manager",
+      hod: "hod",
+      employee: "employee",
+      driver: "driver",
+    };
+    return fallbackMap[normalizedPosition] || position;
+  };
+
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -298,7 +319,7 @@ export default function Users() {
       lastName: user.last_name,
       email: user.email,
       phone: user.phone || "",
-      role: user.position,
+      role: mapPositionToRoleCode(user.position),
       employeeId: user.employee_id,
       password: "",
     });

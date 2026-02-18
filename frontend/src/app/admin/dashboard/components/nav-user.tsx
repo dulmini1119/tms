@@ -1,5 +1,4 @@
- "use client"
-
+"use client"
 
 import {
   Avatar,
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/sidebar"
 import { LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { fetchAPI } from "@/lib/api";
 
 export function NavUser({
 
@@ -29,9 +29,20 @@ export function NavUser({
 
   const router = useRouter();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetchAPI("/auth/logout", { method: "POST" });
+    } catch {
+      // continue client-side logout
+    }
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("authToken");
     router.push("/login");
   }
+
+  const displayName = user?.name || "User";
+  const displayRole = user?.role || "SUPERADMIN";
+  const avatarChar = displayName?.trim()?.[0]?.toUpperCase() || "U";
 
   return (
     <SidebarMenu>
@@ -43,11 +54,17 @@ export function NavUser({
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarFallback className="rounded-lg">{user.name[0]}</AvatarFallback>
+                <AvatarFallback className="rounded-lg" suppressHydrationWarning>
+                  {avatarChar}
+                </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
-                <span className="truncate text-xs">{user.role}</span>
+                <span className="truncate font-medium" suppressHydrationWarning>
+                  {displayName}
+                </span>
+                <span className="truncate text-xs" suppressHydrationWarning>
+                  {displayRole}
+                </span>
               </div>
 
                <LogOut

@@ -44,15 +44,15 @@ const menuItems = [
   }
 ];
 
-const data = {
-  user: {
-    name: "Sarah Wilson",
-    email: "sarah@wilson.com",
-    role: "HoD",
-  },
+type SidebarUser = {
+  name: string;
+  role: string;
 };
 
-export function HodApp({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function HodApp({
+  user,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & { user: SidebarUser }) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -64,7 +64,7 @@ export function HodApp({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
 
       <SidebarFooter className="pb-5">
-        <HodUser user={data.user} />
+        <HodUser user={user} />
       </SidebarFooter>
 
       <SidebarRail />

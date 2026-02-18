@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createDriverDocument,
+  downloadDriverDocument,
   deleteDriverDocument,
   getAllDriverDocuments,
   getDriverOptions,
@@ -48,6 +49,12 @@ router.patch(
   "/:id/verify",
   authenticate,
   verifyDriverDocument
+);
+
+router.get(
+  "/:id/download",
+  authenticate,
+  downloadDriverDocument
 );
 
 router.delete(

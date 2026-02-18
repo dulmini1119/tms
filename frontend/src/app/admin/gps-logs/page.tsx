@@ -2,36 +2,29 @@
 
 import React, { useState, useEffect, JSX } from "react";
 import {
-  Navigation,
   Map,
   Play,
-  Download,
   Search,
   MoreHorizontal,
   Eye,
   MapPin,
   Car,
-  User,
   Clock,
-  Gauge,
   AlertTriangle,
   Shield,
   Activity,
   Route,
   Pause,
   RotateCcw,
-  FastForward,
-  TrendingUp,
   Navigation2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { VariantProps } from "class-variance-authority";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -64,10 +57,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
+import { fetchAPI } from "@/lib/api";
 
-// ────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Types
-// ────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface GPSLog {
   id: string;
@@ -134,12 +128,35 @@ interface Pagination {
   totalPages: number;
 }
 
-// ────────────────────────────────────────────────
+interface TripLogApiRow {
+  id: string;
+  trip_assignment_id?: string | null;
+  tripAssignmentId?: string | null;
+  trip_number?: string | null;
+  tripNumber?: string | null;
+  trip_date?: string;
+  tripDate?: string;
+  driver_name?: string | null;
+  driverName?: string | null;
+  vehicle_registration?: string | null;
+  vehicleRegistration?: string | null;
+  planned_distance?: number | null;
+  actual_distance?: number | null;
+  total_duration?: number | null;
+  trip_assignments?: {
+    id?: string;
+    vehicles?: { registration_number?: string | null };
+    drivers?: { first_name?: string | null; last_name?: string | null };
+    trip_requests?: { request_number?: string | null };
+  } | null;
+}
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Component
-// ────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function GPSLogs() {
-  // ── GPS Logs ──────────────────────────────────────────
+  // â”€â”€ GPS Logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [gpsLogs, setGpsLogs] = useState<GPSLog[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -153,12 +170,12 @@ export default function GPSLogs() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // ── UI Dialogs ────────────────────────────────────────
+  // â”€â”€ UI Dialogs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [selectedLog, setSelectedLog] = useState<GPSLog | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isMapDialogOpen, setIsMapDialogOpen] = useState(false);
 
-  // ── Trip Replay ───────────────────────────────────────
+  // â”€â”€ Trip Replay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [isReplayDialogOpen, setIsReplayDialogOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<TripReplayData | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -166,14 +183,16 @@ export default function GPSLogs() {
   const [currentProgress, setCurrentProgress] = useState(0);
   const [currentRoutePoint, setCurrentRoutePoint] = useState(0);
 
-  // ── Trip History ──────────────────────────────────────
+  // â”€â”€ Trip History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [isTripHistoryDialogOpen, setIsTripHistoryDialogOpen] = useState(false);
   const [selectedVehicleTrips, setSelectedVehicleTrips] = useState<TripReplayData[]>([]);
+  const [replayTrips, setReplayTrips] = useState<TripReplayData[]>([]);
+  const [tripsLoading, setTripsLoading] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize] = useState(10);
 
-  // ── Fetch GPS Logs ────────────────────────────────────
+  // â”€â”€ Fetch GPS Logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const fetchGPSLogs = async () => {
       setLoading(true);
@@ -187,13 +206,7 @@ export default function GPSLogs() {
           ...(statusFilter !== "all" && { status: statusFilter }),
         }).toString();
 
-        const res = await fetch(`/gps-logs?${query}`, {
-          credentials: "include",
-        });
-
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const json = await res.json();
+        const json = await fetchAPI(`/gps-logs?${query}`);
 
         if (!json.success || !json.data) {
           throw new Error("Invalid API response");
@@ -217,7 +230,7 @@ export default function GPSLogs() {
     fetchGPSLogs();
   }, [currentPage, pageSize, searchTerm, statusFilter]);
 
-  // ── Playback effect ───────────────────────────────────
+  // â”€â”€ Playback effect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (!isPlaying || !selectedTrip?.routePoints?.length) return;
 
@@ -244,7 +257,7 @@ export default function GPSLogs() {
     setCurrentRoutePoint(Math.max(0, Math.min(index, selectedTrip.routePoints.length - 1)));
   }, [currentProgress, selectedTrip]);
 
-  // ── Actions Handlers ──────────────────────────────────
+  // â”€â”€ Actions Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleViewDetails = (log: GPSLog) => {
     setSelectedLog(log);
     setIsDetailsDialogOpen(true);
@@ -255,50 +268,121 @@ export default function GPSLogs() {
     setIsMapDialogOpen(true);
   };
 
-  const handleTripHistory = (log: GPSLog) => {
-    // TODO: In real app → fetch(`/gps-logs/trips?vehicleId=${log.vehicleId}`)
-    // For now we use dummy data
-    const dummyTrips: TripReplayData[] = [
-      {
-        tripId: "TRIP-001",
-        requestNumber: log.requestNumber || "REQ-001",
-        vehicleNumber: log.vehicleNumber,
-        driverName: log.driverName,
-        startTime: "2026-01-28T08:00:00Z",
-        endTime: "2026-01-28T10:30:00Z",
-        distance: 28.4,
-        durationMinutes: 150,
-        avgSpeed: 38,
-        maxSpeed: 72,
-        startLocation: "Maharagama",
-        endLocation: "Colombo",
-        routePoints: Array.from({ length: 30 }, (_, i) => ({
-          timestamp: new Date(Date.now() - (30 - i) * 300000).toISOString(),
-          latitude: 6.848 + i * 0.002,
-          longitude: 79.921 + i * 0.003,
-          speed: Math.floor(Math.random() * 60) + 20,
-          heading: Math.floor(Math.random() * 360),
-        })),
-      },
-      // Add 1-2 more dummy trips if you want
-    ];
+  const mapTripLogToReplay = (trip: TripLogApiRow): TripReplayData | null => {
+    const tripAssignmentId =
+      trip.trip_assignment_id ||
+      trip.tripAssignmentId ||
+      trip.trip_assignments?.id ||
+      null;
+    if (!tripAssignmentId) return null;
 
-    setSelectedVehicleTrips(dummyTrips);
-    setIsTripHistoryDialogOpen(true);
+    const vehicleNumber =
+      trip.vehicle_registration ||
+      trip.vehicleRegistration ||
+      trip.trip_assignments?.vehicles?.registration_number ||
+      null;
+
+    const driverName =
+      trip.driver_name ||
+      trip.driverName ||
+      `${trip.trip_assignments?.drivers?.first_name || ""} ${trip.trip_assignments?.drivers?.last_name || ""}`.trim() ||
+      undefined;
+
+    const startTime = (trip.trip_date || trip.tripDate || new Date().toISOString()) as string;
+    return {
+      tripId: tripAssignmentId,
+      requestNumber:
+        trip.trip_assignments?.trip_requests?.request_number ||
+        trip.trip_number ||
+        trip.tripNumber ||
+        null,
+      vehicleNumber,
+      driverName,
+      startTime,
+      endTime: startTime,
+      distance: Number(trip.actual_distance ?? trip.planned_distance ?? 0),
+      durationMinutes: Number(trip.total_duration ?? 0),
+      avgSpeed: 0,
+      maxSpeed: 0,
+      routePoints: [],
+    };
   };
 
-  const handleOpenReplay = () => {
+  const fetchTrips = async (vehicleNumber?: string): Promise<TripReplayData[]> => {
+    const query = new URLSearchParams({
+      page: "1",
+      pageSize: "100",
+      ...(vehicleNumber ? { searchTerm: vehicleNumber } : {}),
+    }).toString();
+
+    const response = (await fetchAPI(`/trip-logs?${query}`)) as { data?: TripLogApiRow[] };
+    const list = Array.isArray(response?.data) ? response.data : [];
+
+    return list
+      .map(mapTripLogToReplay)
+      .filter((trip): trip is TripReplayData => Boolean(trip))
+      .filter((trip) => (vehicleNumber ? trip.vehicleNumber === vehicleNumber : true));
+  };
+
+  const handleTripHistory = async (log: GPSLog) => {
+    setTripsLoading(true);
+    try {
+      const trips = await fetchTrips(log.vehicleNumber);
+      setSelectedVehicleTrips(trips);
+      setSelectedLog(log);
+      setIsTripHistoryDialogOpen(true);
+      if (!trips.length) toast.info("No real trip history found for this vehicle");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load trip history");
+    } finally {
+      setTripsLoading(false);
+    }
+  };
+
+  const handleOpenReplay = async () => {
     setIsReplayDialogOpen(true);
     setSelectedTrip(null);
     setIsPlaying(false);
     setCurrentProgress(0);
+    setTripsLoading(true);
+    try {
+      const trips = await fetchTrips();
+      setReplayTrips(trips);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load replay trips");
+    } finally {
+      setTripsLoading(false);
+    }
   };
 
-  const handleSelectTrip = (trip: TripReplayData) => {
-    setSelectedTrip(trip);
-    setCurrentProgress(0);
-    setCurrentRoutePoint(0);
-    setIsPlaying(false);
+  const handleSelectTrip = async (trip: TripReplayData) => {
+    if (!trip.tripId) {
+      toast.error("Trip assignment ID is missing");
+      return;
+    }
+
+    setTripsLoading(true);
+    try {
+      const response = (await fetchAPI(`/gps-logs/replay/${trip.tripId}`)) as {
+        data?: { replayData?: TripReplayData };
+      };
+      const replay = response?.data?.replayData;
+      if (!replay) {
+        toast.error("Replay data not found");
+        return;
+      }
+      setSelectedTrip(replay);
+      setCurrentProgress(0);
+      setCurrentRoutePoint(0);
+      setIsPlaying(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load replay data");
+    } finally {
+      setTripsLoading(false);
+    }
   };
 
   const handlePlayPause = () => setIsPlaying(!isPlaying);
@@ -309,7 +393,7 @@ export default function GPSLogs() {
     setIsPlaying(false);
   };
 
-  // ── Helpers ───────────────────────────────────────────
+
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleString("en-US", {
       month: "short",
@@ -338,16 +422,13 @@ export default function GPSLogs() {
     );
   };
 
-  // ───────────────────────────────────────────────────────
-  // Render
-  // ───────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">GPS Tracking</h1>
+          <h1 className="text-2xl  tracking-tight">GPS TRACKING</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Monitor vehicles in real-time and replay trips
           </p>
@@ -413,7 +494,7 @@ export default function GPSLogs() {
               {gpsLogs.map((log) => (
                 <TableRow key={log.id}>
                   <TableCell className="font-medium">{log.vehicleNumber}</TableCell>
-                  <TableCell>{log.driverName || "—"}</TableCell>
+                  <TableCell>{log.driverName || "â€”"}</TableCell>
                   <TableCell className="text-sm">
                     {log.location.address || "No address"}
                     <div className="text-xs text-muted-foreground mt-0.5">
@@ -453,7 +534,7 @@ export default function GPSLogs() {
           {/* Pagination */}
           <div className="flex items-center justify-between px-4 py-3 border-t">
             <div className="text-sm text-muted-foreground">
-              Showing {(pagination.page - 1) * pagination.limit + 1}–
+              Showing {(pagination.page - 1) * pagination.limit + 1}â€“
               {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
             </div>
             <div className="flex gap-2">
@@ -489,11 +570,11 @@ export default function GPSLogs() {
         </div>
       )}
 
-      {/* ── Details Dialog ──────────────────────────────────── */}
+      {/* â”€â”€ Details Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
         <DialogContent className="sm:max-w-[700px]">
           <DialogHeader>
-            <DialogTitle>Vehicle Details – {selectedLog?.vehicleNumber}</DialogTitle>
+            <DialogTitle>Vehicle Details â€“ {selectedLog?.vehicleNumber}</DialogTitle>
           </DialogHeader>
           {selectedLog && (
             <div className="grid gap-4 py-4 text-sm">
@@ -536,11 +617,11 @@ export default function GPSLogs() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Map Dialog (placeholder) ───────────────────────── */}
+      {/* â”€â”€ Map Dialog (placeholder) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={isMapDialogOpen} onOpenChange={setIsMapDialogOpen}>
         <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
-            <DialogTitle>Map View – {selectedLog?.vehicleNumber}</DialogTitle>
+            <DialogTitle>Map View â€“ {selectedLog?.vehicleNumber}</DialogTitle>
           </DialogHeader>
           <div className="h-[400px] bg-muted rounded-md flex items-center justify-center">
             <div className="text-center">
@@ -559,7 +640,7 @@ export default function GPSLogs() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Trip Replay Dialog ─────────────────────────────── */}
+      {/* â”€â”€ Trip Replay Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={isReplayDialogOpen} onOpenChange={setIsReplayDialogOpen}>
         <DialogContent className="sm:max-w-[1100px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -574,46 +655,36 @@ export default function GPSLogs() {
 
           {!selectedTrip ? (
             <div className="py-6">
-              <p className="text-center text-muted-foreground py-12">
-                Trip selection list would appear here
-                <br />
-                (You can add /gps-logs/trips endpoint later)
-              </p>
-              {/* Example dummy trip for testing */}
-              <Card className="mt-6 cursor-pointer hover:border-primary/50 transition"
-                    onClick={() => handleSelectTrip({
-                      tripId: "TRIP-TEST-001",
-                      requestNumber: "REQ-TEST",
-                      vehicleNumber: "DL-03-CD-5678",
-                      startTime: "2026-01-28T08:00:00Z",
-                      endTime: "2026-01-28T10:00:00Z",
-                      distance: 24.5,
-                      durationMinutes: 120,
-                      avgSpeed: 45,
-                      maxSpeed: 78,
-                      routePoints: Array.from({length: 40}, (_, i) => ({
-                        timestamp: new Date(Date.now() - (40-i)*180000).toISOString(),
-                        latitude: 6.85 + i*0.001,
-                        longitude: 79.92 + i*0.0015,
-                        speed: 30 + Math.floor(Math.random()*40),
-                        heading: 90 + Math.floor(Math.random()*180),
-                      }))
-                    })}>
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="font-medium">Test Trip – DL-03-CD-5678</div>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        24.5 km • 120 min • Avg 45 km/h
-                      </div>
-                    </div>
-                    <Button size="sm">
-                      <Play className="h-4 w-4 mr-2" />
-                      Replay
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              {tripsLoading ? (
+                <p className="text-center text-muted-foreground py-12">Loading trips...</p>
+              ) : replayTrips.length === 0 ? (
+                <p className="text-center text-muted-foreground py-12">No real trips available for replay.</p>
+              ) : (
+                <div className="space-y-3">
+                  {replayTrips.map((trip) => (
+                    <Card
+                      key={trip.tripId}
+                      className="cursor-pointer hover:border-primary/50 transition"
+                      onClick={() => handleSelectTrip(trip)}
+                    >
+                      <CardContent className="p-5">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <div className="font-medium">{trip.vehicleNumber || "N/A"} - {trip.requestNumber || "N/A"}</div>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {formatDate(trip.startTime)} • {trip.distance} km • {trip.durationMinutes} min
+                            </div>
+                          </div>
+                          <Button size="sm">
+                            <Play className="h-4 w-4 mr-2" />
+                            Replay
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-6 py-4">
@@ -621,10 +692,10 @@ export default function GPSLogs() {
               <div className="flex justify-between items-start">
                 <div>
                   <div className="font-medium text-lg">
-                    {selectedTrip.vehicleNumber} – {selectedTrip.requestNumber}
+                    {selectedTrip.vehicleNumber} â€“ {selectedTrip.requestNumber}
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">
-                    {formatDate(selectedTrip.startTime)} → {formatDate(selectedTrip.endTime)}
+                    {formatDate(selectedTrip.startTime)} â†’ {formatDate(selectedTrip.endTime)}
                   </div>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => setSelectedTrip(null)}>
@@ -712,16 +783,18 @@ export default function GPSLogs() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Trip History Dialog ─────────────────────────────── */}
+      {/* â”€â”€ Trip History Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Dialog open={isTripHistoryDialogOpen} onOpenChange={setIsTripHistoryDialogOpen}>
         <DialogContent className="sm:max-w-[800px]">
           <DialogHeader>
             <DialogTitle>
-              Trip History – {selectedLog?.vehicleNumber}
+              Trip History â€“ {selectedLog?.vehicleNumber}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {selectedVehicleTrips.length === 0 ? (
+            {tripsLoading ? (
+              <div className="text-center py-8 text-muted-foreground">Loading trip history...</div>
+            ) : selectedVehicleTrips.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No trip history available for this vehicle
               </div>
@@ -734,10 +807,10 @@ export default function GPSLogs() {
                         {trip.requestNumber || "Unnamed Trip"}
                       </div>
                       <div className="text-sm text-muted-foreground mt-1">
-                        {formatDate(trip.startTime)} – {formatDate(trip.endTime)}
+                        {formatDate(trip.startTime)} â€“ {formatDate(trip.endTime)}
                       </div>
                       <div className="text-sm mt-1">
-                        {trip.distance} km • Avg {trip.avgSpeed} km/h
+                        {trip.distance} km â€¢ Avg {trip.avgSpeed} km/h
                       </div>
                     </div>
                     <Button

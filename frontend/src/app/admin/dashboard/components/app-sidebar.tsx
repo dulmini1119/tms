@@ -117,15 +117,15 @@ const menuItems = [
   },
 ];
 
-const data = {
-  user: {
-    name: "John Doe",
-    email: "john@doe.com",
-    role: "Super Admin",
-  },
+type SidebarUser = {
+  name: string;
+  role: string;
 };
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  user,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & { user: SidebarUser }) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -137,7 +137,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
 
       <SidebarFooter className="pb-5">
-        <NavUser user={data.user} />
+        <NavUser user={user} />
       </SidebarFooter>
 
       <SidebarRail />

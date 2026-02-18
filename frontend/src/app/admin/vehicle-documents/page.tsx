@@ -16,7 +16,6 @@ import {
   AlertTriangle,
   Shield,
   RefreshCw,
-  Bell,
   Loader2,
 } from "lucide-react";
 import { VehicleDocument } from "@/types/system-interfaces";
@@ -160,7 +159,9 @@ const fetchDocuments = async () => {
 
       status: item.status ?? "Pending",
       fileName: item.file_name,
-      fileUrl: item.file_path ? item.file_path.replace(/\\/g, "/") : null,
+      fileUrl: item.file_path
+        ? `/${item.file_path.replace(/\\/g, "/").replace(/^\/+/, "")}`
+        : null,
 
       file_size: item.file_size ? Number(item.file_size) : null,
       mime_type: item.mime_type ?? null,
@@ -246,44 +247,6 @@ const fetchDocuments = async () => {
       if (doc.priority === "High" || doc.priority === "Critical")
         return "Medium";
       return "Low";
-    },
-    [calculateDaysToExpiry]
-  );
-
-  const sendReminders = useCallback(
-    (document: VehicleDocument) => {
-      const days = calculateDaysToExpiry(document.expiryDate);
-      if (days !== undefined && days <= 30 && document.remindersSent < 3) {
-        const updated = {
-          ...document,
-          remindersSent: document.remindersSent + 1,
-          lastReminderDate: new Date().toISOString(),
-          auditTrail: [
-            ...document.auditTrail,
-            {
-              action: "Reminder Sent",
-              performedBy: "system",
-              timestamp: new Date().toISOString(),
-              comments: `Reminder ${
-                document.remindersSent + 1
-              } sent for expiring document`,
-            },
-          ],
-        };
-        setVehicleDocuments((prev) =>
-          prev.map((d) => (d.id === document.id ? updated : d))
-        );
-        toast.success(`Reminder sent for ${document.documentName}`, {
-          description: `Count: ${updated.remindersSent}`,
-        });
-      } else {
-        toast.error(`Cannot send reminder for ${document.documentName}`, {
-          description:
-            days && days > 30
-              ? "Not expiring soon enough"
-              : "Maximum reminders reached",
-        });
-      }
     },
     [calculateDaysToExpiry]
   );
@@ -448,12 +411,13 @@ const filteredDocuments = useMemo(() => {
 
     try {
       const payload = {
-        document_name: editFormData.documentName,
+        document_type: selectedDocument.documentType,
         document_number: editFormData.documentNumber,
         issue_date: editFormData.issueDate,
         expiry_date: editFormData.expiryDate,
         issuing_authority: editFormData.issuingAuthority,
         notes: editFormData.notes,
+        status: selectedDocument.status,
         // Metadata fields
         renewal_cost: editFormData.renewalCost,
         currency: editFormData.currency,
@@ -462,11 +426,23 @@ const filteredDocuments = useMemo(() => {
         priority: editFormData.priority,
       };
 
-      const res = await fetch(`/vehicle-documents/${selectedDocument.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const requestInit: RequestInit = { method: "PUT" };
+      if (selectedFile) {
+        const fd = new FormData();
+        Object.entries(payload).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) fd.append(key, String(value));
+        });
+        fd.append("documentFile", selectedFile);
+        requestInit.body = fd;
+      } else {
+        requestInit.headers = { "Content-Type": "application/json" };
+        requestInit.body = JSON.stringify(payload);
+      }
+
+      const res = await fetch(
+        `/vehicle-documents/${selectedDocument.id}`,
+        requestInit
+      );
 
       if (!res.ok) throw new Error("Failed to update document");
 
@@ -494,13 +470,15 @@ const filteredDocuments = useMemo(() => {
       toast.success(`Document ${editFormData.documentName} updated`);
       setIsDetailsDialogOpen(false);
       setIsEditMode(false);
+      setSelectedFile(null);
+      await fetchDocuments();
     } catch (error) {
       console.error(error);
       toast.error("Failed to save document");
     } finally {
       setIsSaving(false);
     }
-  }, [editFormData, selectedDocument]);
+  }, [editFormData, selectedDocument, selectedFile]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -534,9 +512,33 @@ const filteredDocuments = useMemo(() => {
     }
   };
 
-  const handleDownloadAgreement = (doc: VehicleDocument) => {
-    // Ensure fileUrl is correct. If backend returns relative path, append backend URL or use rewrite
-    window.open(doc.fileUrl, '_blank');
+  const handleDownloadAgreement = async (doc: VehicleDocument) => {
+    if (!doc.id) {
+      toast.error("Cannot download: invalid document id");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/vehicle-documents/${doc.id}/download`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+
+      if (!response.ok) throw new Error("Failed to download file");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = doc.fileName || "vehicle-document";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      toast.error("Download failed");
+    }
   };
 
   const handleUploadDocument = () => setIsUploadDialogOpen(true);
@@ -585,16 +587,13 @@ const filteredDocuments = useMemo(() => {
 
   const handleRenewDocument = async (doc: VehicleDocument) => {
     try {
-      const res = await fetch(`/vehicle-documents/${doc.id}`, {
-        method: "PUT",
+      const res = await fetch(`/vehicle-documents/${doc.id}/renew`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          document_type: doc.documentType,
           document_number: doc.documentNumber,
           issue_date: doc.issueDate,
           expiry_date: doc.expiryDate,
-          issuing_authority: doc.issuingAuthority,
-          status: "Under_Renewal",
           notes: doc.notes ?? null,
         }),
       });
@@ -609,17 +608,11 @@ const filteredDocuments = useMemo(() => {
 
   const handleVerifyDocument = async (doc: VehicleDocument) => {
     try {
-      const res = await fetch(`/vehicle-documents/${doc.id}`, {
-        method: "PUT",
+      const res = await fetch(`/vehicle-documents/${doc.id}/verify`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          document_type: doc.documentType,
-          document_number: doc.documentNumber,
-          issue_date: doc.issueDate,
-          expiry_date: doc.expiryDate,
-          issuing_authority: doc.issuingAuthority,
-          status: "Valid",
-          notes: doc.notes ?? null,
+          comments: "Verified by admin",
         }),
       });
       if (!res.ok) throw new Error("Failed to verify document");
@@ -629,11 +622,6 @@ const filteredDocuments = useMemo(() => {
       console.error(error);
       toast.error("Failed to verify document");
     }
-  };
-
-  const handleSendReminders = () => {
-    filteredDocuments.forEach(sendReminders);
-    toast.success("All eligible reminders sent");
   };
 
   /* ────────────────────── UI HELPERS ─────────────────────' */
@@ -830,10 +818,6 @@ const filteredDocuments = useMemo(() => {
           <Button onClick={handleUploadDocument}>
             <Upload className="h-4 w-4 mr-2" />
             Upload Document
-          </Button>
-          <Button onClick={handleSendReminders}>
-            <Bell className="h-4 w-4 mr-2" />
-            Send Reminders
           </Button>
         </div>
       </div>
@@ -1044,9 +1028,6 @@ const filteredDocuments = useMemo(() => {
                           <DropdownMenuItem onClick={() => handleEditDocument(doc)}>
                             <Edit className="h-4 w-4 mr-2" /> Edit Document
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => sendReminders(doc)}>
-                            <Bell className="h-4 w-4 mr-2" /> Send Reminder
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleRenewDocument(doc)}>
                             <RefreshCw className="h-4 w-4 mr-2" /> Renew
                           </DropdownMenuItem>
@@ -1135,8 +1116,37 @@ const filteredDocuments = useMemo(() => {
                         <Card><CardContent className="p-4 text-center"><div className={`text-2xl font-bold ${getDaysToExpiryColor(selectedDocument.daysToExpiry)}`}>{selectedDocument.daysToExpiry !== undefined ? (selectedDocument.daysToExpiry < 0 ? `${Math.abs(selectedDocument.daysToExpiry)} overdue` : `${selectedDocument.daysToExpiry} days`) : "N/A"}</div><div className="text-sm text-muted-foreground">Expiry</div></CardContent></Card>
                         <Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-green-600">{selectedDocument.renewalCost ? `${selectedDocument.renewalCost} ${selectedDocument.currency}` : "N/A"}</div><div className="text-sm text-muted-foreground">Renewal</div></CardContent></Card>
                     </div>
-                    {/* Add the rest of the View Mode Fields here as they were in your original file */}
-                    {/* (Vehicle Info, Document Info, Validity, File, Verification, Renewal, Notes, System Info) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Card>
+                        <CardHeader><CardTitle className="text-base">Document Details</CardTitle></CardHeader>
+                        <CardContent className="space-y-2 text-sm">
+                          <div><span className="font-medium">Vehicle:</span> {selectedDocument.vehicleNumber || "N/A"}</div>
+                          <div><span className="font-medium">Type:</span> {(selectedDocument.documentType || "N/A").replace(/_/g, " ")}</div>
+                          <div><span className="font-medium">Number:</span> {selectedDocument.documentNumber || "N/A"}</div>
+                          <div><span className="font-medium">Authority:</span> {selectedDocument.issuingAuthority || "N/A"}</div>
+                          <div><span className="font-medium">Issued:</span> {formatDate(selectedDocument.issueDate)}</div>
+                          <div><span className="font-medium">Expires:</span> {formatDate(selectedDocument.expiryDate)}</div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader><CardTitle className="text-base">File & Verification</CardTitle></CardHeader>
+                        <CardContent className="space-y-2 text-sm">
+                          <div><span className="font-medium">File:</span> {selectedDocument.fileName || "N/A"}</div>
+                          <div><span className="font-medium">Status:</span> {(selectedDocument.status || "N/A").replace(/_/g, " ")}</div>
+                          <div><span className="font-medium">Verified By:</span> {selectedDocument.verifiedBy || "Not verified"}</div>
+                          <div><span className="font-medium">Verified At:</span> {formatDate(selectedDocument.verifiedAt)}</div>
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadAgreement(selectedDocument)}>
+                            <Download className="h-4 w-4 mr-2" /> Download File
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    </div>
+                    <Card>
+                      <CardHeader><CardTitle className="text-base">Notes</CardTitle></CardHeader>
+                      <CardContent className="text-sm text-muted-foreground">
+                        {selectedDocument.notes || "No notes available."}
+                      </CardContent>
+                    </Card>
                  </>
                ) : (
                  // EDIT MODE FORM
@@ -1160,6 +1170,19 @@ const filteredDocuments = useMemo(() => {
                         </div>
                     </div>
                     <div className="space-y-1"><Label>Notes</Label><Textarea name="notes" value={editFormData.notes} onChange={handleFormChange} rows={4} placeholder="Any additional information..." /></div>
+                    <div className="space-y-1">
+                      <Label>Replace File (optional)</Label>
+                      <Input
+                        type="file"
+                        accept="application/pdf,image/png,image/jpeg"
+                        onChange={handleFileChange}
+                      />
+                      {selectedFile && (
+                        <p className="text-xs text-muted-foreground">
+                          Selected: {selectedFile.name}
+                        </p>
+                      )}
+                    </div>
                  </form>
                )}
              </div>

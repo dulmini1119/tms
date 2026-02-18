@@ -40,6 +40,31 @@ interface DepartmentQueryParams {
 }
 
 export class DepartmentService {
+  private toBudgetNumber(value: unknown): number {
+    if (value === null || value === undefined) return 0;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private withBudgetSummary<T extends { budget_allocated?: unknown; budget_utilized?: unknown }>(
+    department: T
+  ) {
+    const allocated = this.toBudgetNumber(department.budget_allocated);
+    const utilized = this.toBudgetNumber(department.budget_utilized);
+    const remaining = allocated - utilized;
+    const utilizationPercentage = allocated > 0 ? (utilized / allocated) * 100 : 0;
+
+    return {
+      ...department,
+      budget_summary: {
+        allocated,
+        utilized,
+        remaining,
+        utilizationPercentage: Number(utilizationPercentage.toFixed(2)),
+      },
+    };
+  }
+
   private async findDepartmentOrThrow(id: string) {
     const department = await prisma.departments.findUnique({
       where: { id },
@@ -121,7 +146,7 @@ export class DepartmentService {
     ]);
 
     return {
-      departments,
+      departments: departments.map((department) => this.withBudgetSummary(department)),
       total,
       page,
       limit,
@@ -178,7 +203,7 @@ export class DepartmentService {
       );
     }
 
-    return department;
+    return this.withBudgetSummary(department);
   }
 
   // --- CREATE DEPARTMENT ---
@@ -208,7 +233,7 @@ export class DepartmentService {
       );
     }
 
-    return await prisma.departments.create({
+    const created = await prisma.departments.create({
       data: {
         name,
         code,
@@ -218,6 +243,7 @@ export class DepartmentService {
         business_unit_id: data.business_unit_id || null,
         head_id: data.head_id || null,
         budget_allocated: data.budget_allocated || null,
+        budget_utilized: 0,
         budget_currency: data.budget_currency || null,
         fiscal_year: data.fiscal_year || null,
         created_by: userId,
@@ -230,6 +256,8 @@ export class DepartmentService {
         },
       },
     });
+
+    return this.withBudgetSummary(created);
   }
 
   // --- UPDATE DEPARTMENT ---
@@ -257,7 +285,48 @@ export class DepartmentService {
       }
     }
 
-    return await prisma.departments.update({
+    const existing = await prisma.departments.findUnique({
+      where: { id },
+      select: {
+        budget_allocated: true,
+        budget_utilized: true,
+      },
+    });
+
+    if (!existing) {
+      throw new AppError(
+        ERROR_CODES.NOT_FOUND,
+        "Department not found",
+        HTTP_STATUS.NOT_FOUND
+      );
+    }
+
+    const nextAllocated =
+      data.budget_allocated !== undefined
+        ? Number(data.budget_allocated)
+        : this.toBudgetNumber(existing.budget_allocated);
+    const nextUtilized =
+      data.budget_utilized !== undefined
+        ? Number(data.budget_utilized)
+        : this.toBudgetNumber(existing.budget_utilized);
+
+    if (nextUtilized < 0) {
+      throw new AppError(
+        ERROR_CODES.BAD_REQUEST,
+        "Budget utilized cannot be negative",
+        HTTP_STATUS.BAD_REQUEST
+      );
+    }
+
+    if (nextAllocated > 0 && nextUtilized > nextAllocated) {
+      throw new AppError(
+        ERROR_CODES.BAD_REQUEST,
+        "Budget utilized cannot exceed budget allocated",
+        HTTP_STATUS.BAD_REQUEST
+      );
+    }
+
+    const updated = await prisma.departments.update({
       where: { id },
       data: {
         ...(name && { name }),
@@ -286,6 +355,8 @@ export class DepartmentService {
         },
       },
     });
+
+    return this.withBudgetSummary(updated);
   }
 
   // --- DELETE DEPARTMENT ---

@@ -42,15 +42,15 @@ const menuItems = [
   },
 ];
 
-const data = {
-  user: {
-    name: "Sarah Wilson",
-    email: "sarah@wilson.com",
-    role: "HoD",
-  },
+type SidebarUser = {
+  name: string;
+  role: string;
 };
 
-export function VAdminApp({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function VAdminApp({
+  user,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & { user: SidebarUser }) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -62,7 +62,7 @@ export function VAdminApp({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
 
       <SidebarFooter className="pb-5">
-        <VAdminUser user={data.user} />
+        <VAdminUser user={user} />
       </SidebarFooter>
 
       <SidebarRail />

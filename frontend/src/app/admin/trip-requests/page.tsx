@@ -15,7 +15,7 @@ import {
   MapPin,
   Users,
   Activity,
-  DollarSign,
+  CheckCircle,
   ChevronLast,
   ChevronFirst,
   ChevronLeft,
@@ -473,23 +473,21 @@ export default function TripRequests() {
           </CardContent>
         </Card>
 
-        {/* Total Cost */}
+        {/* Approved Requests */}
         <Card>
           <CardHeader className="pb-2 flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-green-500" />
+            <CheckCircle className="w-5 h-5 text-green-500" />
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Cost
+              Approved Requests
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">
-              Rs.
-              {tripRequests
-                .reduce((sum, r) => sum + (r.estimatedCost || 0), 0)
-                .toLocaleString()}
+              {tripRequests.filter((r) => r.status === "Approved").length}
             </div>
           </CardContent>
         </Card>
+
       </div>
 
       {/* Main Content Card */}
@@ -592,7 +590,6 @@ export default function TripRequests() {
                       <TableHead>Trip Information</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Priority</TableHead>
-                      <TableHead>Cost</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -670,11 +667,6 @@ export default function TripRequests() {
                             </Badge>
                           </TableCell>
 
-                          <TableCell>
-                            <div className="flex items-center">
-                              Rs. {request.estimatedCost.toLocaleString()}
-                            </div>
-                          </TableCell>
 
                           <TableCell>
                             <DropdownMenu>

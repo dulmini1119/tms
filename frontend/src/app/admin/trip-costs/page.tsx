@@ -219,8 +219,7 @@ getInvoiceDetails: async (invoiceId: string) => {
 
 
   generateInvoice: async (data: {
-    cabServiceId: string;
-    month: string;
+    invoiceId: string;
     dueDate: string;
     notes: string;
   }) => {
@@ -514,8 +513,7 @@ export default function TripCosts() {
     const promise = Promise.all(
       drafts.map((inv) =>
         api.generateInvoice({
-          cabServiceId: inv.cabServiceId,
-          month: inv.billingMonth,
+          invoiceId: inv.id,
           dueDate: inv.dueDate || new Date().toISOString().split("T")[0],
           notes: "Generated monthly batch",
         }),
@@ -529,15 +527,10 @@ export default function TripCosts() {
     promise.then(() => fetchInvoices());
   };
 
-  const handleConfirmGenerateInvoice = async (
-    invoiceNumber: string,
-    dueDate: string,
-    notes: string,
-  ) => {
+  const handleConfirmGenerateInvoice = async (dueDate: string, notes: string) => {
     if (!selectedInvoice) return;
     const promise = api.generateInvoice({
-      cabServiceId: selectedInvoice.cabServiceId,
-      month: selectedInvoice.billingMonth,
+      invoiceId: selectedInvoice.id,
       dueDate,
       notes,
     });
@@ -1202,7 +1195,6 @@ export default function TripCosts() {
               onClick={() => {
                 if (selectedInvoice && generateDueDate) {
                   handleConfirmGenerateInvoice(
-                    "AUTO",
                     generateDueDate,
                     generateNotes,
                   );

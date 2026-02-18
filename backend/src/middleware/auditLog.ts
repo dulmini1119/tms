@@ -40,6 +40,7 @@ export const auditLog = (moduleName?: string) => {
         const entityType = extractResourceType(req.path);
         const entityId = extractResourceId(req, responseData);
         const status = mapStatus(res.statusCode);
+        if (!shouldPersistAudit(req, status)) return;
         const errorMessage = status === 'Failed' ? extractErrorMessage(responseData) : null;
         const userName = buildUserName(req);
         const durationMs = Date.now() - startedAt;
@@ -220,4 +221,10 @@ function shouldSkipRequest(req: AuthRequest): boolean {
   if (req.path.startsWith('/audit-logs')) return true;
 
   return false;
+}
+
+function shouldPersistAudit(req: AuthRequest, status: 'Success' | 'Failed' | 'Pending'): boolean {
+  // Keep failed GETs for troubleshooting, but drop successful/pending GET noise.
+  if (req.method === 'GET') return status === 'Failed';
+  return true;
 }

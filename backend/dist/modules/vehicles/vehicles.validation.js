@@ -15,8 +15,10 @@ export const createVehicleSchema = Joi.object({
     ownership_type: Joi.string().max(50).optional(),
     purchase_date: Joi.date().optional(),
     purchase_price: Joi.number().positive().optional(),
-    cab_service_id: Joi.string().uuid().optional(),
-    assigned_department_id: Joi.string().uuid().optional(),
+    cab_service_id: Joi.string().uuid().allow(null).optional(),
+    assigned_department_id: Joi.string().uuid().allow(null).optional(),
+    availability_status: Joi.string().max(50).allow(null).optional(),
+    operational_status: Joi.string().max(50).allow(null).optional(),
 });
 export const updateVehicleSchema = createVehicleSchema.fork(["registration_number", "make", "model", "year"], (schema) => schema.optional());
 // vehicles.validation.ts
@@ -25,11 +27,11 @@ export const getVehiclesQuerySchema = Joi.object({
     limit: Joi.number().integer().min(1).max(100).default(20),
     vehicle_type: Joi.string().max(50).optional(),
     availability_status: Joi.string()
-        .valid('Available', 'In Use', 'Maintenance', 'Out of Service')
+        .valid("Available", "In Use", "Maintenance", "Out of Service", "On Trip", "Under Repair")
         .optional(),
     ownership_type: Joi.string()
         .valid('Owned', 'Leased', 'Rented')
         .optional(),
-    cab_service_id: Joi.string().uuid().optional(),
+    cab_service_id: Joi.string().uuid().allow(null).optional(),
 });
 //# sourceMappingURL=vehicles.validation.js.map

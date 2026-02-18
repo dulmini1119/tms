@@ -1,12 +1,17 @@
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 // Helper: Get Full Name
-const getFullName = (user) => {
-    if (!user)
+const getFullName = (userLike) => {
+    if (!userLike)
         return "Unknown";
+    // Driver records usually carry the linked user in this nested relation.
+    const user = userLike.users_drivers_user_idTousers || userLike;
     const first = user.first_name || "";
     const last = user.last_name || "";
-    return `${first} ${last}`.trim() || user.employee_id || "Unknown";
+    return (`${first} ${last}`.trim() ||
+        user.employee_id ||
+        userLike.employee_id ||
+        "Unknown");
 };
 // Helper: Map DB to Frontend Structure
 const mapAssignmentToFrontend = (assignment) => {
@@ -14,6 +19,8 @@ const mapAssignmentToFrontend = (assignment) => {
         id: assignment.id,
         requestNumber: assignment.trip_requests?.request_number,
         tripRequestId: assignment.trip_request_id,
+        fromLocation: assignment.trip_requests?.from_location_address || null,
+        toLocation: assignment.trip_requests?.to_location_address || null,
         assignmentStatus: assignment.assignment_status,
         assignmentNotes: assignment.assignment_notes,
         scheduledDeparture: assignment.actual_departure_time || assignment.trip_requests?.departure_date,
@@ -40,7 +47,8 @@ const mapAssignmentToFrontend = (assignment) => {
         assignedDriver: {
             id: assignment.drivers?.id,
             name: getFullName(assignment.drivers),
-            phoneNumber: assignment.drivers?.phone,
+            phoneNumber: assignment.drivers?.users_drivers_user_idTousers?.phone ||
+                assignment.drivers?.phone,
             licenseNumber: assignment.drivers?.license_number,
             licenseExpiryDate: assignment.drivers?.license_expiry_date?.toISOString().split('T')[0],
             isAvailable: assignment.drivers?.is_available,

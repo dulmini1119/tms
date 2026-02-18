@@ -172,6 +172,8 @@ export interface Metadata {
   userAgent: string | null;
   sessionId: string | null;
   requestId: string | null | undefined;
+  requestMethod?: string | null;
+  requestUrl?: string | null;
   // These fields are optional because the DB doesn't have them,
   // but the Service provides defaults for them.
   browser?: string;
@@ -207,11 +209,14 @@ export interface AuditLog {
   description: string | null;
   
   // 'unknown' is the strict type-safe version of 'any' for values we don't know the type of yet.
-  changes: Array<{
-    field: string;
-    oldValue: unknown;
-    newValue: unknown;
-  }> | null;
+  changes:
+    | Array<{
+      field: string;
+      oldValue: unknown;
+      newValue: unknown;
+    }>
+    | Record<string, unknown>
+    | null;
 
   metadata: Metadata;
   

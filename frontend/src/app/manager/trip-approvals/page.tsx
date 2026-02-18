@@ -38,23 +38,23 @@ async function fetchPortal(path: string, options?: RequestInit) {
   return fetch(`http://localhost:3001${path}`, { credentials: "include", ...options });
 }
 
-export default function PendingRequestsPage() {
+export default function ManagerTripApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<ApprovalRow[]>([]);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<ApprovalRow | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
-  const fetchData = useCallback(async () => {
+  const fetchApprovals = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetchPortal("/portal/team/approvals");
-      if (!res.ok) throw new Error("Failed to fetch pending requests");
+      if (!res.ok) throw new Error("Failed to fetch approvals");
       const data: ApprovalQueueResponse = await res.json();
       setRows(data.approvals || []);
     } catch (error) {
       console.error(error);
-      toast.error("Failed to load pending requests");
+      toast.error("Failed to load approvals");
       setRows([]);
     } finally {
       setLoading(false);
@@ -62,8 +62,8 @@ export default function PendingRequestsPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchApprovals();
+  }, [fetchApprovals]);
 
   const submitAction = async (approvalId: string, action: "Approved" | "Rejected", comments = "") => {
     setSubmittingId(approvalId);
@@ -78,10 +78,11 @@ export default function PendingRequestsPage() {
         const payload = await res.json().catch(() => ({}));
         throw new Error(payload?.message || `Failed to ${action.toLowerCase()}`);
       }
+
       toast.success(`Request ${action.toLowerCase()} successfully`);
       setSelected(null);
       setRejectReason("");
-      await fetchData();
+      await fetchApprovals();
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "Action failed");
@@ -94,28 +95,25 @@ export default function PendingRequestsPage() {
     <div className="space-y-4 p-4">
       <Card>
         <CardHeader>
-          <CardTitle>Pending Trip Requests</CardTitle>
+          <CardTitle>Trip Approvals</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {loading && <div>Loading...</div>}
           {!loading && rows.length === 0 && (
-            <div className="text-sm text-muted-foreground">No pending requests assigned to you.</div>
+            <div className="text-sm text-muted-foreground">No pending approvals assigned to you.</div>
           )}
           {!loading &&
             rows.map((r) => (
               <div key={r.approvalId} className="border rounded p-3">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-start gap-4">
                   <div>
-                    <p className="font-medium">{r.employee} ({r.requestNumber})</p>
-                    <p className="text-sm text-muted-foreground">
-                      {r.destination} - {r.date} {r.time}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{r.purpose}</p>
+                    <p className="font-medium">{r.requestNumber} - {r.employee}</p>
+                    <p className="text-sm text-muted-foreground">{r.department} | {r.fromLocation} to {r.destination}</p>
+                    <p className="text-sm text-muted-foreground">{r.date} {r.time} | {r.purpose}</p>
                   </div>
-                  <Badge variant={r.priority === "high" ? "destructive" : "outline"}>
-                    {r.priority}
-                  </Badge>
+                  <Badge variant={r.priority === "high" ? "destructive" : "outline"}>{r.priority}</Badge>
                 </div>
+
                 <div className="mt-3 flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => setSelected(r)}>
                     View Details

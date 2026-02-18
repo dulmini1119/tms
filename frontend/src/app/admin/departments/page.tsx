@@ -85,6 +85,12 @@ interface Department {
     vehicles: number;
     trip_requests: number;
   };
+  budget_summary?: {
+    allocated: number;
+    utilized: number;
+    remaining: number;
+    utilizationPercentage: number;
+  };
 }
 
 interface BusinessUnit {
@@ -99,6 +105,7 @@ interface User {
   last_name: string;
   email: string;
   position: string;
+  roles?: string[];
 }
 
 export default function Departments() {
@@ -385,7 +392,7 @@ export default function Departments() {
     amount: number | null,
     currency: string | null = "USD"
   ) => {
-    if (!amount) return "-";
+    if (amount === null || amount === undefined) return "-";
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: currency || "USD",
@@ -514,10 +521,30 @@ export default function Departments() {
                     </TableCell>
 
                     <TableCell>
-                      {formatCurrency(
-                        dept.budget_allocated,
-                        dept.budget_currency
-                      )}
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium">
+                          Alloc:{" "}
+                          {formatCurrency(
+                            dept.budget_summary?.allocated ?? dept.budget_allocated,
+                            dept.budget_currency
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Used:{" "}
+                          {formatCurrency(
+                            dept.budget_summary?.utilized ?? dept.budget_utilized,
+                            dept.budget_currency
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Remaining:{" "}
+                          {formatCurrency(
+                            dept.budget_summary?.remaining ??
+                              ((dept.budget_allocated || 0) - (dept.budget_utilized || 0)),
+                            dept.budget_currency
+                          )}
+                        </div>
+                      </div>
                     </TableCell>
 
                     <TableCell>{getStatusBadge(dept.status)}</TableCell>
@@ -829,7 +856,11 @@ export default function Departments() {
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
                   {potentialHeads
-                    .filter((user) => user.position === "HOD")
+                    .filter((user) => {
+                      const position = (user.position || "").toUpperCase();
+                      const roles = (user.roles || []).map((r) => r.toUpperCase());
+                      return position === "HOD" || roles.includes("HOD");
+                    })
                     .sort((a, b) =>
                       `${a.first_name} ${a.last_name}`.localeCompare(
                         `${b.first_name} ${b.last_name}`

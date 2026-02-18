@@ -54,7 +54,7 @@ export const createTripRequestSchema = Joi.object({
   requirements: requirementsSchema,
   priority: Joi.string().valid("Low", "Medium", "High", "Urgent").required(),
   status: Joi.string().valid("Pending", "Approved", "Rejected", "Cancelled", "Assigned", "In Progress", "Completed").default("Pending"),
-  estimatedCost: Joi.number().min(0).required(),
+  estimatedCost: Joi.number().min(0).optional(),
   approvalRequired: Joi.boolean().optional().default(true),
 });
 

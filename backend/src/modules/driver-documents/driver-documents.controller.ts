@@ -139,3 +139,27 @@ export const deleteDriverDocument = async (
     return res.status(500).json({ message: "Failed to delete driver document" });
   }
 };
+
+export const downloadDriverDocument = async (
+  req: AuthRequest<{ id: string }>,
+  res: Response
+) => {
+  try {
+    const doc = await DriverDocumentsService.getById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+
+    const safePath = (doc.file_path || "").replace(/^\/+/, "");
+    const absolutePath = path.join(process.cwd(), safePath);
+
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(404).json({ message: "Document file not found on server" });
+    }
+
+    return res.download(absolutePath, doc.file_name || "driver-document");
+  } catch (error) {
+    console.error("[DOWNLOAD DRIVER DOCUMENT ERROR]", error);
+    return res.status(500).json({ message: "Failed to download driver document" });
+  }
+};

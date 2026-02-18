@@ -218,9 +218,7 @@ export const createNotification = async (data: any) => {
   if (isCritical) {
     try {
       const io = getSocketIO();
-      io.to("superadmin").emit(
-        `Emitted Critical notification: ${frontendNotification.title}`,
-      );
+      io.to("superadmins").emit("critical-notification", frontendNotification);
     } catch (error) {
       logger.error("Socket emission failed:", error);
     }

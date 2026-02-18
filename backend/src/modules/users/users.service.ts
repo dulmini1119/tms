@@ -19,6 +19,8 @@ export class UsersService {
     sortBy?: "created_at" | "first_name" | "last_name" | "email";
     sortOrder?: "asc" | "desc";
     role?: string;
+    position?: string;
+    forDepartmentHead?: boolean | string;
   }) {
     const {
       page = 1,
@@ -29,6 +31,8 @@ export class UsersService {
       sortBy = "created_at",
       sortOrder = "desc",
       role, // Destructure the role from filters
+      position,
+      forDepartmentHead,
     } = filters;
 
     const where: any = { deleted_at: null };
@@ -44,12 +48,37 @@ export class UsersService {
 
     if (status) where.status = status;
     if (organizationId) where.business_unit_id = organizationId;
+    if (position) {
+      where.position = { equals: position, mode: "insensitive" };
+    }
+
+    const isDepartmentHeadFilter =
+      forDepartmentHead === true || forDepartmentHead === "true";
+
+    if (isDepartmentHeadFilter) {
+      const hodRole = await prisma.roles.findFirst({
+        where: { code: { equals: "HOD", mode: "insensitive" } },
+        select: { id: true },
+      });
+
+      const hodRoleUsers = hodRole
+        ? await prisma.user_roles.findMany({
+            where: { role_id: hodRole.id },
+            select: { user_id: true },
+          })
+        : [];
+
+      where.OR = [
+        { position: { equals: "HOD", mode: "insensitive" } },
+        { id: { in: hodRoleUsers.map((ur) => ur.user_id) } },
+      ];
+    }
 
     // --- START OF CORRECTED ROLE FILTERING LOGIC ---
-    if (role) {
+    if (role && !isDepartmentHeadFilter) {
       // Find the role in the database by its CODE (e.g., "VEHICLE_ADMIN")
       const roleRecord = await prisma.roles.findFirst({
-        where: { code: role }, // <-- CORRECT: Searching by 'code'
+        where: { code: { equals: role, mode: "insensitive" } },
         select: { id: true },
       });
 

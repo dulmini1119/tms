@@ -9,6 +9,66 @@ const calculateDuration = (start: Date | string, end: Date | string): number | n
   return Math.floor(diffMs / 60000); // Convert ms to minutes
 };
 
+const toNumber = (value: unknown): number => {
+  if (value == null) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getDistanceSourceForAssignment = (gpsRows: Array<{ mileage: unknown }>) => {
+  if (!gpsRows.length) return null;
+  if (gpsRows.length < 2) return "GPS (insufficient points)";
+  const firstMileage = toNumber(gpsRows[0].mileage);
+  const lastMileage = toNumber(gpsRows[gpsRows.length - 1].mileage);
+  if (lastMileage >= firstMileage && (lastMileage > 0 || firstMileage > 0)) {
+    return "GPS mileage";
+  }
+  return "GPS route";
+};
+
+const attachDistanceSource = async <T extends { trip_assignment_id?: string | null }>(
+  logs: T[],
+): Promise<Array<T & { distance_source: string | null }>> => {
+  const assignmentIds = Array.from(
+    new Set(
+      logs
+        .map((log) => log.trip_assignment_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+
+  if (!assignmentIds.length) {
+    return logs.map((log) => ({ ...log, distance_source: null }));
+  }
+
+  const gps = await prisma.gps_logs.findMany({
+    where: { trip_assignment_id: { in: assignmentIds } },
+    select: {
+      trip_assignment_id: true,
+      mileage: true,
+      device_timestamp: true,
+    },
+    orderBy: { device_timestamp: "asc" },
+  });
+
+  const grouped = new Map<string, Array<{ mileage: unknown }>>();
+  for (const row of gps) {
+    if (!row.trip_assignment_id) continue;
+    const current = grouped.get(row.trip_assignment_id) || [];
+    current.push({ mileage: row.mileage });
+    grouped.set(row.trip_assignment_id, current);
+  }
+
+  return logs.map((log) => {
+    const source =
+      log.trip_assignment_id && grouped.has(log.trip_assignment_id)
+        ? getDistanceSourceForAssignment(grouped.get(log.trip_assignment_id) || [])
+        : null;
+    return { ...log, distance_source: source };
+  });
+};
+
 interface GetAllParams {
   searchTerm?: string;
   status?: string;
@@ -76,7 +136,16 @@ export const getAllTripLogs = async ({
         trip_assignments: {
           include: {
             vehicles: true,
-            drivers: true
+            drivers: {
+              include: {
+                users_drivers_user_idTousers: {
+                  select: {
+                    first_name: true,
+                    last_name: true,
+                  },
+                },
+              },
+            },
           }
         }, 
         trip_requests: {
@@ -91,8 +160,10 @@ export const getAllTripLogs = async ({
     prisma.trip_logs.count({ where }),
   ]);
 
+  const logsWithDistanceSource = await attachDistanceSource(logs);
+
   return {
-    data: logs,
+    data: logsWithDistanceSource,
     meta: {
       total,
       page: Number(page),
@@ -103,18 +174,31 @@ export const getAllTripLogs = async ({
 };
 
 export const getTripLogById = async (id: string) => {
-  return await prisma.trip_logs.findUnique({
+  const log = await prisma.trip_logs.findUnique({
     where: { id },
     include: {
       trip_assignments: {
         include: {
            vehicles: true,
-           drivers: true
+           drivers: {
+             include: {
+               users_drivers_user_idTousers: {
+                 select: {
+                   first_name: true,
+                   last_name: true,
+                 },
+               },
+             },
+           },
         }
       },
       trip_requests: true,
     },
   });
+
+  if (!log) return null;
+  const [logWithDistanceSource] = await attachDistanceSource([log]);
+  return logWithDistanceSource;
 };
 
 export const createTripLog = async (data: any) => {

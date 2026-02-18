@@ -72,3 +72,111 @@ export const getTeamDashboard = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const getTeamApprovalQueue = async (req: AuthRequest, res: Response) => {
+  try {
+    const data = await PortalService.getTeamApprovalQueue(req.user!.id);
+    return res.json(data);
+  } catch (error) {
+    return sendError(res, error, "Failed to fetch approval queue");
+  }
+};
+
+export const getTeamApprovalNotifications = async (
+  req: AuthRequest,
+  res: Response,
+) => {
+  try {
+    const data = await PortalService.getTeamApprovalQueue(req.user!.id);
+    return res.json({
+      unreadCount: data.notifications.unreadCount,
+      latest: data.approvals.slice(0, 5),
+    });
+  } catch (error) {
+    return sendError(res, error, "Failed to fetch notifications");
+  }
+};
+
+export const processTeamApprovalAction = async (
+  req: AuthRequest,
+  res: Response,
+) => {
+  try {
+    const action = (req.body?.action || "").toString();
+    if (action !== "Approved" && action !== "Rejected") {
+      return res
+        .status(400)
+        .json({ message: "action must be Approved or Rejected" });
+    }
+
+    const data = await PortalService.processTeamApproval(req.user!.id, req.params.id, {
+      action,
+      comments: req.body?.comments,
+    });
+    return res.json(data);
+  } catch (error) {
+    return sendError(res, error, "Failed to process approval");
+  }
+};
+
+export const getVehicleAdminDashboard = async (
+  req: AuthRequest,
+  res: Response,
+) => {
+  try {
+    const data = await PortalService.getVehicleAdminDashboard(req.user!.id);
+    return res.json(data);
+  } catch (error) {
+    return sendError(res, error, "Failed to fetch vehicle admin dashboard");
+  }
+};
+
+export const getVehicleAdminProfile = async (req: AuthRequest, res: Response) => {
+  try {
+    const data = await PortalService.getVehicleAdminProfile(req.user!.id);
+    return res.json(data);
+  } catch (error) {
+    return sendError(res, error, "Failed to fetch vehicle admin profile");
+  }
+};
+
+export const getVehicleAdminApprovedTrips = async (
+  _req: AuthRequest,
+  res: Response,
+) => {
+  try {
+    const data = await PortalService.getVehicleAdminApprovedTrips();
+    return res.json(data);
+  } catch (error) {
+    return sendError(res, error, "Failed to fetch approved trips");
+  }
+};
+
+export const getVehicleAdminAssignments = async (_req: AuthRequest, res: Response) => {
+  try {
+    const data = await PortalService.getVehicleAdminAssignments();
+    return res.json(data);
+  } catch (error) {
+    return sendError(res, error, "Failed to fetch vehicle assignments");
+  }
+};
+
+export const assignVehicleAdminTrip = async (req: AuthRequest, res: Response) => {
+  try {
+    const { tripRequestId, vehicleId, driverId, assignmentNotes } = req.body || {};
+    if (!tripRequestId || !vehicleId || !driverId) {
+      return res
+        .status(400)
+        .json({ message: "tripRequestId, vehicleId and driverId are required" });
+    }
+
+    const data = await PortalService.assignVehicleAdminTrip(req.user!.id, {
+      tripRequestId,
+      vehicleId,
+      driverId,
+      assignmentNotes,
+    });
+    return res.status(201).json(data);
+  } catch (error) {
+    return sendError(res, error, "Failed to assign vehicle");
+  }
+};

@@ -1,5 +1,6 @@
- "use client"
+"use client"
 
+import { useEffect, useState } from "react"
 
 import {
   Avatar,
@@ -28,10 +29,19 @@ export function HodUser({
 }) {
 
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = () => {
     router.push("/login");
   }
+
+  const displayName = mounted ? user.name : "User";
+  const displayRole = mounted ? user.role : "HOD";
+  const avatarChar = displayName?.trim()?.[0]?.toUpperCase() || "U";
 
   return (
     <SidebarMenu>
@@ -43,11 +53,11 @@ export function HodUser({
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarFallback className="rounded-lg">{user.name[0]}</AvatarFallback>
+                <AvatarFallback className="rounded-lg">{avatarChar}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
-                <span className="truncate text-xs">{user.role}</span>
+                <span className="truncate font-medium">{displayName}</span>
+                <span className="truncate text-xs">{displayRole}</span>
               </div>
 
                <LogOut

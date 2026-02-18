@@ -1,5 +1,58 @@
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
+const roundCurrency = (value) => Number(value.toFixed(2));
+const resolveBillableDepartmentId = async (tx, tripAssignmentId) => {
+    const assignment = await tx.trip_assignments.findUnique({
+        where: { id: tripAssignmentId },
+        include: {
+            trip_requests: {
+                include: {
+                    users_trip_requests_requested_by_user_idTousers: {
+                        select: {
+                            department_id: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+    if (!assignment)
+        return null;
+    return (assignment.trip_requests?.bill_to_department_id ||
+        assignment.trip_requests?.users_trip_requests_requested_by_user_idTousers?.department_id ||
+        null);
+};
+const applyDepartmentBudgetDelta = async (tx, departmentId, delta) => {
+    if (!departmentId || delta === 0)
+        return;
+    const department = await tx.departments.findUnique({
+        where: { id: departmentId },
+        select: {
+            id: true,
+            name: true,
+            budget_allocated: true,
+            budget_utilized: true,
+        },
+    });
+    if (!department)
+        return;
+    const allocated = Number(department.budget_allocated || 0);
+    const utilized = Number(department.budget_utilized || 0);
+    const nextUtilized = roundCurrency(utilized + delta);
+    if (nextUtilized < 0) {
+        throw new Error(`Department budget utilization cannot go below 0 for ${department.name}.`);
+    }
+    if (allocated > 0 && nextUtilized > allocated) {
+        throw new Error(`Budget exceeded for department ${department.name}. Allocated: ${allocated.toFixed(2)}, Requested utilization: ${nextUtilized.toFixed(2)}`);
+    }
+    await tx.departments.update({
+        where: { id: department.id },
+        data: {
+            budget_utilized: nextUtilized,
+            updated_at: new Date(),
+        },
+    });
+};
 // --- Helper: Financial Calculations ---
 const calculateTotals = (data) => {
     const { base_fare = 0, distance_charges = 0, time_charges = 0, fuel_cost = 0, toll_charges = 0, parking_charges = 0, waiting_charges = 0, night_surcharge = 0, holiday_surcharge = 0, driver_allowance = 0, other_charges = 0, discount = 0, tax_percentage = 0, } = data;
@@ -195,29 +248,34 @@ export const getTripCostById = async (id) => {
 export const createTripCost = async (data) => {
     const { createdByUserId, trip_assignment_id, ...costFields } = data;
     const financials = calculateTotals(costFields);
-    const newCost = await prisma.trip_costs.create({
-        data: {
-            trip_assignment_id,
-            ...costFields,
-            ...financials,
-            payment_status: "Draft", // Default status
-            created_by: createdByUserId,
-            created_at: new Date(),
-        },
-        include: {
-            trip_assignments: {
-                include: {
-                    trip_requests: {
-                        include: { users_trip_requests_requested_by_user_idTousers: true }
-                    },
-                    vehicles: {
-                        include: {
-                            cab_services: true
-                        }
+    const newCost = await prisma.$transaction(async (tx) => {
+        const departmentId = await resolveBillableDepartmentId(tx, trip_assignment_id);
+        const totalCost = roundCurrency(Number(financials.total_cost || 0));
+        await applyDepartmentBudgetDelta(tx, departmentId, totalCost);
+        return tx.trip_costs.create({
+            data: {
+                trip_assignment_id,
+                ...costFields,
+                ...financials,
+                payment_status: "Draft",
+                created_by: createdByUserId,
+                created_at: new Date(),
+            },
+            include: {
+                trip_assignments: {
+                    include: {
+                        trip_requests: {
+                            include: { users_trip_requests_requested_by_user_idTousers: true }
+                        },
+                        vehicles: {
+                            include: {
+                                cab_services: true
+                            }
+                        },
                     },
                 },
             },
-        },
+        });
     });
     return mapDbToFrontend(newCost);
 };
@@ -229,29 +287,50 @@ export const updateTripCost = async (id, data) => {
     if (userRole !== "SUPERADMIN") {
         throw new Error("FORBIDDEN: You do not have permission to update trip costs.");
     }
-    const financials = calculateTotals(costFields);
-    const updatedCost = await prisma.trip_costs.update({
+    const existing = await prisma.trip_costs.findUnique({
         where: { id },
-        data: {
-            ...costFields,
-            ...financials,
-            updated_by: updatedByUserId,
-            updated_at: new Date(),
+        select: {
+            id: true,
+            trip_assignment_id: true,
+            total_cost: true,
         },
-        include: {
-            trip_assignments: {
-                include: {
-                    trip_requests: {
-                        include: { users_trip_requests_requested_by_user_idTousers: true }
-                    },
-                    vehicles: {
-                        include: {
-                            cab_services: true
-                        }
+    });
+    if (!existing)
+        throw new Error("Trip Cost not found");
+    if (costFields.trip_assignment_id &&
+        costFields.trip_assignment_id !== existing.trip_assignment_id) {
+        throw new Error("Changing trip assignment is not supported for budget consistency.");
+    }
+    const financials = calculateTotals(costFields);
+    const newTotal = roundCurrency(Number(financials.total_cost || 0));
+    const oldTotal = roundCurrency(Number(existing.total_cost || 0));
+    const delta = roundCurrency(newTotal - oldTotal);
+    const updatedCost = await prisma.$transaction(async (tx) => {
+        const departmentId = await resolveBillableDepartmentId(tx, existing.trip_assignment_id);
+        await applyDepartmentBudgetDelta(tx, departmentId, delta);
+        return tx.trip_costs.update({
+            where: { id },
+            data: {
+                ...costFields,
+                ...financials,
+                updated_by: updatedByUserId,
+                updated_at: new Date(),
+            },
+            include: {
+                trip_assignments: {
+                    include: {
+                        trip_requests: {
+                            include: { users_trip_requests_requested_by_user_idTousers: true }
+                        },
+                        vehicles: {
+                            include: {
+                                cab_services: true
+                            }
+                        },
                     },
                 },
             },
-        },
+        });
     });
     return mapDbToFrontend(updatedCost);
 };
@@ -259,7 +338,22 @@ export const updateTripCost = async (id, data) => {
  * Delete a trip cost entry
  */
 export const deleteTripCost = async (id) => {
-    await prisma.trip_costs.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+        const existing = await tx.trip_costs.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                trip_assignment_id: true,
+                total_cost: true,
+            },
+        });
+        if (!existing)
+            throw new Error("Trip Cost not found");
+        const departmentId = await resolveBillableDepartmentId(tx, existing.trip_assignment_id);
+        const amount = roundCurrency(Number(existing.total_cost || 0));
+        await applyDepartmentBudgetDelta(tx, departmentId, -amount);
+        await tx.trip_costs.delete({ where: { id } });
+    });
     return { success: true };
 };
 /**

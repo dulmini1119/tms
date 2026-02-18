@@ -39,6 +39,12 @@ export const createTripRequest = async (req: AuthRequest, res: Response) => {
     res.status(201).json(newRequest);
   } catch (error: any) {
     console.error("Controller Error:", error);
+    if (
+      error?.message ===
+      "No approver configured for this employee. Set department head and/or business unit head."
+    ) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: "Internal Server Error" });
   }
 };

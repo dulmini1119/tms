@@ -114,6 +114,15 @@ export class DriverDocumentsService {
             driver: driverInfo,
         }));
     }
+    static async getById(id) {
+        return prisma.documents.findFirst({
+            where: {
+                id,
+                entity_type: DOCUMENT_ENTITY.DRIVER,
+                deleted_at: null,
+            },
+        });
+    }
     static async getDriverOptions() {
         const [drivers, driverUsers] = await Promise.all([
             prisma.drivers.findMany({

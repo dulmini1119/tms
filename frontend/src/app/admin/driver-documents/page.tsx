@@ -344,26 +344,52 @@ export default function DriverDocuments() {
     setIsDetailsDialogOpen(true);
   };
 
-  const handleDownload = (doc: DriverDocument) => {
-    if (!doc.fileUrl) {
+  const handleDownload = async (doc: DriverDocument) => {
+    if (!doc.id) {
       toast.error("No file attached");
       return;
     }
-    const a = document.createElement("a");
-    a.href = doc.fileUrl;
-    a.download = doc.fileName || `${doc.documentName}.pdf`;
-    a.click();
-    toast.success("Download started");
+
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`/driver-documents/${doc.id}/download`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+
+      if (!response.ok) throw new Error("Failed to download document");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = doc.fileName || `${doc.documentName}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Download started");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to download document");
+    }
   };
 
   const handleEdit = (document: DriverDocument) => {
     setSelectedDocument(document);
     setEditFormData({
-      ...document,
+      documentName: document.documentName || "",
+      documentNumber: document.documentNumber || "",
       issueDate: document.issueDate.split("T")[0],
       expiryDate: document.expiryDate?.split("T")[0] ?? "",
+      issuingAuthority: document.issuingAuthority || "",
+      notes: document.notes || "",
+      verifiedBy: document.verifiedBy || "",
+      verifiedAt: document.verifiedAt || "",
       renewalCost: document.renewalCost ?? 0,
-      priority: document.priority,
+      currency: document.currency || "LKR",
+      vendor: document.vendor || "",
+      contactNumber: document.contactNumber || "",
+      priority: document.priority || "Low",
     });
     setIsEditMode(true);
     setIsDetailsDialogOpen(true);
@@ -1394,15 +1420,14 @@ export default function DriverDocuments() {
                       <div>File Size: {selectedDocument.fileSize}</div>
                       <div>File Type: {selectedDocument.fileType}</div>
                       <div>
-                        File URL:{" "}
-                        <a
-                          href={selectedDocument.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        File:{" "}
+                        <button
+                          type="button"
+                          onClick={() => handleDownload(selectedDocument)}
                           className="text-blue-600 underline"
                         >
-                          Open
-                        </a>
+                          Download
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1549,7 +1574,7 @@ export default function DriverDocuments() {
                       <Label>Document Name *</Label>
                       <Input
                         name="documentName"
-                        value={editFormData.documentName}
+                        value={editFormData.documentName ?? ""}
                         onChange={handleFormChange}
                         required
                       />
@@ -1558,7 +1583,7 @@ export default function DriverDocuments() {
                       <Label>Document Number *</Label>
                       <Input
                         name="documentNumber"
-                        value={editFormData.documentNumber}
+                        value={editFormData.documentNumber ?? ""}
                         onChange={handleFormChange}
                         required
                       />
@@ -1571,7 +1596,7 @@ export default function DriverDocuments() {
                       <Input
                         type="date"
                         name="issueDate"
-                        value={editFormData.issueDate}
+                        value={editFormData.issueDate ?? ""}
                         onChange={handleFormChange}
                         required
                       />
@@ -1581,7 +1606,7 @@ export default function DriverDocuments() {
                       <Input
                         type="date"
                         name="expiryDate"
-                        value={editFormData.expiryDate}
+                        value={editFormData.expiryDate ?? ""}
                         onChange={handleFormChange}
                       />
                     </div>
@@ -1591,7 +1616,7 @@ export default function DriverDocuments() {
                     <Label>Issuing Authority *</Label>
                     <Input
                       name="issuingAuthority"
-                      value={editFormData.issuingAuthority}
+                      value={editFormData.issuingAuthority ?? ""}
                       onChange={handleFormChange}
                       required
                     />
@@ -1605,7 +1630,7 @@ export default function DriverDocuments() {
                         <Input
                           type="number"
                           name="renewalCost"
-                          value={editFormData.renewalCost}
+                          value={editFormData.renewalCost ?? 0}
                           onChange={handleFormChange}
                         />
                       </div>
@@ -1613,7 +1638,7 @@ export default function DriverDocuments() {
                         <Label>Currency</Label>
                         <Input
                           name="currency"
-                          value={editFormData.currency}
+                          value={editFormData.currency ?? "LKR"}
                           onChange={handleFormChange}
                         />
                       </div>
@@ -1621,7 +1646,7 @@ export default function DriverDocuments() {
                         <Label>Vendor</Label>
                         <Input
                           name="vendor"
-                          value={editFormData.vendor}
+                          value={editFormData.vendor ?? ""}
                           onChange={handleFormChange}
                         />
                       </div>
@@ -1629,7 +1654,7 @@ export default function DriverDocuments() {
                         <Label>Contact Number</Label>
                         <Input
                           name="contactNumber"
-                          value={editFormData.contactNumber}
+                          value={editFormData.contactNumber ?? ""}
                           onChange={handleFormChange}
                         />
                       </div>
@@ -1639,7 +1664,7 @@ export default function DriverDocuments() {
                   <div className="space-y-1">
                     <Label>Priority</Label>
                     <Select
-                      value={editFormData.priority}
+                      value={editFormData.priority ?? "Low"}
                       onValueChange={(
                         v: "Low" | "Medium" | "High" | "Critical"
                       ) => setEditFormData((p) => ({ ...p, priority: v }))}
@@ -1675,7 +1700,7 @@ export default function DriverDocuments() {
                     <Label>Notes</Label>
                     <Textarea
                       name="notes"
-                      value={editFormData.notes}
+                      value={editFormData.notes ?? ""}
                       onChange={handleFormChange}
                       rows={4}
                     />

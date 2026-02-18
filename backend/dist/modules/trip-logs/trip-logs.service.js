@@ -55,7 +55,16 @@ export const getAllTripLogs = async ({ searchTerm, status, page, pageSize, start
                 trip_assignments: {
                     include: {
                         vehicles: true,
-                        drivers: true
+                        drivers: {
+                            include: {
+                                users_drivers_user_idTousers: {
+                                    select: {
+                                        first_name: true,
+                                        last_name: true,
+                                    },
+                                },
+                            },
+                        },
                     }
                 },
                 trip_requests: {
@@ -86,7 +95,16 @@ export const getTripLogById = async (id) => {
             trip_assignments: {
                 include: {
                     vehicles: true,
-                    drivers: true
+                    drivers: {
+                        include: {
+                            users_drivers_user_idTousers: {
+                                select: {
+                                    first_name: true,
+                                    last_name: true,
+                                },
+                            },
+                        },
+                    },
                 }
             },
             trip_requests: true,

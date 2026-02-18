@@ -5,18 +5,16 @@ export class UsersController {
     getUsers = async (req, res, next) => {
         try {
             const filters = { ...req.validatedQuery };
-            // THIS IS THE FINAL WINNING VERSION
-            if (filters.forDepartmentHead === 'true') {
-                // Ignore all other filters — only return real HODs
-                filters.position = 'HOD';
-                filters.status = 'Active'; // optional: only active HODs
-                delete filters.role;
-                delete filters.forDepartmentHead;
+            const forDepartmentHead = filters.forDepartmentHead === true || filters.forDepartmentHead === 'true';
+            if (forDepartmentHead) {
+                // Return users who are department heads by either role mapping or position.
+                filters.forDepartmentHead = true;
+                filters.status = 'Active';
             }
             const result = await this.usersService.getUsers(filters);
             return ApiResponse.success(res, {
                 users: result.users,
-                pagination: result.pagination
+                pagination: result.pagination,
             });
         }
         catch (error) {

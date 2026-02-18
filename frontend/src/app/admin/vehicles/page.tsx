@@ -65,6 +65,12 @@ interface Vehicle {
   seating_capacity?: number | null;
   availability_status?: string | null;
   operational_status?: string | null;
+  cab_service_id?: string | null;
+  cab_services?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -79,6 +85,13 @@ interface VehicleFormData {
   fuelType: string;
   seatingCapacity: string;
   status: string;
+  cabServiceId: string;
+}
+
+interface CabServiceOption {
+  id: string;
+  name: string;
+  code: string;
 }
 
 interface MaintenanceRecord {
@@ -109,6 +122,7 @@ export default function Vehicles() {
   const [maintenanceRecords, setMaintenanceRecords] = useState<
     MaintenanceRecord[]
   >([]);
+  const [cabServices, setCabServices] = useState<CabServiceOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
   const [total, setTotal] = useState(0);
@@ -126,6 +140,7 @@ export default function Vehicles() {
     fuelType: "",
     seatingCapacity: "",
     status: "",
+    cabServiceId: "",
   });
 
   const [maintenanceFormData, setMaintenanceFormData] = useState({
@@ -178,6 +193,23 @@ export default function Vehicles() {
     fetchVehicles();
   }, [fetchVehicles]);
 
+  const fetchCabServices = useCallback(async () => {
+    try {
+      const response = await fetch("/cab-services");
+      if (!response.ok) throw new Error("Failed to fetch cab services");
+      const data = await response.json();
+      const services: CabServiceOption[] = Array.isArray(data) ? data : [];
+      setCabServices(services);
+    } catch (error) {
+      console.error(error);
+      setCabServices([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCabServices();
+  }, [fetchCabServices]);
+
   // Initialize form when editing
   useEffect(() => {
     if (editingVehicle) {
@@ -191,6 +223,7 @@ export default function Vehicles() {
         fuelType: editingVehicle.fuel_type || "",
         seatingCapacity: editingVehicle.seating_capacity?.toString() || "",
         status: editingVehicle.availability_status || "",
+        cabServiceId: editingVehicle.cab_service_id || "",
       });
     } else {
       setFormData({
@@ -203,6 +236,7 @@ export default function Vehicles() {
         fuelType: "",
         seatingCapacity: "",
         status: "",
+        cabServiceId: "",
       });
     }
   }, [editingVehicle]);
@@ -293,6 +327,7 @@ export default function Vehicles() {
         ? Number(formData.seatingCapacity)
         : null,
       availability_status: formData.status || "Available",
+      cab_service_id: formData.cabServiceId || undefined,
     };
 
     try {
@@ -309,14 +344,18 @@ export default function Vehicles() {
 
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.message || "Failed");
+        const details =
+          err?.details && typeof err.details === "object"
+            ? Object.values(err.details).join(", ")
+            : "";
+        throw new Error(details || err.message || "Failed");
       }
 
       toast.success(editingVehicle ? "Vehicle updated" : "Vehicle added");
       setIsDialogOpen(false);
       fetchVehicles();
     } catch (err) {
-      toast.error("Operation failed");
+      toast.error(err instanceof Error ? err.message : "Operation failed");
       console.error(err);
     }
   };
@@ -469,6 +508,7 @@ export default function Vehicles() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Vehicle Details</TableHead>
+                  <TableHead>Cab Service</TableHead>
                   <TableHead>Capacity</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Mileage</TableHead>
@@ -478,14 +518,14 @@ export default function Vehicles() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-10">
+                    <TableCell colSpan={6} className="text-center py-10">
                       Loading vehicles...
                     </TableCell>
                   </TableRow>
                 ) : paginatedVehicles.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={6}
                       className="text-center py-10 text-muted-foreground"
                     >
                       No vehicles found
@@ -519,6 +559,9 @@ export default function Vehicles() {
                             </div>
                           </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {vehicle.cab_services?.name || "Unassigned"}
                       </TableCell>
                       <TableCell>
                         {vehicle.seating_capacity || "-"} seater
@@ -841,6 +884,30 @@ export default function Vehicles() {
                     {statusTypes.map((s) => (
                       <SelectItem key={s} value={s}>
                         {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="cabServiceId">Cab Service</Label>
+                <Select
+                  value={formData.cabServiceId || "none"}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      cabServiceId: value === "none" ? "" : value,
+                    }))
+                  }
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select cab service" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {cabServices.map((service) => (
+                      <SelectItem key={service.id} value={service.id}>
+                        {service.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

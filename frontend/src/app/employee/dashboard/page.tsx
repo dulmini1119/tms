@@ -21,6 +21,8 @@ interface UserRole {
   email?: string;
   department_id?: string;
   business_unit_id?: string;
+  department_name?: string | null;
+  business_unit_name?: string | null;
 }
 
 interface Trip {
@@ -42,8 +44,10 @@ interface DashboardResponse {
     approvedTrips: number;
     completedTrips: number;
   };
-  recentTrips: Trip[];
-  upcomingTrips: Trip[];
+  // Change these from 'Trip[]' to 'Record<string, unknown>[]'
+  // because the API returns raw data that needs normalization.
+  recentTrips: Record<string, unknown>[];
+  upcomingTrips: Record<string, unknown>[];
 }
 
 export default function EmployeeDashboard() {
@@ -61,10 +65,29 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const res = await fetch('/employee/dashboard', {
-          credentials: 'include', // send cookies
-        });
-        if (!res.ok) throw new Error('Failed to fetch dashboard');
+        const fetchWithFallback = async () => {
+          const primary = await fetch("/employee/dashboard", {
+            credentials: "include",
+          });
+
+          const contentType = primary.headers.get("content-type") || "";
+          if (primary.ok && contentType.includes("application/json")) {
+            return primary;
+          }
+
+          // Fallback for cases where Next rewrite isn't active yet (returns HTML)
+          return fetch("http://localhost:3001/employee/dashboard", {
+            credentials: "include",
+          });
+        };
+
+        const res = await fetchWithFallback();
+        if (!res.ok) throw new Error("Failed to fetch dashboard");
+
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          throw new Error("Dashboard API did not return JSON");
+        }
 
         const apiPayload = await res.json();
         const payload: DashboardResponse = apiPayload.data || apiPayload;
@@ -90,6 +113,8 @@ export default function EmployeeDashboard() {
         setUpcomingTrips((payload.upcomingTrips || []).map(normalizeTrip));
       } catch (err) {
         console.error(err);
+        setRecentTrips([]);
+        setUpcomingTrips([]);
       } finally {
         setLoading(false);
       }
@@ -140,26 +165,10 @@ export default function EmployeeDashboard() {
             Welcome back, {actualUser.first_name} {actualUser.last_name}!
           </h1>
           <p className="text-muted-foreground">
-            {actualUser.department_id || 'Department'} • {actualUser.business_unit_id || 'Business Unit'}
+            {actualUser.department_name || actualUser.department_id || 'Department'} •{" "}
+            {actualUser.business_unit_name || actualUser.business_unit_id || "Business Unit"}
           </p>
         </div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Request New Trip
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Request a New Trip</DialogTitle>
-              <DialogDescription>
-                This feature is coming soon. Contact your admin to request a trip.
-              </DialogDescription>
-            </DialogHeader>
-            <Button variant="outline">Close</Button>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Stats Cards */}

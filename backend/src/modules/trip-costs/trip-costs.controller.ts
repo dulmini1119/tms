@@ -62,6 +62,11 @@ export const createTripCost = async (req: AuthRequest, res: Response) => {
     res.status(201).json(newCost);
   } catch (error: any) {
     console.error("Controller Error:", error);
+    if (typeof error?.message === "string") {
+      if (error.message.includes("Budget exceeded") || error.message.includes("cannot go below 0")) {
+        return res.status(400).json({ error: error.message });
+      }
+    }
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
@@ -76,7 +81,7 @@ export const updateTripCost = async (req: AuthRequest, res: Response) => {
     const payload = {
       ...req.body,
       updatedByUserId: req.user!.id,
-      
+      userRole: (req.user?.position || "").toUpperCase(),
     };
 
     const updatedCost = await costService.updateTripCost(id, payload);
@@ -85,6 +90,18 @@ export const updateTripCost = async (req: AuthRequest, res: Response) => {
     console.error("Controller Error:", error);
     if (error.code === "P2025") {
       return res.status(404).json({ error: "Trip Cost not found" });
+    }
+    if (typeof error?.message === "string") {
+      if (error.message.startsWith("FORBIDDEN")) {
+        return res.status(403).json({ error: error.message });
+      }
+      if (
+        error.message.includes("Budget exceeded") ||
+        error.message.includes("cannot go below 0") ||
+        error.message.includes("Changing trip assignment is not supported")
+      ) {
+        return res.status(400).json({ error: error.message });
+      }
     }
     res.status(500).json({ error: "Internal Server Error" });
   }
@@ -102,6 +119,11 @@ export const deleteTripCost = async (req: AuthRequest, res: Response) => {
     console.error("Controller Error:", error);
     if (error.code === "P2025") {
       return res.status(404).json({ error: "Trip Cost not found" });
+    }
+    if (typeof error?.message === "string") {
+      if (error.message.includes("cannot go below 0")) {
+        return res.status(400).json({ error: error.message });
+      }
     }
     res.status(500).json({ error: "Internal Server Error" });
   }

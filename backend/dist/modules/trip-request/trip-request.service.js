@@ -229,60 +229,162 @@ export const createTripRequest = async (data) => {
     const returnTime = tripDetails.returnTime
         ? new Date(`1970-01-01T${tripDetails.returnTime}:00`)
         : undefined;
-    const newRequest = await prisma.trip_requests.create({
-        data: {
-            // Relation: connect existing user
-            users_trip_requests_requested_by_user_idTousers: {
-                connect: { id: requestedByUserId },
-            },
-            status: rest.status || "Pending",
-            created_at: new Date(),
-            // Trip details
-            from_location_address: tripDetails.fromLocation.address,
-            from_location_latitude: tripDetails.fromLocation.coordinates?.lat,
-            from_location_longitude: tripDetails.fromLocation.coordinates?.lng,
-            from_location_landmark: tripDetails.fromLocation.landmark,
-            to_location_address: tripDetails.toLocation.address,
-            to_location_latitude: tripDetails.toLocation.coordinates?.lat,
-            to_location_longitude: tripDetails.toLocation.coordinates?.lng,
-            to_location_landmark: tripDetails.toLocation.landmark,
-            departure_date: tripDetails.departureDate ? new Date(tripDetails.departureDate) : new Date(),
-            departure_time: departureTime,
-            return_date: tripDetails.returnDate ? new Date(tripDetails.returnDate) : undefined,
-            return_time: returnTime,
-            is_round_trip: false, // removed round trip logic
-            estimated_distance: tripDetails.estimatedDistance || 0,
-            estimated_duration: tripDetails.estimatedDuration || 0,
-            // Purpose
-            purpose_category: purpose.category,
-            purpose_description: purpose.description,
-            project_code: purpose.projectCode || "",
-            cost_center: purpose.costCenter || "",
-            business_justification: purpose.businessJustification || "",
-            // Requirements
-            vehicle_type_required: requirements.vehicleType || "",
-            passenger_count: requirements.passengerCount || 1,
-            ac_required: requirements.acRequired !== undefined ? requirements.acRequired : true,
-            luggage_type: requirements.luggage || "",
-            luggage_requirements: requirements.specialRequirements || "",
-            // Other fields
-            priority: rest.priority || "Medium",
-            estimated_cost: rest.estimatedCost || 0,
-            approval_required: rest.approvalRequired !== undefined ? rest.approvalRequired : true,
-            request_number: rest.requestNumber || `REQ-${Date.now()}`,
-        },
+    const requester = await prisma.users.findUnique({
+        where: { id: requestedByUserId },
         include: {
-            users_trip_requests_requested_by_user_idTousers: {
-                select: { first_name: true, last_name: true, email: true },
-            },
-            trip_approvals: {
-                include: {
-                    users: {
-                        select: { first_name: true, last_name: true },
+            departments_users_department_idTodepartments: {
+                select: {
+                    head_id: true,
+                    users_departments_head_idTousers: {
+                        select: { id: true, status: true, position: true },
+                    },
+                    business_units: {
+                        select: {
+                            head_id: true,
+                            users_business_units_head_idTousers: {
+                                select: { id: true, status: true, position: true },
+                            },
+                        },
                     },
                 },
             },
         },
+    });
+    const workflowUsers = [];
+    let managerUser = requester?.departments_users_department_idTodepartments?.business_units
+        ?.users_business_units_head_idTousers;
+    let hodUser = requester?.departments_users_department_idTodepartments
+        ?.users_departments_head_idTousers;
+    // Fallback 1: if BU head / dept head are not linked, find active users by position.
+    if (!managerUser?.id && requester?.business_unit_id) {
+        managerUser = await prisma.users.findFirst({
+            where: {
+                business_unit_id: requester.business_unit_id,
+                status: "Active",
+                id: { not: requestedByUserId },
+                position: { contains: "MANAGER", mode: "insensitive" },
+            },
+            select: { id: true, status: true, position: true },
+        });
+    }
+    if (!hodUser?.id && requester?.department_id) {
+        hodUser = await prisma.users.findFirst({
+            where: {
+                department_id: requester.department_id,
+                status: "Active",
+                id: { not: requestedByUserId },
+                position: { contains: "HOD", mode: "insensitive" },
+            },
+            select: { id: true, status: true, position: true },
+        });
+    }
+    // Fallback 2: as a last resort, pick any active manager/hod in system.
+    if (!managerUser?.id) {
+        managerUser = await prisma.users.findFirst({
+            where: {
+                status: "Active",
+                id: { not: requestedByUserId },
+                position: { contains: "MANAGER", mode: "insensitive" },
+            },
+            select: { id: true, status: true, position: true },
+        });
+    }
+    if (!hodUser?.id) {
+        hodUser = await prisma.users.findFirst({
+            where: {
+                status: "Active",
+                id: { not: requestedByUserId },
+                position: { contains: "HOD", mode: "insensitive" },
+            },
+            select: { id: true, status: true, position: true },
+        });
+    }
+    if (managerUser?.id &&
+        managerUser.status === "Active" &&
+        managerUser.id !== requestedByUserId) {
+        workflowUsers.push({ userId: managerUser.id, role: "MANAGER" });
+    }
+    if (hodUser?.id &&
+        hodUser.status === "Active" &&
+        hodUser.id !== requestedByUserId &&
+        !workflowUsers.some((w) => w.userId === hodUser.id)) {
+        workflowUsers.push({ userId: hodUser.id, role: "HOD" });
+    }
+    if (workflowUsers.length === 0) {
+        throw new Error("No approver configured for this employee. Set department head and/or business unit head.");
+    }
+    const now = new Date();
+    const newRequest = await prisma.$transaction(async (tx) => {
+        const created = await tx.trip_requests.create({
+            data: {
+                users_trip_requests_requested_by_user_idTousers: {
+                    connect: { id: requestedByUserId },
+                },
+                status: "Pending",
+                approval_level_required: workflowUsers.length,
+                created_at: now,
+                from_location_address: tripDetails.fromLocation.address,
+                from_location_latitude: tripDetails.fromLocation.coordinates?.lat,
+                from_location_longitude: tripDetails.fromLocation.coordinates?.lng,
+                from_location_landmark: tripDetails.fromLocation.landmark,
+                to_location_address: tripDetails.toLocation.address,
+                to_location_latitude: tripDetails.toLocation.coordinates?.lat,
+                to_location_longitude: tripDetails.toLocation.coordinates?.lng,
+                to_location_landmark: tripDetails.toLocation.landmark,
+                departure_date: tripDetails.departureDate
+                    ? new Date(tripDetails.departureDate)
+                    : new Date(),
+                departure_time: departureTime,
+                return_date: tripDetails.returnDate
+                    ? new Date(tripDetails.returnDate)
+                    : undefined,
+                return_time: returnTime,
+                is_round_trip: false,
+                estimated_distance: tripDetails.estimatedDistance || 0,
+                estimated_duration: tripDetails.estimatedDuration || 0,
+                purpose_category: purpose.category,
+                purpose_description: purpose.description,
+                project_code: purpose.projectCode || "",
+                cost_center: purpose.costCenter || "",
+                business_justification: purpose.businessJustification || "",
+                vehicle_type_required: requirements.vehicleType || "",
+                passenger_count: requirements.passengerCount || 1,
+                ac_required: requirements.acRequired !== undefined ? requirements.acRequired : true,
+                luggage_type: requirements.luggage || "",
+                luggage_requirements: requirements.specialRequirements || "",
+                priority: rest.priority || "Medium",
+                estimated_cost: rest.estimatedCost ?? null,
+                approval_required: rest.approvalRequired !== undefined ? rest.approvalRequired : true,
+                request_number: rest.requestNumber || `REQ-${Date.now()}`,
+            },
+        });
+        if (workflowUsers.length) {
+            await tx.trip_approvals.createMany({
+                data: workflowUsers.map((step, index) => ({
+                    trip_request_id: created.id,
+                    approval_level: index + 1,
+                    approver_role: step.role,
+                    approver_user_id: step.userId,
+                    status: "Pending",
+                })),
+            });
+        }
+        return tx.trip_requests.findUnique({
+            where: { id: created.id },
+            include: {
+                users_trip_requests_requested_by_user_idTousers: {
+                    select: { first_name: true, last_name: true, email: true },
+                },
+                trip_approvals: {
+                    include: {
+                        users: {
+                            select: { first_name: true, last_name: true },
+                        },
+                    },
+                    orderBy: { approval_level: "asc" },
+                },
+            },
+        });
     });
     return newRequest;
 };

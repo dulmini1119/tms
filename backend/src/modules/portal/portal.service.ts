@@ -8,6 +8,67 @@ const isHodPosition = (position?: string | null) =>
 const formatTime = (date?: Date | null) =>
   date ? date.toISOString().slice(11, 16) : "";
 
+const toNumber = (value: unknown): number => {
+  if (value == null) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const haversineDistanceKm = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+const calculateAssignmentDistanceKm = async (
+  assignmentId: string,
+): Promise<number | null> => {
+  const gps = await prisma.gps_logs.findMany({
+    where: { trip_assignment_id: assignmentId },
+    orderBy: { device_timestamp: "asc" },
+    select: {
+      latitude: true,
+      longitude: true,
+      mileage: true,
+    },
+  });
+
+  if (gps.length < 2) return null;
+
+  const firstMileage = toNumber(gps[0].mileage);
+  const lastMileage = toNumber(gps[gps.length - 1].mileage);
+  if (lastMileage >= firstMileage && (lastMileage > 0 || firstMileage > 0)) {
+    return round2(lastMileage - firstMileage);
+  }
+
+  let total = 0;
+  for (let i = 1; i < gps.length; i++) {
+    total += haversineDistanceKm(
+      toNumber(gps[i - 1].latitude),
+      toNumber(gps[i - 1].longitude),
+      toNumber(gps[i].latitude),
+      toNumber(gps[i].longitude),
+    );
+  }
+  return round2(total);
+};
+
 const mapDriverAssignment = (assignment: any) => {
   const statusRaw = (assignment.assignment_status || "Assigned").toString();
   const status = /completed/i.test(statusRaw)
@@ -49,9 +110,12 @@ const mapDriverAssignment = (assignment: any) => {
       : "N/A",
     purpose: assignment.trip_requests?.purpose_category || "General",
     status,
-    distance: assignment.trip_requests?.estimated_distance
-      ? `${Number(assignment.trip_requests.estimated_distance)} km`
-      : "N/A",
+    distance:
+      assignment.actual_distance != null
+        ? `${Number(assignment.actual_distance)} km`
+        : assignment.trip_requests?.estimated_distance
+          ? `${Number(assignment.trip_requests.estimated_distance)} km`
+          : "N/A",
     actualStartTime: assignment.actual_departure_time
       ? new Date(assignment.actual_departure_time).toISOString()
       : null,
@@ -76,6 +140,41 @@ const getMonthRange = (month?: string) => {
   const start = new Date(year, m - 1, 1);
   const end = new Date(year, m, 1);
   return { start, end };
+};
+
+const isManagerPosition = (position?: string | null) =>
+  (position || "").toUpperCase().includes("MANAGER");
+
+const mapApprovalQueueItem = (approval: any) => {
+  const trip = approval.trip_requests;
+  const requester = trip?.users_trip_requests_requested_by_user_idTousers;
+  const department =
+    requester?.departments_users_department_idTodepartments?.name || "N/A";
+
+  return {
+    approvalId: approval.id,
+    tripRequestId: trip?.id,
+    requestNumber: trip?.request_number || "N/A",
+    approvalLevel: approval.approval_level,
+    approverRole: approval.approver_role || "Approver",
+    employee:
+      [requester?.first_name, requester?.last_name].filter(Boolean).join(" ").trim() ||
+      "Unknown",
+    employeeId: requester?.employee_id || "",
+    department,
+    destination: trip?.to_location_address || "N/A",
+    fromLocation: trip?.from_location_address || "N/A",
+    date: trip?.departure_date
+      ? new Date(trip.departure_date).toISOString().split("T")[0]
+      : "",
+    time: formatTime(trip?.departure_time),
+    returnTime: formatTime(trip?.return_time),
+    purpose: trip?.purpose_category || "General",
+    priority: (trip?.priority || "Medium").toLowerCase(),
+    estimatedCost: Number(trip?.estimated_cost || 0),
+    currency: trip?.currency || "LKR",
+    submittedAt: trip?.created_at || null,
+  };
 };
 
 export class PortalService {
@@ -278,6 +377,7 @@ export class PortalService {
     if (!assignment) throw new Error("Assignment not found");
 
     const now = new Date();
+    const actualDistance = await calculateAssignmentDistanceKm(assignment.id);
     const duration =
       assignment.actual_departure_time != null
         ? Math.max(
@@ -295,6 +395,7 @@ export class PortalService {
         assignment_status: "Completed",
         completed_at: now,
         actual_arrival_time: now,
+        actual_distance: actualDistance ?? undefined,
         actual_duration: duration ?? undefined,
         current_status: "Completed",
         updated_at: now,
@@ -315,12 +416,14 @@ export class PortalService {
         vehicle_registration: assignment.vehicles?.registration_number,
         actual_departure: assignment.actual_departure_time || null,
         actual_arrival: now,
+        actual_distance: actualDistance ?? null,
         total_duration: duration,
         comments: payload.remarks || null,
       },
       update: {
         trip_status: "Completed",
         actual_arrival: now,
+        actual_distance: actualDistance ?? undefined,
         total_duration: duration ?? undefined,
         to_location: payload.location || undefined,
         comments: payload.remarks || undefined,
@@ -625,5 +728,591 @@ export class PortalService {
         lastTrip: requestsByUser.get(u.id)?.lastTrip || null,
       })),
     };
+  }
+
+  static async getTeamApprovalQueue(userId: string) {
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      include: {
+        departments_users_department_idTodepartments: { select: { name: true } },
+        business_units_users_business_unit_idTobusiness_units: {
+          select: { name: true },
+        },
+      },
+    });
+
+    if (!user) throw new Error("User not found");
+    const position = (user.position || "").toUpperCase();
+    const isHod = isHodPosition(position);
+    const isManager = isManagerPosition(position);
+    if (!isHod && !isManager) throw new Error("User is not an approver");
+
+    const pending = await prisma.trip_approvals.findMany({
+      where: {
+        approver_user_id: userId,
+        status: "Pending",
+      },
+      include: {
+        trip_requests: {
+          include: {
+            users_trip_requests_requested_by_user_idTousers: {
+              include: {
+                departments_users_department_idTodepartments: {
+                  select: { name: true },
+                },
+              },
+            },
+            trip_approvals: {
+              select: { id: true, approval_level: true, status: true },
+              orderBy: { approval_level: "asc" },
+            },
+          },
+        },
+      },
+      orderBy: { created_at: "asc" },
+    });
+
+    const actionable = pending.filter((step) => {
+      const allSteps = step.trip_requests?.trip_approvals || [];
+      return allSteps
+        .filter((s) => s.approval_level < step.approval_level)
+        .every((s) => s.status === "Approved");
+    });
+
+    return {
+      user: {
+        id: user.id,
+        name: `${user.first_name} ${user.last_name}`.trim(),
+        role: user.position || "APPROVER",
+        department:
+          user.departments_users_department_idTodepartments?.name || "N/A",
+        businessUnit:
+          user.business_units_users_business_unit_idTobusiness_units?.name || "N/A",
+      },
+      notifications: {
+        unreadCount: actionable.length,
+      },
+      approvals: actionable.map(mapApprovalQueueItem),
+    };
+  }
+
+  static async processTeamApproval(
+    userId: string,
+    approvalId: string,
+    payload: { action: "Approved" | "Rejected"; comments?: string },
+  ) {
+    const step = await prisma.trip_approvals.findUnique({
+      where: { id: approvalId },
+      include: {
+        trip_requests: {
+          include: {
+            trip_approvals: {
+              orderBy: { approval_level: "asc" },
+            },
+          },
+        },
+      },
+    });
+
+    if (!step) throw new Error("Approval step not found");
+    if (step.approver_user_id !== userId) throw new Error("Approval step is not assigned to this user");
+    if (step.status !== "Pending") throw new Error("Approval already processed");
+
+    const previousSteps =
+      step.trip_requests.trip_approvals?.filter(
+        (s) => s.approval_level < step.approval_level,
+      ) || [];
+    const canAct = previousSteps.every((s) => s.status === "Approved");
+    if (!canAct) throw new Error("Previous approval level is still pending");
+
+    const now = new Date();
+    await prisma.trip_approvals.update({
+      where: { id: step.id },
+      data: {
+        status: payload.action,
+        comments: payload.comments || null,
+        approved_at: now,
+        updated_at: now,
+      },
+    });
+
+    if (payload.action === "Rejected") {
+      await prisma.trip_requests.update({
+        where: { id: step.trip_request_id },
+        data: { status: "Rejected", updated_at: now },
+      });
+      return { tripRequestId: step.trip_request_id, status: "Rejected" };
+    }
+
+    const remaining = await prisma.trip_approvals.findMany({
+      where: { trip_request_id: step.trip_request_id, status: "Pending" },
+      select: { id: true },
+    });
+
+    if (!remaining.length) {
+      await prisma.trip_requests.update({
+        where: { id: step.trip_request_id },
+        data: { status: "Approved", updated_at: now },
+      });
+      return { tripRequestId: step.trip_request_id, status: "Approved" };
+    }
+
+    await prisma.trip_requests.update({
+      where: { id: step.trip_request_id },
+      data: { status: "Pending", updated_at: now },
+    });
+    return { tripRequestId: step.trip_request_id, status: "Pending" };
+  }
+
+  static async getVehicleAdminDashboard(userId: string) {
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      include: {
+        departments_users_department_idTodepartments: { select: { name: true } },
+        business_units_users_business_unit_idTobusiness_units: {
+          select: { name: true },
+        },
+      },
+    });
+    if (!user) throw new Error("User not found");
+
+    const [availableVehicles, assignedVehicles, activeTrips, approvedWaiting, pendingTrips, fleet] =
+      await Promise.all([
+        prisma.vehicles.count({
+          where: {
+            deleted_at: null,
+            availability_status: { equals: "Available", mode: "insensitive" },
+          },
+        }),
+        prisma.vehicles.count({
+          where: {
+            deleted_at: null,
+            availability_status: { equals: "Assigned", mode: "insensitive" },
+          },
+        }),
+        prisma.trip_assignments.count({
+          where: {
+            assignment_status: { in: ["Started", "In_Progress", "Accepted"] },
+          },
+        }),
+        prisma.trip_requests.count({
+          where: {
+            status: "Approved",
+            trip_assignments: { none: {} },
+          },
+        }),
+        prisma.trip_requests.findMany({
+          where: {
+            status: "Approved",
+            trip_assignments: { none: {} },
+          },
+          include: {
+            users_trip_requests_requested_by_user_idTousers: {
+              include: {
+                departments_users_department_idTodepartments: { select: { name: true } },
+              },
+            },
+            trip_approvals: {
+              where: { status: "Approved" },
+              include: {
+                users: { select: { first_name: true, last_name: true } },
+              },
+              orderBy: { approved_at: "desc" },
+              take: 1,
+            },
+          },
+          orderBy: { created_at: "desc" },
+          take: 6,
+        }),
+        prisma.vehicles.findMany({
+          where: { deleted_at: null },
+          include: {
+            drivers_vehicles_current_driver_idTodrivers: {
+              include: {
+                users_drivers_user_idTousers: { select: { first_name: true, last_name: true } },
+              },
+            },
+          },
+          orderBy: { created_at: "desc" },
+          take: 8,
+        }),
+      ]);
+
+    return {
+      user: {
+        id: user.id,
+        name: `${user.first_name} ${user.last_name}`.trim(),
+        role: user.position || "VEHICLE_ADMIN",
+        department: user.departments_users_department_idTodepartments?.name || "N/A",
+        businessUnit:
+          user.business_units_users_business_unit_idTobusiness_units?.name || "N/A",
+      },
+      stats: {
+        availableVehicles,
+        assignedVehicles,
+        approvedTripsWaiting: approvedWaiting,
+        activeTrips,
+      },
+      pendingTrips: pendingTrips.map((trip) => ({
+        id: trip.id,
+        requestNumber: trip.request_number,
+        employee:
+          [
+            trip.users_trip_requests_requested_by_user_idTousers?.first_name,
+            trip.users_trip_requests_requested_by_user_idTousers?.last_name,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .trim() || "Unknown",
+        department:
+          trip.users_trip_requests_requested_by_user_idTousers
+            ?.departments_users_department_idTodepartments?.name || "N/A",
+        destination: trip.to_location_address,
+        date: trip.departure_date ? new Date(trip.departure_date).toISOString().split("T")[0] : "",
+        time: formatTime(trip.departure_time),
+        priority: (trip.priority || "Medium").toLowerCase(),
+        vehicleType: trip.vehicle_type_required || "Any",
+        passengers: trip.passenger_count || 1,
+        approvedBy:
+          trip.trip_approvals?.[0]?.users
+            ? `${trip.trip_approvals[0].users.first_name || ""} ${trip.trip_approvals[0].users.last_name || ""}`.trim()
+            : "Approver",
+      })),
+      fleet: fleet.map((v) => ({
+        id: v.id,
+        make: v.make,
+        model: v.model,
+        licensePlate: v.registration_number,
+        status: (v.availability_status || "Unknown").toLowerCase(),
+        location: v.current_location || "N/A",
+        fuelLevel: 0,
+        driver: v.drivers_vehicles_current_driver_idTodrivers
+          ? `${
+              v.drivers_vehicles_current_driver_idTodrivers.users_drivers_user_idTousers
+                ?.first_name || ""
+            } ${
+              v.drivers_vehicles_current_driver_idTodrivers.users_drivers_user_idTousers
+                ?.last_name || ""
+            }`.trim()
+          : "Unassigned",
+      })),
+    };
+  }
+
+  static async getVehicleAdminProfile(userId: string) {
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      include: {
+        departments_users_department_idTodepartments: { select: { name: true } },
+        business_units_users_business_unit_idTobusiness_units: {
+          select: { name: true },
+        },
+      },
+    });
+    if (!user) throw new Error("User not found");
+
+    const [totalAssignments, successfulAssignments, pendingAssignments, activeVehicles] =
+      await Promise.all([
+        prisma.trip_assignments.count({ where: { assigned_by: userId } }),
+        prisma.trip_assignments.count({
+          where: { assigned_by: userId, assignment_status: "Completed" },
+        }),
+        prisma.trip_assignments.count({
+          where: { assigned_by: userId, assignment_status: { in: ["Assigned", "Accepted"] } },
+        }),
+        prisma.vehicles.count({
+          where: { deleted_at: null, availability_status: "Assigned" },
+        }),
+      ]);
+
+    return {
+      personalInfo: {
+        name: `${user.first_name} ${user.last_name}`.trim(),
+        employeeId: user.employee_id,
+        phone: user.phone || "",
+        email: user.email,
+        address: [user.address_street, user.address_city, user.address_state]
+          .filter(Boolean)
+          .join(", "),
+        dateOfJoining: user.hire_date
+          ? new Date(user.hire_date).toISOString().split("T")[0]
+          : "",
+        department: user.departments_users_department_idTodepartments?.name || "N/A",
+        businessUnit:
+          user.business_units_users_business_unit_idTobusiness_units?.name || "N/A",
+      },
+      permissions: [
+        "Vehicle Assignment",
+        "Driver Management",
+        "Fleet Overview",
+        "Trip Assignment",
+      ],
+      stats: {
+        totalAssignments,
+        successfulAssignments,
+        pendingAssignments,
+        activeVehicles,
+      },
+    };
+  }
+
+  static async getVehicleAdminApprovedTrips() {
+    const rows = await prisma.trip_requests.findMany({
+      where: {
+        status: "Approved",
+        trip_assignments: { none: {} },
+      },
+      include: {
+        users_trip_requests_requested_by_user_idTousers: {
+          include: {
+            departments_users_department_idTodepartments: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    return rows.map((trip) => ({
+      id: trip.id,
+      requestNumber: trip.request_number,
+      employee:
+        [
+          trip.users_trip_requests_requested_by_user_idTousers?.first_name,
+          trip.users_trip_requests_requested_by_user_idTousers?.last_name,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .trim() || "Unknown",
+      employeePhone: trip.users_trip_requests_requested_by_user_idTousers?.phone || "",
+      department:
+        trip.users_trip_requests_requested_by_user_idTousers
+          ?.departments_users_department_idTodepartments?.name || "N/A",
+      destination: trip.to_location_address,
+      fromLocation: trip.from_location_address,
+      date: trip.departure_date ? new Date(trip.departure_date).toISOString().split("T")[0] : "",
+      time: formatTime(trip.departure_time),
+      returnTime: formatTime(trip.return_time),
+      purpose: trip.purpose_category || "General",
+      priority: (trip.priority || "Medium").toLowerCase(),
+      vehicleType: trip.vehicle_type_required || "Any",
+      passengers: trip.passenger_count || 1,
+      estimatedDistance: trip.estimated_distance ? `${Number(trip.estimated_distance)} km` : "N/A",
+      status: "awaiting-vehicle",
+    }));
+  }
+
+  static async getVehicleAdminAssignments() {
+    const driverUsers = await prisma.users.findMany({
+      where: {
+        deleted_at: null,
+        status: "Active",
+        position: { contains: "DRIVER", mode: "insensitive" },
+      },
+      select: { id: true, employee_id: true },
+    });
+
+    await Promise.all(
+      driverUsers.map((u) =>
+        prisma.drivers.upsert({
+          where: { user_id: u.id },
+          update: {
+            deleted_at: null,
+            updated_at: new Date(),
+          },
+          create: {
+            user_id: u.id,
+            license_number: `AUTO-${u.employee_id || u.id.slice(0, 8)}-${u.id.slice(0, 4)}`.slice(
+              0,
+              100,
+            ),
+            driver_status: "Available",
+          },
+        }),
+      ),
+    );
+
+    const [approvedTrips, vehicles, assignments, drivers] = await Promise.all([
+      this.getVehicleAdminApprovedTrips(),
+      prisma.vehicles.findMany({
+        where: { deleted_at: null },
+        include: {
+          drivers_vehicles_current_driver_idTodrivers: {
+            include: {
+              users_drivers_user_idTousers: {
+                select: { first_name: true, last_name: true, phone: true },
+              },
+            },
+          },
+        },
+      }),
+      prisma.trip_assignments.findMany({
+        include: {
+          trip_requests: true,
+          vehicles: true,
+          drivers: {
+            include: {
+              users_drivers_user_idTousers: { select: { first_name: true, last_name: true } },
+            },
+          },
+        },
+        orderBy: { created_at: "desc" },
+        take: 50,
+      }),
+      prisma.drivers.findMany({
+        where: { deleted_at: null },
+        include: {
+          users_drivers_user_idTousers: {
+            select: { first_name: true, last_name: true, phone: true },
+          },
+        },
+      }),
+    ]);
+
+    const assignedByRequest = new Map(
+      assignments.map((a) => [a.trip_request_id, a]),
+    );
+
+    const trips = approvedTrips.map((trip) => {
+      const assignment = assignedByRequest.get(trip.id);
+      if (!assignment) return trip;
+      return {
+        ...trip,
+        status: "vehicle-assigned",
+        assignedVehicle: assignment.vehicles
+          ? `${assignment.vehicles.make} ${assignment.vehicles.model} - ${assignment.vehicles.registration_number}`
+          : null,
+        assignedDriver: assignment.drivers
+          ? `${assignment.drivers.users_drivers_user_idTousers?.first_name || ""} ${
+              assignment.drivers.users_drivers_user_idTousers?.last_name || ""
+            }`.trim()
+          : null,
+      };
+    });
+
+    const driverOptionsFromDrivers = drivers.map((d) => ({
+      id: d.id,
+      name: `${d.users_drivers_user_idTousers?.first_name || ""} ${
+        d.users_drivers_user_idTousers?.last_name || ""
+      }`.trim(),
+      phone: d.users_drivers_user_idTousers?.phone || "",
+    }));
+
+    return {
+      trips,
+      vehicles: vehicles.map((v) => ({
+        id: v.id,
+        make: v.make,
+        model: v.model,
+        licensePlate: v.registration_number,
+        type: v.vehicle_type || "UNKNOWN",
+        seating: v.seating_capacity || 0,
+        driver: v.drivers_vehicles_current_driver_idTodrivers
+          ? `${
+              v.drivers_vehicles_current_driver_idTodrivers.users_drivers_user_idTousers
+                ?.first_name || ""
+            } ${
+              v.drivers_vehicles_current_driver_idTodrivers.users_drivers_user_idTousers
+                ?.last_name || ""
+            }`.trim()
+          : "Unassigned",
+        driverPhone:
+          v.drivers_vehicles_current_driver_idTodrivers?.users_drivers_user_idTousers
+            ?.phone || "",
+        status: (v.availability_status || "Unknown").toLowerCase(),
+        location: v.current_location || "N/A",
+        fuelLevel: 0,
+      })),
+      drivers: driverOptionsFromDrivers,
+    };
+  }
+
+  static async assignVehicleAdminTrip(userId: string, payload: {
+    tripRequestId: string;
+    vehicleId: string;
+    driverId: string;
+    assignmentNotes?: string;
+  }) {
+    let resolvedDriver = await prisma.drivers.findFirst({
+      where: {
+        OR: [{ id: payload.driverId }, { user_id: payload.driverId }],
+      },
+      select: { id: true, deleted_at: true, user_id: true, license_number: true },
+    });
+
+    if (!resolvedDriver) {
+      const selectedUser = await prisma.users.findUnique({
+        where: { id: payload.driverId },
+        select: { id: true, position: true, employee_id: true, status: true },
+      });
+
+      const isDriverUser = (selectedUser?.position || "")
+        .toUpperCase()
+        .includes("DRIVER");
+
+      if (!selectedUser || !isDriverUser || selectedUser.status !== "Active") {
+        throw new Error("Selected driver is invalid or inactive.");
+      }
+
+      const base = selectedUser.employee_id || selectedUser.id.slice(0, 8);
+      const autoLicense = `AUTO-${base}-${Date.now().toString().slice(-6)}`.slice(
+        0,
+        100,
+      );
+
+      const createdOrUpdated = await prisma.drivers.upsert({
+        where: { user_id: selectedUser.id },
+        update: { deleted_at: null, updated_at: new Date(), updated_by: userId },
+        create: {
+          user_id: selectedUser.id,
+          license_number: autoLicense,
+          driver_status: "Available",
+          created_by: userId,
+        },
+        select: { id: true, deleted_at: true, user_id: true, license_number: true },
+      });
+
+      resolvedDriver = createdOrUpdated;
+    } else if (resolvedDriver.deleted_at) {
+      resolvedDriver = await prisma.drivers.update({
+        where: { id: resolvedDriver.id },
+        data: { deleted_at: null, updated_at: new Date(), updated_by: userId },
+        select: { id: true, deleted_at: true, user_id: true, license_number: true },
+      });
+    }
+
+    const existing = await prisma.trip_assignments.findFirst({
+      where: { trip_request_id: payload.tripRequestId },
+      select: { id: true },
+    });
+
+    if (existing) {
+      await prisma.trip_assignments.update({
+        where: { id: existing.id },
+        data: {
+          vehicle_id: payload.vehicleId,
+          driver_id: resolvedDriver.id,
+          assignment_notes: payload.assignmentNotes || null,
+          assignment_status: "Assigned",
+          assigned_by: userId,
+          assigned_at: new Date(),
+          updated_at: new Date(),
+        },
+      });
+      return { id: existing.id, updated: true };
+    }
+
+    const created = await prisma.trip_assignments.create({
+      data: {
+        trip_request_id: payload.tripRequestId,
+        vehicle_id: payload.vehicleId,
+        driver_id: resolvedDriver.id,
+        assignment_notes: payload.assignmentNotes || null,
+        assignment_status: "Assigned",
+        assigned_by: userId,
+        assigned_at: new Date(),
+      },
+      select: { id: true },
+    });
+    return { id: created.id, updated: false };
   }
 }

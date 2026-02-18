@@ -64,22 +64,21 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
-// ── TYPES (Strictly matching your Schema) ────────────────────────────────────────────────────────
+// ── TYPES ────────────────────────────────────────────────────────
 
-// Matches 'users' model structure
 type UserBasic = {
   first_name: string;
   last_name: string;
 };
 
-// Matches 'drivers' model structure
 type DriverBasic = {
   id: string;
-  users?: UserBasic | null; // Relation to users table
+  users?: UserBasic | null; 
+  users_drivers_user_idTousers?: UserBasic | null;
   license_number?: string | null;
 };
 
-// Matches 'vehicles' model structure
+
 type VehicleBasic = {
   id: string;
   registration_number: string;
@@ -101,7 +100,6 @@ type TripCosts = {
   currency: string | null;
 };
 
-// Interface matching the JSON structure returned by your Backend API
 interface TripLogDb {
   id: string;
   trip_number: string;
@@ -114,7 +112,6 @@ interface TripLogDb {
   passenger_name: string | null;
   passenger_department: string | null;
   
-  // Redundant fields in trip_logs (denormalized)
   driver_name: string | null;
   vehicle_registration: string | null;
   totalCost: number | null;
@@ -125,14 +122,10 @@ interface TripLogDb {
   driver_behavior_rating: number | null;
   vehicle_condition_rating: number | null;
   comments: string | null;
-
-  // Relations (Matching Schema: trip_assignments -> drivers -> users)
   trip_assignments: {
     id: string;
-    // Relations from Schema
     drivers: DriverBasic | null;
     vehicles: VehicleBasic | null;
-    // Nested relation to trip_costs
     trip_costs: TripCosts[]; 
   } | null;
 
@@ -313,12 +306,12 @@ export default function TripLogs() {
     return `${hours}h ${mins}m`;
   };
   
-  // Safe getter for Driver Name
   const getDriverName = (log: TripLogDb) => {
-    if (log.driver_name) return log.driver_name; // Use redundant field if present
-    // Else traverse: Assignment -> Drivers -> Users -> Name
-    const fName = log.trip_assignments?.drivers?.users?.first_name;
-    const lName = log.trip_assignments?.drivers?.users?.last_name;
+    if (log.driver_name) return log.driver_name; 
+    const nestedUser = log.trip_assignments?.drivers?.users_drivers_user_idTousers;
+    const legacyUser = log.trip_assignments?.drivers?.users;
+    const fName = nestedUser?.first_name || legacyUser?.first_name;
+    const lName = nestedUser?.last_name || legacyUser?.last_name;
     if (fName || lName) return `${fName || ""} ${lName || ""}`.trim();
     return "Unassigned";
   };
@@ -402,7 +395,7 @@ export default function TripLogs() {
       {/* Header + Export */}
       <div className="flex items-center justify-between">
         <div className="p-3">
-          <h1 className="text-2xl font-bold">TRIP LOGS</h1>
+          <h1 className="text-2xl">TRIP LOGS</h1>
           <p className="text-muted-foreground text-xs">
             Execution data, GPS logs, and detailed costs
           </p>

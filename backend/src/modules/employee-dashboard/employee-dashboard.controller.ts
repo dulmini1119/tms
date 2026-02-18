@@ -13,6 +13,23 @@ export const getEmployeeDashboard = async (req: AuthRequest, res: Response) => {
 
     const userId = req.user.id;
 
+    // Load full user so UI can show names (department/business unit) instead of UUIDs
+    const currentUser = await prisma.users.findUnique({
+      where: { id: userId },
+      include: {
+        departments_users_department_idTodepartments: {
+          select: { id: true, name: true },
+        },
+        business_units_users_business_unit_idTobusiness_units: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    if (!currentUser) {
+      return ApiResponse.error(res, 'NOT_FOUND', 'User not found', 404);
+    }
+
     // Fetch trips for this employee
     const trips = await prisma.trip_requests.findMany({
       where: { requested_by_user_id: userId },
@@ -38,12 +55,16 @@ export const getEmployeeDashboard = async (req: AuthRequest, res: Response) => {
 
     return ApiResponse.success(res, {
       user: {
-        id: req.user.id,
-        first_name: req.user.first_name,
-        last_name: req.user.last_name,
-        email: req.user.email,
-        department_id: req.user.department_id,
-        business_unit_id: req.user.business_unit_id,
+        id: currentUser.id,
+        first_name: currentUser.first_name,
+        last_name: currentUser.last_name,
+        email: currentUser.email,
+        department_id: currentUser.department_id,
+        business_unit_id: currentUser.business_unit_id,
+        department_name:
+          currentUser.departments_users_department_idTodepartments?.name || null,
+        business_unit_name:
+          currentUser.business_units_users_business_unit_idTobusiness_units?.name || null,
       },
       stats,
       recentTrips,

@@ -10,4 +10,5 @@ export interface UpdateVehicleDto {
 
   current_driver_id?: string;
   assigned_department_id?: string;
+  cab_service_id?: string | null;
 }

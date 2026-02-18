@@ -46,15 +46,15 @@ const menuItems = [
   }
 ];
 
-const data = {
-  user: {
-    name: "Sarah Wilson",
-    email: "sarah@wilson.com",
-    role: "HoD",
-  },
+type SidebarUser = {
+  name: string;
+  role: string;
 };
 
-export function MngApp({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function MngApp({
+  user,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & { user: SidebarUser }) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -66,7 +66,7 @@ export function MngApp({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
 
       <SidebarFooter className="pb-5">
-        <MngUser user={data.user} />
+        <MngUser user={user} />
       </SidebarFooter>
 
       <SidebarRail />

@@ -49,6 +49,12 @@ interface EmployeeTripRequestsProps {
 export default function EmployeeTripRequests({
   viewMode = "my-trips", // default to my-trips for employee page
 }: EmployeeTripRequestsProps) {
+  const toDateInput = (value?: string | null) => {
+    if (!value) return "";
+    // Handles both "YYYY-MM-DD" and ISO strings like "YYYY-MM-DDTHH:mm:ss.sssZ"
+    return value.split("T")[0];
+  };
+
   const [trips, setTrips] = useState<(TripRequest & { approval?: TripApproval })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -208,9 +214,9 @@ export default function EmployeeTripRequests({
     setFormData({
       fromLocation: trip.tripDetails.fromLocation.address,
       toLocation: trip.tripDetails.toLocation.address,
-      departureDate: trip.tripDetails.departureDate,
+      departureDate: toDateInput(trip.tripDetails.departureDate),
       departureTime: trip.tripDetails.departureTime,
-      returnDate: trip.tripDetails.returnDate || "",
+      returnDate: toDateInput(trip.tripDetails.returnDate),
       returnTime: trip.tripDetails.returnTime || "",
       purposeCategory: trip.purpose.category,
       purposeDescription: trip.purpose.description,

@@ -79,6 +79,15 @@ export class VehicleDocumentsService {
             orderBy: { created_at: "desc" },
         });
     }
+    static async getById(id) {
+        return prisma.documents.findFirst({
+            where: {
+                id,
+                entity_type: DOCUMENT_ENTITY.VEHICLE,
+                deleted_at: null,
+            },
+        });
+    }
     static async update(id, data) {
         const payload = {
             document_type: data.document_type,
@@ -102,6 +111,41 @@ export class VehicleDocumentsService {
         return prisma.documents.update({
             where: { id },
             data: payload,
+        });
+    }
+    static async verify(id, userId, comments) {
+        const existing = await this.getById(id);
+        if (!existing)
+            return null;
+        return prisma.documents.update({
+            where: { id },
+            data: {
+                status: "Valid",
+                verification_status: "Verified",
+                verified_by: userId,
+                verified_at: new Date(),
+                notes: comments ?? existing.notes ?? null,
+                updated_at: new Date(),
+                updated_by: userId,
+            },
+        });
+    }
+    static async renew(id, userId, data) {
+        const existing = await this.getById(id);
+        if (!existing)
+            return null;
+        return prisma.documents.update({
+            where: { id },
+            data: {
+                status: "Under_Renewal",
+                verification_status: "Pending",
+                issue_date: data?.issue_date ? new Date(data.issue_date) : existing.issue_date,
+                expiry_date: data?.expiry_date ? new Date(data.expiry_date) : existing.expiry_date,
+                document_number: data?.document_number ?? existing.document_number,
+                notes: data?.notes ?? existing.notes ?? null,
+                updated_at: new Date(),
+                updated_by: userId,
+            },
         });
     }
     static async delete(id) {

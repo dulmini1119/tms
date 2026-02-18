@@ -1,127 +1,89 @@
-'use client'
-import React from 'react';
+'use client';
 
+import React, { useEffect, useState } from 'react';
 import { Clock, MapPin, Car, Calendar, AlertTriangle, Route, Fuel } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
-interface UserRole {
-  id: string;
-  name: string;
-  role: string;
-  department: string;
-  businessUnit: string;
-}
-
-interface VehicleAdminDashboardProps {
-  user: UserRole;
-}
-
-// Mock data for vehicle admin dashboard
-const mockStats = {
-  availableVehicles: 8,
-  assignedVehicles: 12,
-  approvedTripsWaiting: 5,
-  activeTrips: 7
+type DashboardData = {
+  user: {
+    id: string;
+    name: string;
+    role: string;
+    department: string;
+    businessUnit: string;
+  };
+  stats: {
+    availableVehicles: number;
+    assignedVehicles: number;
+    approvedTripsWaiting: number;
+    activeTrips: number;
+  };
+  pendingTrips: Array<{
+    id: string;
+    requestNumber: string;
+    employee: string;
+    department: string;
+    destination: string;
+    date: string;
+    time: string;
+    priority: string;
+    vehicleType: string;
+    passengers: number;
+    approvedBy: string;
+  }>;
+  fleet: Array<{
+    id: string;
+    make: string;
+    model: string;
+    licensePlate: string;
+    status: string;
+    location: string;
+    fuelLevel: number;
+    driver: string;
+  }>;
 };
 
-const mockApprovedTrips = [
-  {
-    id: 'TR001',
-    employee: 'John Smith',
-    department: 'Marketing',
-    destination: 'Downtown Office',
-    date: '2024-01-16',
-    time: '09:00 AM',
-    approvedBy: 'Sarah Wilson',
-    status: 'awaiting-vehicle',
-    priority: 'high',
-    vehicleType: 'Sedan',
-    passengers: 1
-  },
-  {
-    id: 'TR002',
-    employee: 'Lisa Chen',
-    department: 'Sales',
-    destination: 'Airport',
-    date: '2024-01-17',
-    time: '02:30 PM',
-    approvedBy: 'David Brown',
-    status: 'awaiting-vehicle',
-    priority: 'high',
-    vehicleType: 'SUV',
-    passengers: 1
-  },
-  {
-    id: 'TR003',
-    employee: 'Mike Johnson',
-    department: 'IT',
-    destination: 'Client Office',
-    date: '2024-01-17',
-    time: '11:00 AM',
-    approvedBy: 'Sarah Wilson',
-    status: 'awaiting-vehicle',
-    priority: 'medium',
-    vehicleType: 'Sedan',
-    passengers: 2
+async function fetchPortal(path: string) {
+  const primary = await fetch(path, { credentials: 'include' });
+  const contentType = primary.headers.get('content-type') || '';
+  if (primary.ok && contentType.includes('application/json')) {
+    return primary;
   }
-];
+  return fetch(`http://localhost:3001${path}`, { credentials: 'include' });
+}
 
-const mockVehicleStatus = [
-  {
-    id: 'V001',
-    make: 'Honda',
-    model: 'City',
-    licensePlate: 'KA01AB1234',
-    driver: 'Raj Kumar',
-    status: 'available',
-    location: 'Head Office',
-    fuelLevel: 85
-  },
-  {
-    id: 'V002',
-    make: 'Toyota',
-    model: 'Innova',
-    licensePlate: 'KA02CD5678',
-    driver: 'Suresh Babu',
-    status: 'on-trip',
-    location: 'Downtown',
-    fuelLevel: 60,
-    currentTrip: 'TR004'
-  },
-  {
-    id: 'V003',
-    make: 'Maruti',
-    model: 'Swift',
-    licensePlate: 'KA03EF9012',
-    driver: 'Anil Sharma',
-    status: 'available',
-    location: 'Branch Office',
-    fuelLevel: 70
-  },
-  {
-    id: 'V004',
-    make: 'Ford',
-    model: 'EcoSport',
-    licensePlate: 'KA04GH3456',
-    driver: 'Ramesh Kumar',
-    status: 'maintenance',
-    location: 'Service Center',
-    fuelLevel: 30
-  }
-];
+export default function VehicleAdminDashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export default function VehicleAdminDashboard({ user }: VehicleAdminDashboardProps) {
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const res = await fetchPortal('/portal/vehicle-admin/dashboard');
+        if (!res.ok) throw new Error('Failed to fetch dashboard');
+        const payload = await res.json();
+        setData(payload);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to fetch dashboard');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    run();
+  }, []);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'available':
         return 'default';
+      case 'assigned':
       case 'on-trip':
         return 'secondary';
       case 'maintenance':
-        return 'destructive';
-      case 'awaiting-vehicle':
         return 'destructive';
       default:
         return 'secondary';
@@ -134,42 +96,38 @@ export default function VehicleAdminDashboard({ user }: VehicleAdminDashboardPro
         return 'destructive';
       case 'medium':
         return 'default';
-      case 'low':
-        return 'secondary';
       default:
         return 'secondary';
     }
   };
 
-  const assignVehicle = (tripId: string) => {
-    console.log('Assigning vehicle to trip:', tripId);
-  };
+  if (loading) return <div className="p-4">Loading dashboard...</div>;
+  if (error || !data) return <div className="p-4 text-red-600">{error || 'No data found'}</div>;
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
       <div className="flex items-center justify-between">
-        <div className='p-3'>
-        <h1 className='text-2xl'>DASHBOARD</h1>
-      </div>
-        <Button className="gap-2">
-          <Car className="h-4 w-4" />
-          Assign Vehicles
+        <div className="p-3">
+          <h1 className="text-2xl">DASHBOARD</h1>
+          <p className="text-sm text-muted-foreground">{data.user.department} | {data.user.businessUnit}</p>
+        </div>
+        <Button className="gap-2" asChild>
+          <a href="/vehicleadmin/vehicle-assignments">
+            <Car className="h-4 w-4" />
+            Assign Vehicles
+          </a>
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Available Vehicles</CardTitle>
             <Car className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{mockStats.availableVehicles}</div>
-            <p className="text-xs text-muted-foreground">
-              Ready for assignment
-            </p>
+            <div className="text-2xl font-bold text-green-600">{data.stats.availableVehicles}</div>
+            <p className="text-xs text-muted-foreground">Ready for assignment</p>
           </CardContent>
         </Card>
 
@@ -179,10 +137,8 @@ export default function VehicleAdminDashboard({ user }: VehicleAdminDashboardPro
             <Route className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.assignedVehicles}</div>
-            <p className="text-xs text-muted-foreground">
-              Currently on trips
-            </p>
+            <div className="text-2xl font-bold">{data.stats.assignedVehicles}</div>
+            <p className="text-xs text-muted-foreground">Currently engaged</p>
           </CardContent>
         </Card>
 
@@ -192,10 +148,8 @@ export default function VehicleAdminDashboard({ user }: VehicleAdminDashboardPro
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{mockStats.approvedTripsWaiting}</div>
-            <p className="text-xs text-muted-foreground">
-              Approved trips
-            </p>
+            <div className="text-2xl font-bold text-orange-600">{data.stats.approvedTripsWaiting}</div>
+            <p className="text-xs text-muted-foreground">Approved trips</p>
           </CardContent>
         </Card>
 
@@ -205,16 +159,13 @@ export default function VehicleAdminDashboard({ user }: VehicleAdminDashboardPro
             <MapPin className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.activeTrips}</div>
-            <p className="text-xs text-muted-foreground">
-              In progress
-            </p>
+            <div className="text-2xl font-bold">{data.stats.activeTrips}</div>
+            <p className="text-xs text-muted-foreground">In progress</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Approved Trips Awaiting Vehicle Assignment */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -225,84 +176,56 @@ export default function VehicleAdminDashboard({ user }: VehicleAdminDashboardPro
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockApprovedTrips.map((trip) => (
-                <div key={trip.id} className="flex items-center justify-between p-4 border rounded-lg">
+              {data.pendingTrips.length === 0 && (
+                <div className="text-sm text-muted-foreground">No approved trips waiting for assignment.</div>
+              )}
+              {data.pendingTrips.map((trip) => (
+                <div key={trip.id} className="flex items-center justify-between rounded-lg border p-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="mb-1 flex items-center gap-2">
                       <span className="font-medium">{trip.employee}</span>
                       <Badge variant={getPriorityColor(trip.priority)} className="text-xs">
                         {trip.priority}
                       </Badge>
                     </div>
+                    <div className="text-sm text-muted-foreground">{trip.department} | {trip.vehicleType} required</div>
                     <div className="text-sm text-muted-foreground">
-                      {trip.department} • {trip.vehicleType} required
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      <MapPin className="h-3 w-3 inline mr-1" />
+                      <MapPin className="mr-1 inline h-3 w-3" />
                       {trip.destination}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      <Calendar className="h-3 w-3 inline mr-1" />
+                      <Calendar className="mr-1 inline h-3 w-3" />
                       {trip.date} at {trip.time}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      Approved by: {trip.approvedBy} • Passengers: {trip.passengers}
-                    </div>
+                    <div className="text-xs text-muted-foreground">Approved by: {trip.approvedBy} | Passengers: {trip.passengers}</div>
                   </div>
-                  <Button 
-                    size="sm" 
-                    onClick={() => assignVehicle(trip.id)}
-                    className="gap-1"
-                  >
-                    <Car className="h-3 w-3" />
-                    Assign
-                  </Button>
                 </div>
               ))}
-              <div className="text-center pt-2">
-                <Button variant="outline" className="w-full">
-                  View All Pending Assignments
-                </Button>
-              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Vehicle Status Overview */}
         <Card>
           <CardHeader>
             <CardTitle>Fleet Status Overview</CardTitle>
-            <CardDescription>Current status of all vehicles</CardDescription>
+            <CardDescription>Current status of vehicles</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockVehicleStatus.map((vehicle) => (
-                <div key={vehicle.id} className="flex items-center justify-between p-4 border rounded-lg">
+              {data.fleet.map((vehicle) => (
+                <div key={vehicle.id} className="flex items-center justify-between rounded-lg border p-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
                       <Car className="h-5 w-5 text-blue-600" />
                     </div>
                     <div>
-                      <div className="font-medium">
-                        {vehicle.make} {vehicle.model}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {vehicle.licensePlate} • {vehicle.driver}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Location: {vehicle.location}
-                      </div>
-                      {vehicle.currentTrip && (
-                        <div className="text-xs text-blue-600">
-                          Trip: {vehicle.currentTrip}
-                        </div>
-                      )}
+                      <div className="font-medium">{vehicle.make} {vehicle.model}</div>
+                      <div className="text-sm text-muted-foreground">{vehicle.licensePlate} | {vehicle.driver}</div>
+                      <div className="text-sm text-muted-foreground">Location: {vehicle.location}</div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <Badge variant={getStatusColor(vehicle.status)} className="mb-2">
-                      {vehicle.status}
-                    </Badge>
+                    <Badge variant={getStatusColor(vehicle.status)} className="mb-2">{vehicle.status}</Badge>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Fuel className="h-3 w-3" />
                       {vehicle.fuelLevel}%

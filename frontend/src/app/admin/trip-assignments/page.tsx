@@ -188,7 +188,7 @@ export default function TripAssignments() {
     fetchAssignments();
   }, [fetchAssignments]);
 
-  // ── HANDLERS ─────────────────────────────────────────────────────────────
+  // â”€â”€ HANDLERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleViewDetails = (assignment: TripAssignment) => {
     setSelectedAssignment(assignment);
@@ -284,7 +284,7 @@ export default function TripAssignments() {
     setIsPreTripDialogOpen(true);
   };
 
-  // ── HELPERS ─────────────────────────────────────────────────────────────
+  // â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const getStatusBadge = (status: string) => {
     const variants: Record<
@@ -756,8 +756,7 @@ export default function TripAssignments() {
                   </div>
                   <div className="text-sm text-muted-foreground mt-2">
                     <span className="font-medium text-foreground">Route:</span>{" "}
-                    {/* From/To locations usually in Request, not Assignment. Displaying placeholders if not embedded */}
-                    Unknown Location → Unknown Location
+                    {selectedAssignment.fromLocation || "Unknown Location"}{" -> "}{selectedAssignment.toLocation || "Unknown Location"}
                   </div>
                 </section>
                 <section className="rounded-xl border border-border bg-card p-5 shadow-sm transition hover:shadow-md">
@@ -851,7 +850,7 @@ export default function TripAssignments() {
                           </span>
                         ) : (
                           <span className="flex items-center gap-1 text-red-500 font-medium">
-                            ✗ Not Verified
+                            âœ— Not Verified
                           </span>
                         )}
                       </div>
@@ -859,11 +858,11 @@ export default function TripAssignments() {
                         <span className="font-medium text-foreground">Emergency Kit:</span>{" "}
                         {selectedAssignment.preTrip.checklist.emergencyKitPresent ? (
                           <span className="text-green-500 font-medium">
-                            ✓ Present
+                            âœ“ Present
                           </span>
                         ) : (
                           <span className="text-red-500 font-medium">
-                            ✗ Missing
+                            âœ— Missing
                           </span>
                         )}
                       </div>
@@ -871,11 +870,11 @@ export default function TripAssignments() {
                         <span className="font-medium text-foreground">GPS:</span>{" "}
                         {selectedAssignment.preTrip.checklist.gpsWorking ? (
                           <span className="text-green-500 font-medium">
-                            ✓ Working
+                            âœ“ Working
                           </span>
                         ) : (
                           <span className="text-red-500 font-medium">
-                            ✗ Not Working
+                            âœ— Not Working
                           </span>
                         )}
                       </div>

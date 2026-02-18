@@ -42,15 +42,27 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 interface BusinessUnit {
   id: string;
   name: string;
   code: string;
+  description?: string | null;
+  status?: string | null;
+  head_id?: string | null;
   created_at: string;
   updated_at: string;
   users_business_units_head_idTousers?: {
+    id?: string;
     first_name: string;
     last_name: string;
     email: string;
@@ -59,6 +71,16 @@ interface BusinessUnit {
   _count?: {
     users_users_business_unit_idTobusiness_units: number;
   };
+}
+
+interface UserOption {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  status?: string;
+  position?: string;
+  roles?: string[];
 }
 
 export default function BusinessUnitsPage() {
@@ -74,7 +96,14 @@ export default function BusinessUnitsPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<BusinessUnit | null>(null);
-  const [formData, setFormData] = useState({ name: "", code: "" });
+  const [headOptions, setHeadOptions] = useState<UserOption[]>([]);
+  const [formData, setFormData] = useState({
+    name: "",
+    code: "",
+    description: "",
+    status: "Active",
+    head_id: "none",
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
@@ -159,15 +188,90 @@ const fetchBusinessUnits = useCallback(async () => {
     fetchBusinessUnits();
   }, [fetchBusinessUnits]);
 
+  const fetchHeadOptions = useCallback(async () => {
+    const fetchUsersByRole = async (role: "MANAGER" | "HOD") => {
+      const all: UserOption[] = [];
+      let page = 1;
+      let totalPages = 1;
+
+      while (page <= totalPages) {
+        const res = await fetch(
+          `/users?page=${page}&limit=100&role=${role}&status=Active`,
+          { headers: getAuthHeaders() }
+        );
+
+        if (!res.ok) break;
+        const data = await res.json();
+        const users: UserOption[] = Array.isArray(data?.data?.users) ? data.data.users : [];
+        all.push(...users);
+
+        totalPages = Number(data?.data?.pagination?.totalPages || 1);
+        page += 1;
+      }
+
+      return all;
+    };
+
+    try {
+      const [managers, hods] = await Promise.all([
+        fetchUsersByRole("MANAGER"),
+        fetchUsersByRole("HOD"),
+      ]);
+
+      const merged = [...managers, ...hods];
+      const unique = Array.from(new Map(merged.map((user) => [user.id, user])).values());
+      setHeadOptions(unique);
+    } catch (error) {
+      console.error("Failed to fetch business unit heads", error);
+      setHeadOptions([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHeadOptions();
+  }, [fetchHeadOptions]);
+
   const handleCreate = () => {
     setEditingUnit(null);
-    setFormData({ name: "", code: "" });
+    setFormData({
+      name: "",
+      code: "",
+      description: "",
+      status: "Active",
+      head_id: "none",
+    });
     setIsDialogOpen(true);
   };
 
   const handleEdit = (unit: BusinessUnit) => {
     setEditingUnit(unit);
-    setFormData({ name: unit.name, code: unit.code });
+    const currentHeadId =
+      unit.head_id || unit.users_business_units_head_idTousers?.id || "none";
+
+    if (
+      unit.users_business_units_head_idTousers?.id &&
+      !headOptions.some((option) => option.id === unit.users_business_units_head_idTousers?.id)
+    ) {
+      setHeadOptions((prev) => [
+        {
+          id: unit.users_business_units_head_idTousers!.id as string,
+          first_name: unit.users_business_units_head_idTousers!.first_name,
+          last_name: unit.users_business_units_head_idTousers!.last_name,
+          email: unit.users_business_units_head_idTousers!.email,
+          position: "MANAGER",
+          roles: ["MANAGER"],
+        },
+        ...prev,
+      ]);
+    }
+
+    setFormData({
+      name: unit.name,
+      code: unit.code,
+      description: unit.description || "",
+      status: unit.status || "Active",
+      head_id: currentHeadId,
+    });
     setIsDialogOpen(true);
   };
 
@@ -183,7 +287,13 @@ const fetchBusinessUnits = useCallback(async () => {
       const res = await fetch(url, {
         method,
         headers: getAuthHeaders(),
-        body: JSON.stringify({ name: formData.name.trim(), code: formData.code.trim() || undefined }),
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          code: formData.code.trim() || undefined,
+          description: formData.description.trim() || null,
+          status: formData.status,
+          head_id: formData.head_id === "none" ? null : formData.head_id,
+        }),
       });
       const data = await res.json();
 
@@ -268,6 +378,7 @@ const fetchBusinessUnits = useCallback(async () => {
                   <TableHead>Name</TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Manager</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Employees</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -275,7 +386,7 @@ const fetchBusinessUnits = useCallback(async () => {
               <TableBody>
                 {businessUnits.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No business units found
                     </TableCell>
                   </TableRow>
@@ -305,6 +416,11 @@ const fetchBusinessUnits = useCallback(async () => {
                         ) : (
                           <span className="text-muted-foreground italic">No manager</span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={bu.status === "Inactive" ? "secondary" : "default"}>
+                          {bu.status || "Active"}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -388,6 +504,54 @@ const fetchBusinessUnits = useCallback(async () => {
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 placeholder="e.g., TECH"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Short description of this business unit"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => setFormData({ ...formData, status: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Business Unit Head</Label>
+              <Select
+                value={formData.head_id}
+                onValueChange={(value) => setFormData({ ...formData, head_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select manager/HOD" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {headOptions
+                    .sort((a, b) =>
+                      `${a.first_name} ${a.last_name}`.localeCompare(
+                        `${b.first_name} ${b.last_name}`
+                      )
+                    )
+                    .map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.first_name} {user.last_name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
