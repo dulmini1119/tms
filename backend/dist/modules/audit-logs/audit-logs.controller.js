@@ -11,9 +11,9 @@ const validateRequest = (schema, data) => {
 };
 export const getAuditLogs = async (req, res, next) => {
     try {
-        const { page, limit, search, action, module, status } = req.query;
+        const { page, limit, search, action, module, status, actor } = req.query;
         const result = await auditLogService.getAuditLogs({
-            page, limit, search, action, module, status
+            page, limit, search, action, module, status, actor
         });
         return ApiResponse.success(res, result);
     }

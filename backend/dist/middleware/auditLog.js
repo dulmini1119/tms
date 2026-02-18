@@ -31,6 +31,8 @@ export const auditLog = (moduleName) => {
                 const entityType = extractResourceType(req.path);
                 const entityId = extractResourceId(req, responseData);
                 const status = mapStatus(res.statusCode);
+                if (!shouldPersistAudit(req, status))
+                    return;
                 const errorMessage = status === 'Failed' ? extractErrorMessage(responseData) : null;
                 const userName = buildUserName(req);
                 const durationMs = Date.now() - startedAt;
@@ -203,5 +205,11 @@ function shouldSkipRequest(req) {
     if (req.path.startsWith('/audit-logs'))
         return true;
     return false;
+}
+function shouldPersistAudit(req, status) {
+    // Keep failed GETs for troubleshooting, but drop successful/pending GET noise.
+    if (req.method === 'GET')
+        return status === 'Failed';
+    return true;
 }
 //# sourceMappingURL=auditLog.js.map

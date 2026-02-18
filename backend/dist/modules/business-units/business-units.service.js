@@ -23,6 +23,7 @@ export class BusinessUnitService {
             where.OR = [
                 { name: { contains: search, mode: "insensitive" } },
                 { code: { contains: search, mode: "insensitive" } },
+                { description: { contains: search, mode: "insensitive" } },
             ];
         }
         try {
@@ -31,6 +32,15 @@ export class BusinessUnitService {
                 skip,
                 take: limitNum,
                 orderBy: { [sort_by]: sort_order },
+                include: {
+                    users_business_units_head_idTousers: {
+                        select: { id: true, first_name: true, last_name: true, email: true },
+                    },
+                    departments: { select: { id: true, name: true } },
+                    _count: {
+                        select: { users_users_business_unit_idTobusiness_units: true },
+                    },
+                },
             });
             const total = await prisma.business_units.count({ where });
             return {
@@ -74,11 +84,14 @@ export class BusinessUnitService {
         if (exists) {
             throw new AppError(ERROR_CODES.ALREADY_EXISTS, "Business Unit already exists", HTTP_STATUS.CONFLICT);
         }
+        const headId = data.head_id ?? data.manager_id ?? null;
         return await prisma.business_units.create({
             data: {
-                ...data,
                 name,
                 code,
+                description: data.description?.trim() || null,
+                status: data.status || "Active",
+                head_id: headId,
                 created_by: userId,
                 updated_by: userId,
             },
@@ -99,27 +112,29 @@ export class BusinessUnitService {
         const checkUniqueness = [];
         // Handle name update
         if (data.name !== undefined) {
-            updates.name = data.name.trim();
-            checkUniqueness.push({ name: updates.name });
+            const trimmedName = data.name.trim();
+            updates.name = trimmedName;
+            checkUniqueness.push({ name: trimmedName });
         }
         // Handle code: auto-generate if name changed and code not provided
         if (data.name !== undefined && data.code === undefined) {
-            updates.code = updates.name.toUpperCase().replace(/\s+/g, "_");
+            const autoCode = data.name.trim().toUpperCase().replace(/\s+/g, "_");
+            updates.code = autoCode;
             checkUniqueness.push({ code: updates.code });
         }
         else if (data.code !== undefined) {
             updates.code = data.code.trim().toUpperCase();
             checkUniqueness.push({ code: updates.code });
         }
-        // Copy other fields
-        if (data.manager_id !== undefined)
-            updates.manager_id = data.manager_id;
-        if (data.department_id !== undefined)
-            updates.department_id = data.department_id;
-        if (data.budget !== undefined)
-            updates.budget = data.budget;
-        if (data.established !== undefined)
-            updates.established = data.established;
+        if (data.description !== undefined) {
+            updates.description = data.description?.trim() || null;
+        }
+        if (data.status !== undefined) {
+            updates.status = data.status;
+        }
+        if (data.head_id !== undefined || data.manager_id !== undefined) {
+            updates.head_id = data.head_id ?? data.manager_id ?? null;
+        }
         // Check uniqueness only if name or code is being updated
         if (checkUniqueness.length > 0) {
             const existing = await prisma.business_units.findFirst({

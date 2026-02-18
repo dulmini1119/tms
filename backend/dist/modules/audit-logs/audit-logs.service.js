@@ -14,6 +14,13 @@ const buildDisplayAction = (log, actionType) => {
     const target = log.entity_name || log.entity_type || moduleName;
     return `${actionType} ${target}`;
 };
+const getDurationMs = (changes) => {
+    if (!changes || typeof changes !== "object")
+        return null;
+    const typedChanges = changes;
+    const value = typedChanges.durationMs;
+    return typeof value === "number" ? value : null;
+};
 // Helper to map DB row to Frontend Interface
 const mapDbToFrontend = (log) => {
     const normalizedStatus = log.status === "Failed" || log.status === "Pending" ? log.status : "Success";
@@ -33,16 +40,18 @@ const mapDbToFrontend = (log) => {
         entityId: log.entity_id,
         entityName: log.entity_name,
         description: log.description || null,
-        changes: Array.isArray(log.changes) ? log.changes : null,
+        changes: log.changes && typeof log.changes === "object" ? log.changes : null,
         status: normalizedStatus,
         severity: normalizedStatus === "Failed" ? "Error" : "Info",
-        duration: null,
+        duration: getDurationMs(log.changes),
         errorMessage: log.error_message,
         metadata: {
             ipAddress: log.ip_address,
             sessionId: log.session_id,
             requestId: log.request_id,
             userAgent: log.user_agent,
+            requestMethod: log.request_method,
+            requestUrl: log.request_url,
         },
         tags: [],
         archived: false,
@@ -51,7 +60,7 @@ const mapDbToFrontend = (log) => {
     };
 };
 export const getAuditLogs = async (filters) => {
-    const { page, limit, search, action, module, status } = filters;
+    const { page, limit, search, action, module, status, actor } = filters;
     const pageInt = parseInt(page, 10) || 1;
     const limitInt = parseInt(limit, 10) || 10;
     const skip = (pageInt - 1) * limitInt;
@@ -63,6 +72,7 @@ export const getAuditLogs = async (filters) => {
             { action: { contains: search, mode: "insensitive" } },
             { entity_name: { contains: search, mode: "insensitive" } },
             { user_name: { contains: search, mode: "insensitive" } },
+            { request_url: { contains: search, mode: "insensitive" } },
         ];
     }
     if (action)
@@ -71,6 +81,10 @@ export const getAuditLogs = async (filters) => {
         where.module = module;
     if (status)
         where.status = status;
+    if (actor === "system")
+        where.user_id = null;
+    if (actor === "user")
+        where.user_id = { not: null };
     const [logs, total] = await Promise.all([
         prisma.audit_logs.findMany({
             where,
