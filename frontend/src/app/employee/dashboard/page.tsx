@@ -66,12 +66,28 @@ export default function EmployeeDashboard() {
         });
         if (!res.ok) throw new Error('Failed to fetch dashboard');
 
-        const data: DashboardResponse = await res.json();
+        const apiPayload = await res.json();
+        const payload: DashboardResponse = apiPayload.data || apiPayload;
 
-        setUser(data.user);
-        setStats(data.stats);
-        setRecentTrips(data.recentTrips);
-        setUpcomingTrips(data.upcomingTrips);
+        const normalizeTrip = (trip: Record<string, unknown>): Trip => ({
+          id: String(trip.id || ""),
+          destination: (trip.destination as string) || (trip.to_location_address as string) || "N/A",
+          departure_date: trip.departure_date
+            ? new Date(trip.departure_date as string).toISOString().split("T")[0]
+            : "N/A",
+          departure_time: trip.departure_time
+            ? new Date(trip.departure_time as string).toISOString().slice(11, 16)
+            : "N/A",
+          status: (trip.status || "Pending") as Trip["status"],
+          driver: trip.driver as string | undefined,
+          vehicle: trip.vehicle as string | undefined,
+          trip_approvals: trip.trip_approvals as unknown[] | undefined,
+        });
+
+        setUser(payload.user);
+        setStats(payload.stats);
+        setRecentTrips((payload.recentTrips || []).map(normalizeTrip));
+        setUpcomingTrips((payload.upcomingTrips || []).map(normalizeTrip));
       } catch (err) {
         console.error(err);
       } finally {

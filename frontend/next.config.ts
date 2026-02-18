@@ -94,6 +94,18 @@ const nextConfig: NextConfig = {
         source: "/trip-requests/:path*",
         destination: "http://localhost:3001/trip-requests/:path*",
       },
+      {
+        source: "/employee/dashboard",
+        destination: "http://localhost:3001/employee/dashboard",
+      },
+      {
+        source: "/portal",
+        destination: "http://localhost:3001/portal",
+      },
+      {
+        source: "/portal/:path*",
+        destination: "http://localhost:3001/portal/:path*",
+      },
       // ── VEHICLE DOCUMENTS ─────────────────────────────────────
       {
         source: "/vehicle-documents",

@@ -1,0 +1,554 @@
+import prisma from "../../config/database.js";
+const isDriverPosition = (position) => (position || "").toUpperCase().includes("DRIVER");
+const isHodPosition = (position) => (position || "").toUpperCase().includes("HOD");
+const formatTime = (date) => date ? date.toISOString().slice(11, 16) : "";
+const mapDriverAssignment = (assignment) => {
+    const statusRaw = (assignment.assignment_status || "Assigned").toString();
+    const status = /completed/i.test(statusRaw)
+        ? "completed"
+        : /progress|started|active|transit|arrived/i.test(statusRaw)
+            ? "active"
+            : "scheduled";
+    const tripDate = assignment.trip_requests?.departure_date
+        ? new Date(assignment.trip_requests.departure_date)
+        : new Date();
+    return {
+        id: assignment.id,
+        requestNumber: assignment.trip_requests?.request_number || "N/A",
+        employee: [
+            assignment.trip_requests?.users_trip_requests_requested_by_user_idTousers
+                ?.first_name,
+            assignment.trip_requests?.users_trip_requests_requested_by_user_idTousers
+                ?.last_name,
+        ]
+            .filter(Boolean)
+            .join(" ")
+            .trim() || "Unknown",
+        employeePhone: assignment.trip_requests?.users_trip_requests_requested_by_user_idTousers
+            ?.phone || "",
+        department: assignment.trip_requests?.users_trip_requests_requested_by_user_idTousers
+            ?.departments_users_department_idTodepartments?.name || "N/A",
+        destination: assignment.trip_requests?.to_location_address || "N/A",
+        fromLocation: assignment.trip_requests?.from_location_address || "N/A",
+        date: tripDate.toISOString().split("T")[0],
+        scheduledTime: formatTime(assignment.trip_requests?.departure_time),
+        returnTime: formatTime(assignment.trip_requests?.return_time),
+        estimatedDuration: assignment.trip_requests?.estimated_duration
+            ? `${assignment.trip_requests.estimated_duration} mins`
+            : "N/A",
+        purpose: assignment.trip_requests?.purpose_category || "General",
+        status,
+        distance: assignment.trip_requests?.estimated_distance
+            ? `${Number(assignment.trip_requests.estimated_distance)} km`
+            : "N/A",
+        actualStartTime: assignment.actual_departure_time
+            ? new Date(assignment.actual_departure_time).toISOString()
+            : null,
+        actualEndTime: assignment.actual_arrival_time
+            ? new Date(assignment.actual_arrival_time).toISOString()
+            : null,
+        startOdometer: null,
+        endOdometer: null,
+        startLocation: assignment.trip_requests?.from_location_address || null,
+        endLocation: assignment.trip_requests?.to_location_address || null,
+        vehicle: assignment.vehicles
+            ? `${assignment.vehicles.make} ${assignment.vehicles.model}`
+            : "N/A",
+        registration: assignment.vehicles?.registration_number || "N/A",
+    };
+};
+const getMonthRange = (month) => {
+    if (!month)
+        return null;
+    const [year, m] = month.split("-").map(Number);
+    if (!year || !m)
+        return null;
+    const start = new Date(year, m - 1, 1);
+    const end = new Date(year, m, 1);
+    return { start, end };
+};
+export class PortalService {
+    static async getDriverContext(userId) {
+        const [user, driver] = await Promise.all([
+            prisma.users.findUnique({
+                where: { id: userId },
+                include: {
+                    departments_users_department_idTodepartments: { select: { name: true } },
+                    business_units_users_business_unit_idTobusiness_units: {
+                        select: { name: true },
+                    },
+                },
+            }),
+            prisma.drivers.findUnique({
+                where: { user_id: userId },
+                include: {
+                    users_drivers_user_idTousers: true,
+                    vehicles_drivers_current_vehicle_idTovehicles: true,
+                },
+            }),
+        ]);
+        if (!user)
+            throw new Error("User not found");
+        if (!driver && !isDriverPosition(user.position)) {
+            throw new Error("User is not a driver");
+        }
+        return { user, driver };
+    }
+    static async getDriverDashboard(userId) {
+        const { user, driver } = await this.getDriverContext(userId);
+        const driverId = driver?.id;
+        const assignments = driverId
+            ? await prisma.trip_assignments.findMany({
+                where: { driver_id: driverId },
+                include: {
+                    trip_requests: {
+                        include: {
+                            users_trip_requests_requested_by_user_idTousers: {
+                                include: {
+                                    departments_users_department_idTodepartments: {
+                                        select: { name: true },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    vehicles: true,
+                },
+                orderBy: { created_at: "desc" },
+                take: 20,
+            })
+            : [];
+        const mapped = assignments.map(mapDriverAssignment);
+        const today = new Date().toISOString().split("T")[0];
+        const todayAssignments = mapped.filter((a) => a.date === today);
+        const stats = {
+            todayTrips: todayAssignments.length,
+            activeTrips: mapped.filter((a) => a.status === "active").length,
+            completedTrips: mapped.filter((a) => a.status === "completed").length,
+            totalDistance: mapped.reduce((sum, a) => {
+                const num = Number((a.distance || "").replace(/[^\d.]/g, ""));
+                return sum + (Number.isFinite(num) ? num : 0);
+            }, 0),
+        };
+        return {
+            user: {
+                id: user.id,
+                name: `${user.first_name} ${user.last_name}`.trim(),
+                role: user.position || "DRIVER",
+                department: user.departments_users_department_idTodepartments?.name || "N/A",
+                businessUnit: user.business_units_users_business_unit_idTobusiness_units?.name || "N/A",
+            },
+            stats,
+            assignments: mapped,
+            currentVehicle: driver?.vehicles_drivers_current_vehicle_idTovehicles
+                ? {
+                    make: driver.vehicles_drivers_current_vehicle_idTovehicles.make,
+                    model: driver.vehicles_drivers_current_vehicle_idTovehicles.model,
+                    year: String(driver.vehicles_drivers_current_vehicle_idTovehicles.year),
+                    licensePlate: driver.vehicles_drivers_current_vehicle_idTovehicles
+                        .registration_number,
+                    fuelType: driver.vehicles_drivers_current_vehicle_idTovehicles.fuel_type ||
+                        "N/A",
+                    seatingCapacity: driver.vehicles_drivers_current_vehicle_idTovehicles
+                        .seating_capacity || 0,
+                    assignedDate: driver.assigned_to_vehicle_date
+                        ? new Date(driver.assigned_to_vehicle_date)
+                            .toISOString()
+                            .split("T")[0]
+                        : "",
+                }
+                : null,
+        };
+    }
+    static async getDriverAssignments(userId, viewMode = "all") {
+        const { driver } = await this.getDriverContext(userId);
+        if (!driver)
+            return [];
+        const assignments = await prisma.trip_assignments.findMany({
+            where: { driver_id: driver.id },
+            include: {
+                trip_requests: {
+                    include: {
+                        users_trip_requests_requested_by_user_idTousers: {
+                            include: {
+                                departments_users_department_idTodepartments: {
+                                    select: { name: true },
+                                },
+                            },
+                        },
+                    },
+                },
+                vehicles: true,
+            },
+            orderBy: { created_at: "desc" },
+        });
+        const mapped = assignments.map(mapDriverAssignment);
+        if (viewMode === "active") {
+            return mapped.filter((a) => a.status === "active");
+        }
+        return mapped.filter((a) => a.status !== "completed");
+    }
+    static async startDriverTrip(userId, assignmentId, payload) {
+        const { driver } = await this.getDriverContext(userId);
+        if (!driver)
+            throw new Error("Driver profile not found");
+        const assignment = await prisma.trip_assignments.findFirst({
+            where: { id: assignmentId, driver_id: driver.id },
+            include: { trip_requests: true, vehicles: true },
+        });
+        if (!assignment)
+            throw new Error("Assignment not found");
+        const now = new Date();
+        await prisma.trip_assignments.update({
+            where: { id: assignment.id },
+            data: {
+                assignment_status: "In_Progress",
+                started_at: now,
+                actual_departure_time: now,
+                current_status: "In Progress",
+                updated_at: now,
+            },
+        });
+        await prisma.trip_logs.upsert({
+            where: { trip_assignment_id: assignment.id },
+            create: {
+                trip_assignment_id: assignment.id,
+                trip_request_id: assignment.trip_request_id,
+                trip_number: assignment.trip_requests?.request_number || `TRIP-${assignment.id.slice(0, 8)}`,
+                trip_date: assignment.trip_requests?.departure_date || now,
+                trip_status: "Started",
+                from_location: payload.location || assignment.trip_requests?.from_location_address,
+                to_location: assignment.trip_requests?.to_location_address,
+                vehicle_registration: assignment.vehicles?.registration_number,
+                actual_departure: now,
+                comments: payload.remarks || null,
+            },
+            update: {
+                trip_status: "Started",
+                actual_departure: now,
+                from_location: payload.location || undefined,
+                comments: payload.remarks || undefined,
+            },
+        });
+    }
+    static async endDriverTrip(userId, assignmentId, payload) {
+        const { driver } = await this.getDriverContext(userId);
+        if (!driver)
+            throw new Error("Driver profile not found");
+        const assignment = await prisma.trip_assignments.findFirst({
+            where: { id: assignmentId, driver_id: driver.id },
+            include: { trip_requests: true, vehicles: true },
+        });
+        if (!assignment)
+            throw new Error("Assignment not found");
+        const now = new Date();
+        const duration = assignment.actual_departure_time != null
+            ? Math.max(0, Math.floor((now.getTime() - new Date(assignment.actual_departure_time).getTime()) /
+                60000))
+            : null;
+        await prisma.trip_assignments.update({
+            where: { id: assignment.id },
+            data: {
+                assignment_status: "Completed",
+                completed_at: now,
+                actual_arrival_time: now,
+                actual_duration: duration ?? undefined,
+                current_status: "Completed",
+                updated_at: now,
+            },
+        });
+        await prisma.trip_logs.upsert({
+            where: { trip_assignment_id: assignment.id },
+            create: {
+                trip_assignment_id: assignment.id,
+                trip_request_id: assignment.trip_request_id,
+                trip_number: assignment.trip_requests?.request_number || `TRIP-${assignment.id.slice(0, 8)}`,
+                trip_date: assignment.trip_requests?.departure_date || now,
+                trip_status: "Completed",
+                from_location: assignment.trip_requests?.from_location_address,
+                to_location: payload.location || assignment.trip_requests?.to_location_address,
+                vehicle_registration: assignment.vehicles?.registration_number,
+                actual_departure: assignment.actual_departure_time || null,
+                actual_arrival: now,
+                total_duration: duration,
+                comments: payload.remarks || null,
+            },
+            update: {
+                trip_status: "Completed",
+                actual_arrival: now,
+                total_duration: duration ?? undefined,
+                to_location: payload.location || undefined,
+                comments: payload.remarks || undefined,
+            },
+        });
+    }
+    static async getDriverTripLogs(userId, month) {
+        const { driver } = await this.getDriverContext(userId);
+        if (!driver)
+            return [];
+        const monthRange = getMonthRange(month);
+        const where = {
+            trip_assignments: { is: { driver_id: driver.id } },
+        };
+        if (monthRange) {
+            where.trip_date = { gte: monthRange.start, lt: monthRange.end };
+        }
+        const logs = await prisma.trip_logs.findMany({
+            where,
+            include: {
+                trip_assignments: {
+                    include: { vehicles: true },
+                },
+                trip_requests: true,
+            },
+            orderBy: { trip_date: "desc" },
+        });
+        return logs.map((log) => ({
+            id: log.id,
+            tripNumber: log.trip_number,
+            date: log.trip_date ? new Date(log.trip_date).toISOString().split("T")[0] : "",
+            status: log.trip_status || "Unknown",
+            employee: log.passenger_name || "N/A",
+            fromLocation: log.from_location || "N/A",
+            destination: log.to_location || "N/A",
+            startTime: log.actual_departure,
+            endTime: log.actual_arrival,
+            actualDistance: Number(log.actual_distance || 0),
+            fuelConsumed: Number(log.fuel_cost || 0),
+            remarks: log.comments || "",
+            rating: Number(log.overall_rating || 0),
+            vehicle: log.trip_assignments?.vehicles?.registration_number ||
+                log.vehicle_registration ||
+                "N/A",
+            purpose: log.trip_requests?.purpose_category || "General",
+        }));
+    }
+    static async getDriverProfile(userId) {
+        const { user, driver } = await this.getDriverContext(userId);
+        const [documents, logs, assignments] = await Promise.all([
+            prisma.documents.findMany({
+                where: {
+                    entity_type: "DRIVER",
+                    deleted_at: null,
+                    OR: [{ entity_id: driver?.id || user.id }, { entity_id: user.id }],
+                },
+                orderBy: { created_at: "desc" },
+            }),
+            prisma.trip_logs.findMany({
+                where: {
+                    trip_assignments: {
+                        is: {
+                            driver_id: driver?.id || "00000000-0000-0000-0000-000000000000",
+                        },
+                    },
+                },
+            }),
+            prisma.trip_assignments.findMany({
+                where: { driver_id: driver?.id || "00000000-0000-0000-0000-000000000000" },
+            }),
+        ]);
+        const completedTrips = assignments.filter((a) => /completed/i.test(a.assignment_status || "")).length;
+        const ratingLogs = logs.filter((l) => l.overall_rating != null);
+        const avgRating = ratingLogs.length
+            ? ratingLogs.reduce((s, l) => s + Number(l.overall_rating || 0), 0) /
+                ratingLogs.length
+            : 0;
+        const onTimeKnown = logs.filter((l) => l.on_time != null);
+        const onTimePct = onTimeKnown.length
+            ? Math.round((onTimeKnown.filter((l) => l.on_time === true).length /
+                onTimeKnown.length) *
+                100)
+            : 0;
+        return {
+            personalInfo: {
+                name: `${user.first_name} ${user.last_name}`.trim(),
+                employeeId: user.employee_id,
+                phone: user.phone || "",
+                email: user.email,
+                address: [user.address_street, user.address_city, user.address_state]
+                    .filter(Boolean)
+                    .join(", "),
+                dateOfJoining: user.hire_date
+                    ? new Date(user.hire_date).toISOString().split("T")[0]
+                    : "",
+                licenseNumber: driver?.license_number || "",
+                licenseExpiry: driver?.license_expiry_date
+                    ? new Date(driver.license_expiry_date).toISOString().split("T")[0]
+                    : "",
+            },
+            currentVehicle: driver?.vehicles_drivers_current_vehicle_idTovehicles
+                ? {
+                    make: driver.vehicles_drivers_current_vehicle_idTovehicles.make,
+                    model: driver.vehicles_drivers_current_vehicle_idTovehicles.model,
+                    year: String(driver.vehicles_drivers_current_vehicle_idTovehicles.year),
+                    licensePlate: driver.vehicles_drivers_current_vehicle_idTovehicles
+                        .registration_number,
+                    fuelType: driver.vehicles_drivers_current_vehicle_idTovehicles.fuel_type ||
+                        "N/A",
+                    seatingCapacity: driver.vehicles_drivers_current_vehicle_idTovehicles
+                        .seating_capacity || 0,
+                    assignedDate: driver.assigned_to_vehicle_date
+                        ? new Date(driver.assigned_to_vehicle_date)
+                            .toISOString()
+                            .split("T")[0]
+                        : "",
+                }
+                : null,
+            documents: documents.map((doc) => ({
+                id: doc.id,
+                type: doc.document_type,
+                number: doc.document_number || "",
+                issueDate: doc.issue_date
+                    ? new Date(doc.issue_date).toISOString().split("T")[0]
+                    : "",
+                expiryDate: doc.expiry_date
+                    ? new Date(doc.expiry_date).toISOString().split("T")[0]
+                    : "",
+                status: doc.status || "Pending_Verification",
+            })),
+            performance: {
+                totalTrips: completedTrips,
+                averageRating: Number(avgRating.toFixed(1)),
+                onTimePercentage: onTimePct,
+                incidents: Number((driver?.violations_count || 0) + (driver?.accidents_count || 0)),
+                compliments: logs.filter((l) => Number(l.overall_rating || 0) >= 4).length,
+            },
+        };
+    }
+    static async getTeamDashboard(userId) {
+        const user = await prisma.users.findUnique({
+            where: { id: userId },
+            include: {
+                departments_users_department_idTodepartments: { select: { name: true } },
+                business_units_users_business_unit_idTobusiness_units: {
+                    select: { name: true },
+                },
+            },
+        });
+        if (!user)
+            throw new Error("User not found");
+        const whereUsers = { deleted_at: null };
+        if (isHodPosition(user.position)) {
+            whereUsers.department_id = user.department_id || undefined;
+        }
+        else {
+            whereUsers.OR = [{ manager_id: user.id }, { department_id: user.department_id || undefined }];
+        }
+        const teamUsers = await prisma.users.findMany({
+            where: whereUsers,
+            select: { id: true, first_name: true, last_name: true },
+        });
+        const teamUserIds = teamUsers.map((u) => u.id);
+        if (!teamUserIds.length) {
+            return {
+                user: {
+                    id: user.id,
+                    name: `${user.first_name} ${user.last_name}`.trim(),
+                    role: user.position,
+                    department: user.departments_users_department_idTodepartments?.name || "N/A",
+                    businessUnit: user.business_units_users_business_unit_idTobusiness_units?.name || "N/A",
+                },
+                stats: {
+                    pendingApprovals: 0,
+                    totalTeamTrips: 0,
+                    approvedThisMonth: 0,
+                    teamMembers: 0,
+                },
+                pendingRequests: [],
+                recentActivity: [],
+                teamUtilization: [],
+            };
+        }
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const [pendingRequests, teamTrips, recentActivity] = await Promise.all([
+            prisma.trip_requests.findMany({
+                where: {
+                    requested_by_user_id: { in: teamUserIds },
+                    status: "Pending",
+                },
+                include: {
+                    users_trip_requests_requested_by_user_idTousers: {
+                        include: {
+                            departments_users_department_idTodepartments: { select: { name: true } },
+                        },
+                    },
+                },
+                orderBy: { created_at: "desc" },
+                take: 6,
+            }),
+            prisma.trip_requests.findMany({
+                where: {
+                    requested_by_user_id: { in: teamUserIds },
+                    departure_date: { gte: monthStart },
+                },
+            }),
+            prisma.trip_approvals.findMany({
+                where: { approver_user_id: user.id },
+                include: {
+                    trip_requests: true,
+                    users: { select: { first_name: true, last_name: true } },
+                },
+                orderBy: { updated_at: "desc" },
+                take: 6,
+            }),
+        ]);
+        const requestsByUser = new Map();
+        for (const trip of teamTrips) {
+            const rec = requestsByUser.get(trip.requested_by_user_id) || { count: 0 };
+            rec.count += 1;
+            if (!rec.lastTrip || (trip.departure_date && trip.departure_date > rec.lastTrip)) {
+                rec.lastTrip = trip.departure_date;
+            }
+            requestsByUser.set(trip.requested_by_user_id, rec);
+        }
+        return {
+            user: {
+                id: user.id,
+                name: `${user.first_name} ${user.last_name}`.trim(),
+                role: user.position || "MANAGER",
+                department: user.departments_users_department_idTodepartments?.name || "N/A",
+                businessUnit: user.business_units_users_business_unit_idTobusiness_units?.name || "N/A",
+            },
+            stats: {
+                pendingApprovals: pendingRequests.length,
+                totalTeamTrips: teamTrips.length,
+                approvedThisMonth: teamTrips.filter((t) => t.status === "Approved").length,
+                teamMembers: teamUsers.length,
+            },
+            pendingRequests: pendingRequests.map((r) => ({
+                id: r.id,
+                requestNumber: r.request_number,
+                employee: `${r.users_trip_requests_requested_by_user_idTousers?.first_name || ""} ${r.users_trip_requests_requested_by_user_idTousers?.last_name || ""}`.trim(),
+                department: r.users_trip_requests_requested_by_user_idTousers
+                    ?.departments_users_department_idTodepartments?.name || "N/A",
+                destination: r.to_location_address,
+                date: r.departure_date ? new Date(r.departure_date).toISOString().split("T")[0] : "",
+                time: formatTime(r.departure_time),
+                purpose: r.purpose_category || "General",
+                priority: (r.priority || "Medium").toLowerCase(),
+                submittedAt: r.created_at,
+            })),
+            recentActivity: recentActivity.map((a) => ({
+                id: a.id,
+                action: `${a.status || "Pending"} trip request`,
+                employee: [
+                    a.users?.first_name,
+                    a.users?.last_name,
+                ]
+                    .filter(Boolean)
+                    .join(" ")
+                    .trim() || "Unknown",
+                tripId: a.trip_requests?.request_number || "N/A",
+                timestamp: a.updated_at || a.created_at,
+            })),
+            teamUtilization: teamUsers.map((u) => ({
+                id: u.id,
+                name: `${u.first_name} ${u.last_name}`.trim(),
+                trips: requestsByUser.get(u.id)?.count || 0,
+                lastTrip: requestsByUser.get(u.id)?.lastTrip || null,
+            })),
+        };
+    }
+}
+//# sourceMappingURL=portal.service.js.map

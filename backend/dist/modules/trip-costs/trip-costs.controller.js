@@ -5,13 +5,14 @@ import prisma from "../../config/database.js";
  */
 export const getAllTripCosts = async (req, res) => {
     try {
-        const { status, vendor_id, start_date, end_date, page, pageSize } = req.query;
+        const { status, vendor_id, start_date, end_date, month, page, pageSize } = req.query;
         // Explicitly cast query params to strings to satisfy TypeScript strict types
         const filters = {
             status: status || "all-status",
             vendor_id: vendor_id || "all-vendors",
             start_date: start_date,
             end_date: end_date,
+            month: month,
             page: page || "1",
             pageSize: pageSize || "10",
             user: req.user,

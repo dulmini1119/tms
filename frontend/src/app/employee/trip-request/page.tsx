@@ -42,20 +42,11 @@ import { TripApproval, TripRequest } from "@/types/trip-interfaces";
 
 // Reuse your existing interfaces (TripRequest, TripApproval, etc.)
 // ... (paste your interface definitions here)
-interface UserRole {
-  id: string;
-  name: string;
-  role: string;
-  department: string;
-  businessUnit: string;
-}
 interface EmployeeTripRequestsProps {
-  user?: UserRole;
   viewMode?: "request" | "my-trips";
 }
 
 export default function EmployeeTripRequests({
-  user,
   viewMode = "my-trips", // default to my-trips for employee page
 }: EmployeeTripRequestsProps) {
   const [trips, setTrips] = useState<(TripRequest & { approval?: TripApproval })[]>([]);
@@ -98,7 +89,7 @@ export default function EmployeeTripRequests({
       if (searchTerm) params.set("searchTerm", searchTerm);
       if (statusFilter !== "all") params.set("status", statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1));
 
-      const res = await fetch(`/api/trip-requests?${params.toString()}`, {
+      const res = await fetch(`/trip-requests?${params.toString()}`, {
         method: "GET",
         credentials: "include", // ← important: sends cookies (accessToken)
       });
@@ -186,7 +177,7 @@ export default function EmployeeTripRequests({
       approvalRequired: true,
     };
 
-    const url = editingTrip ? `/api/trip-requests/${editingTrip.id}` : "/api/trip-requests";
+    const url = editingTrip ? `/trip-requests/${editingTrip.id}` : "/trip-requests";
     const method = editingTrip ? "PUT" : "POST";
 
     try {
@@ -238,7 +229,7 @@ export default function EmployeeTripRequests({
     if (!confirm("Delete this trip request?")) return;
 
     try {
-      const res = await fetch(`/api/trip-requests/${id}`, {
+      const res = await fetch(`/trip-requests/${id}`, {
         method: "DELETE",
         credentials: "include",
       });

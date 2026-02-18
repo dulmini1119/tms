@@ -146,6 +146,40 @@ interface CabServiceInvoice {
   breakdownByVehicle?: VehicleGroup[];
 }
 
+interface BackendTripCostItem {
+  id: string;
+  requestNumber: string;
+  cabServiceName: string;
+  cabServiceId: string;
+  status: string;
+  createdAt: string;
+  totalCost: number;
+  requestedBy?: {
+    name: string;
+  };
+}
+
+interface BackendTripCostsResponse {
+  data: BackendTripCostItem[];
+  meta: {
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
+}
+
+const getCurrentMonthValue = () => {
+  const now = new Date();
+  const month = `${now.getMonth() + 1}`.padStart(2, "0");
+  return `${now.getFullYear()}-${month}`;
+};
+
+const toTripCostStatusParam = (status: string) => {
+  if (status === "all") return undefined;
+  return status.charAt(0).toUpperCase() + status.slice(1);
+};
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     headers: {
@@ -170,6 +204,13 @@ const api = {
   getAllInvoices: async (params?: Record<string, string>) => {
     const query = new URLSearchParams(params).toString();
     return request<BackendInvoice[]>(`/invoices${query ? `?${query}` : ""}`);
+  },
+
+  getTripCostsMonthly: async (params: Record<string, string>) => {
+    const query = new URLSearchParams(params).toString();
+    return request<BackendTripCostsResponse>(
+      `/trip-costs${query ? `?${query}` : ""}`,
+    );
   },
 
 getInvoiceDetails: async (invoiceId: string) => {
@@ -209,7 +250,7 @@ export default function TripCosts() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [monthFilter, setMonthFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState(getCurrentMonthValue());
   const [cabServiceFilter, setCabServiceFilter] = useState("all");
 
   const [isInvoiceDetailsOpen, setIsInvoiceDetailsOpen] = useState(false);
@@ -227,6 +268,7 @@ export default function TripCosts() {
   );
 
   const [invoices, setInvoices] = useState<CabServiceInvoice[]>([]);
+  const [monthlyTrips, setMonthlyTrips] = useState<BackendTripCostItem[]>([]);
 
   const [paymentDate, setPaymentDate] = useState(
     new Date().toISOString().split("T")[0],
@@ -280,6 +322,31 @@ export default function TripCosts() {
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
+
+  const fetchMonthlyTrips = useCallback(async () => {
+    try {
+      const params: Record<string, string> = {
+        month: monthFilter,
+        page: "1",
+        pageSize: "500",
+      };
+
+      const statusParam = toTripCostStatusParam(statusFilter);
+      if (statusParam) params.status = statusParam;
+      if (cabServiceFilter !== "all") params.vendor_id = cabServiceFilter;
+
+      const response = await api.getTripCostsMonthly(params);
+      setMonthlyTrips(response.data || []);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load monthly trips");
+      setMonthlyTrips([]);
+    }
+  }, [cabServiceFilter, monthFilter, statusFilter]);
+
+  useEffect(() => {
+    fetchMonthlyTrips();
+  }, [fetchMonthlyTrips]);
 
   const fetchInvoiceDetails = async (invoice: CabServiceInvoice) => {
     try {
@@ -398,6 +465,17 @@ export default function TripCosts() {
     return matchesSearch && matchesStatus && matchesMonth && matchesCabService;
   });
 
+  const filteredMonthlyTrips = monthlyTrips.filter((trip) => {
+    const q = searchTerm.toLowerCase().trim();
+    if (!q) return true;
+
+    return (
+      (trip.requestNumber || "").toLowerCase().includes(q) ||
+      (trip.cabServiceName || "").toLowerCase().includes(q) ||
+      (trip.requestedBy?.name || "").toLowerCase().includes(q)
+    );
+  });
+
   const stats = {
     totalOutstanding: invoices
       .filter((inv) => inv.status !== "Paid")
@@ -417,6 +495,11 @@ export default function TripCosts() {
     pendingInvoices: invoices.filter((inv) => inv.status === "Pending").length,
     overdueInvoices: invoices.filter((inv) => inv.status === "Overdue").length,
     totalVendors: new Set(invoices.map((inv) => inv.cabServiceId)).size,
+    totalTripsInMonth: filteredMonthlyTrips.length,
+    monthTotalCost: filteredMonthlyTrips.reduce(
+      (sum, trip) => sum + Number(trip.totalCost || 0),
+      0,
+    ),
   };
 
   // --- HANDLERS ---
@@ -591,7 +674,9 @@ export default function TripCosts() {
   };
 
   const getUniqueMonths = () => {
-    return Array.from(new Set(invoices.map((inv) => inv.billingMonth)))
+    return Array.from(
+      new Set([getCurrentMonthValue(), ...invoices.map((inv) => inv.billingMonth)]),
+    )
       .sort((a, b) => b.localeCompare(a))
       .map((month) => {
         const [year, m] = month.split("-");
@@ -656,8 +741,10 @@ export default function TripCosts() {
             <div className="flex items-center space-x-2">
               <Truck className="h-5 w-5 text-blue-500" />
               <div>
-                <div className="text-2xl font-bold">{stats.totalVendors}</div>
-                <p className="text-sm text-muted-foreground">Active Vendors</p>
+                <div className="text-2xl font-bold">
+                  {stats.totalTripsInMonth}
+                </div>
+                <p className="text-sm text-muted-foreground">Trips In Month</p>
               </div>
             </div>
           </CardContent>
@@ -668,9 +755,9 @@ export default function TripCosts() {
               <CheckCircle className="h-5 w-5 text-green-500" />
               <div>
                 <div className="text-2xl font-bold">
-                  {formatCurrency(stats.paidThisMonth)}
+                  {formatCurrency(stats.monthTotalCost)}
                 </div>
-                <p className="text-sm text-muted-foreground">Paid This Month</p>
+                <p className="text-sm text-muted-foreground">Month Total Cost</p>
               </div>
             </div>
           </CardContent>
@@ -748,7 +835,6 @@ export default function TripCosts() {
                 <SelectValue placeholder="Month" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Months</SelectItem>
                 {getUniqueMonths().map((month) => (
                   <SelectItem key={month.value} value={month.value}>
                     {month.label}
@@ -865,6 +951,55 @@ export default function TripCosts() {
               </Card>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>All Trips In Selected Month</CardTitle>
+          <CardDescription>
+            Every trip cost record for {monthFilter}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {filteredMonthlyTrips.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              No trip costs found for this month.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Trip Request</TableHead>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead>Requester</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredMonthlyTrips.map((trip) => (
+                    <TableRow key={trip.id}>
+                      <TableCell className="font-medium">
+                        {trip.requestNumber || "N/A"}
+                      </TableCell>
+                      <TableCell>{trip.cabServiceName || "N/A"}</TableCell>
+                      <TableCell>{trip.requestedBy?.name || "N/A"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{trip.status || "N/A"}</Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(trip.createdAt)}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {formatCurrency(Number(trip.totalCost || 0))}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 

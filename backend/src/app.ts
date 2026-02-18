@@ -35,6 +35,7 @@ import expiryAlertRoutes from './modules/expiry-alerts/expiry-alerts.routes.js';
 import notificationsRoutes from './modules/notifications/notifications.routes.js'; 
 import auditLogsRoutes from './modules/audit-logs/audit-logs.routes.js'
 import systemSettingsRoutes from './modules/system-settings/system-settings.routes.js';
+import portalRoutes from './modules/portal/portal.routes.js';
 
 import { authenticate } from './middleware/auth.js';
 
@@ -95,6 +96,7 @@ app.use('/expiry-alerts', authenticate, expiryAlertRoutes);
 app.use('/notifications', authenticate, notificationsRoutes); 
 app.use('/audit-logs', authenticate, auditLogsRoutes);
 app.use('/system-settings', authenticate, systemSettingsRoutes);
+app.use('/portal', authenticate, portalRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

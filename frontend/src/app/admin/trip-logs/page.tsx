@@ -159,6 +159,27 @@ interface LogStats {
   totalDistance: number;
 }
 
+const getCurrentMonthValue = () => {
+  const now = new Date();
+  const month = `${now.getMonth() + 1}`.padStart(2, "0");
+  return `${now.getFullYear()}-${month}`;
+};
+
+const buildRecentMonths = (count = 12) => {
+  const months: Array<{ value: string; label: string }> = [];
+  const date = new Date();
+  date.setDate(1);
+  for (let i = 0; i < count; i++) {
+    const value = `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, "0")}`;
+    months.push({
+      value,
+      label: date.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+    });
+    date.setMonth(date.getMonth() - 1);
+  }
+  return months;
+};
+
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
 
 export default function TripLogs() {
@@ -175,6 +196,7 @@ export default function TripLogs() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState(getCurrentMonthValue());
 
   // Modals
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
@@ -199,7 +221,7 @@ export default function TripLogs() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, monthFilter]);
 
   const getAuthHeaders = useCallback((): Record<string, string> => {
     const token = localStorage.getItem("authToken");
@@ -220,6 +242,13 @@ export default function TripLogs() {
       });
       if (debouncedSearch) query.set("searchTerm", debouncedSearch);
       if (statusFilter !== "all") query.set("status", statusFilter);
+      if (monthFilter) {
+        const [year, month] = monthFilter.split("-");
+        const startDate = new Date(Number(year), Number(month) - 1, 1);
+        const endDate = new Date(Number(year), Number(month), 0);
+        query.set("startDate", startDate.toISOString().split("T")[0]);
+        query.set("endDate", endDate.toISOString().split("T")[0]);
+      }
 
       const res = await fetch(`/trip-logs?${query}`, {
         headers: getAuthHeaders(),
@@ -258,6 +287,7 @@ export default function TripLogs() {
     pageSize,
     debouncedSearch,
     statusFilter,
+    monthFilter,
     getAuthHeaders,
   ]);
 
@@ -327,27 +357,29 @@ export default function TripLogs() {
   };
 
   const handleExportLogs = async () => {
-    const exportPromise = new Promise<void>((resolve, reject) => {
+    const exportPromise = new Promise<void>(async (resolve, reject) => {
       try {
-        const csvContent = [
-          ["Trip Number", "Status", "Driver", "Vehicle", "Distance (km)", "Duration"],
-          ...tripLogs.map((log) => [
-            log.trip_number,
-            log.trip_status,
-            getDriverName(log),
-            getVehicleInfo(log),
-            log.actual_distance || 0,
-            formatDuration(log.total_duration),
-          ]),
-        ]
-          .map((row) => row.join(","))
-          .join("\n");
+        const query = new URLSearchParams();
+        if (statusFilter !== "all") query.set("status", statusFilter);
+        if (monthFilter) {
+          const [year, month] = monthFilter.split("-");
+          const startDate = new Date(Number(year), Number(month) - 1, 1);
+          const endDate = new Date(Number(year), Number(month), 0);
+          query.set("startDate", startDate.toISOString().split("T")[0]);
+          query.set("endDate", endDate.toISOString().split("T")[0]);
+        }
 
-        const blob = new Blob([csvContent], { type: "text/csv" });
+        const res = await fetch(`/trip-logs/export?${query.toString()}`, {
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) throw new Error("Failed to export logs");
+
+        const csvText = await res.text();
+        const blob = new Blob([csvText], { type: "text/csv" });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "trip_logs.csv";
+        a.download = `trip_logs_${monthFilter}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
         resolve();
@@ -436,7 +468,11 @@ export default function TripLogs() {
         <CardHeader>
           <CardTitle>Execution Data</CardTitle>
           <CardDescription>
-            Detailed breakdown of trip costs, routes, and driver performance
+            Detailed breakdown of trip costs, routes, and driver performance for{" "}
+            {new Date(`${monthFilter}-01`).toLocaleDateString("en-US", {
+              month: "long",
+              year: "numeric",
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -461,6 +497,18 @@ export default function TripLogs() {
                 <SelectItem value="In Transit">In Transit</SelectItem>
                 <SelectItem value="Completed">Completed</SelectItem>
                 <SelectItem value="Cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={monthFilter} onValueChange={setMonthFilter}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Filter by month" />
+              </SelectTrigger>
+              <SelectContent>
+                {buildRecentMonths().map((month) => (
+                  <SelectItem key={month.value} value={month.value}>
+                    {month.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
