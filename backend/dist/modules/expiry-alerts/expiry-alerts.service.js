@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import prisma from "../../config/database.js";
+const isUuid = (value) => !!value &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 export const createExpiryAlert = async (data) => {
     const expiryDate = new Date(data.expiry_date);
     const days_to_expiry = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -14,7 +16,7 @@ export const createExpiryAlert = async (data) => {
     });
 };
 export const getExpiryAlerts = async () => {
-    return prisma.expiry_alerts.findMany({
+    const alerts = await prisma.expiry_alerts.findMany({
         orderBy: {
             expiry_date: "asc",
         },
@@ -34,6 +36,79 @@ export const getExpiryAlerts = async () => {
                 },
             },
         },
+    });
+    const needsResolve = alerts.filter((a) => !a.entity_name || isUuid(a.entity_name));
+    if (!needsResolve.length)
+        return alerts;
+    const byType = needsResolve.reduce((acc, alert) => {
+        const key = (alert.entity_type || "").toUpperCase();
+        acc[key] = acc[key] || [];
+        acc[key].push(alert.entity_id);
+        return acc;
+    }, {});
+    const [vehicles, drivers, documents, agreements] = await Promise.all([
+        prisma.vehicles.findMany({
+            where: { id: { in: byType.VEHICLE || [] } },
+            select: { id: true, registration_number: true },
+        }),
+        prisma.drivers.findMany({
+            where: { id: { in: byType.DRIVER || [] } },
+            select: {
+                id: true,
+                license_number: true,
+                users_drivers_user_idTousers: { select: { first_name: true, last_name: true } },
+            },
+        }),
+        prisma.documents.findMany({
+            where: { id: { in: byType.DOCUMENT || [] } },
+            select: {
+                id: true,
+                document_type: true,
+                document_number: true,
+            },
+        }),
+        prisma.cab_agreements.findMany({
+            where: { id: { in: byType.CAB_AGREEMENT || [] } },
+            select: { id: true, title: true, agreement_number: true },
+        }),
+    ]);
+    const vehicleMap = new Map(vehicles.map((v) => [v.id, v.registration_number || "Unknown Vehicle"]));
+    const driverMap = new Map(drivers.map((d) => {
+        const fullName = `${d.users_drivers_user_idTousers?.first_name || ""} ${d.users_drivers_user_idTousers?.last_name || ""}`.trim() ||
+            d.license_number ||
+            "Unknown Driver";
+        return [d.id, fullName];
+    }));
+    const documentMap = new Map(documents.map((d) => {
+        const name = d.document_number
+            ? `${d.document_type || "Document"} (${d.document_number})`
+            : d.document_type || "Document";
+        return [d.id, name];
+    }));
+    const agreementMap = new Map(agreements.map((a) => [a.id, a.title || a.agreement_number || "Cab Agreement"]));
+    return alerts.map((alert) => {
+        if (alert.entity_name && !isUuid(alert.entity_name))
+            return alert;
+        const entityType = (alert.entity_type || "").toUpperCase();
+        let resolved = alert.entity_name;
+        if (entityType === "VEHICLE")
+            resolved = vehicleMap.get(alert.entity_id) || "Unknown Vehicle";
+        else if (entityType === "DRIVER")
+            resolved = driverMap.get(alert.entity_id) || "Unknown Driver";
+        else if (entityType === "DOCUMENT") {
+            resolved =
+                documentMap.get(alert.entity_id) ||
+                    alert.document_name ||
+                    alert.document_number ||
+                    "Unknown Document";
+        }
+        else if (entityType === "CAB_AGREEMENT") {
+            resolved = agreementMap.get(alert.entity_id) || "Cab Agreement";
+        }
+        else {
+            resolved = alert.document_name || alert.document_number || alert.entity_name || "Unknown Entity";
+        }
+        return { ...alert, entity_name: resolved };
     });
 };
 export const updateExpiryAlert = async (id, data) => {

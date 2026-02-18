@@ -801,16 +801,16 @@ const filteredDocuments = useMemo(() => {
   if (isLoading) return <div className="p-8 text-center"><Loader2 className="animate-spin h-8 w-8 mx-auto mb-2" /> Loading documents...</div>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="p-3">
           <h1 className="text-2xl">VEHICLE DOCUMENTS</h1>
           <p className="text-muted-foreground text-xs">
             Manage vehicle registration, insurance, and compliance documents
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 px-3 sm:px-0">
           <Button variant="outline" onClick={handleExportToExcel}>
             <Download className="h-4 w-4 mr-2" />
             Export Report
@@ -1065,13 +1065,13 @@ const filteredDocuments = useMemo(() => {
               </span>
             </div>
             {/* ... Keep Pagination Controls ... */}
-             <div className="flex items-center gap-2">
+             <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-end">
               <span className="text-sm text-muted-foreground">
                 Page {currentPage} of {totalPages}
               </span>
-              <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>First</Button>
-                <Button variant="outline" size="icon" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+              <div className="flex flex-wrap items-center gap-1 justify-center">
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>First</Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let num;
                   if (totalPages <= 5) num = i + 1;
@@ -1084,8 +1084,8 @@ const filteredDocuments = useMemo(() => {
                     {num}
                   </Button>
                 ))}
-                <Button variant="outline" size="icon" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
-                <Button variant="outline" size="icon" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>Last</Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>Last</Button>
               </div>
             </div>
           </div>
@@ -1099,7 +1099,7 @@ const filteredDocuments = useMemo(() => {
         setIsDetailsDialogOpen(open);
         if (!open) setIsEditMode(false);
       }}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               {selectedDocument?.documentName} - {selectedDocument?.vehicleNumber}
@@ -1111,7 +1111,7 @@ const filteredDocuments = useMemo(() => {
                {!isEditMode ? (
                  // VIEW MODE (Keep existing View Mode JSX)
                  <>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-blue-600">{selectedDocument.complianceScore}%</div><div className="text-sm text-muted-foreground">Compliance</div></CardContent></Card>
                         <Card><CardContent className="p-4 text-center"><div className={`text-2xl font-bold ${getDaysToExpiryColor(selectedDocument.daysToExpiry)}`}>{selectedDocument.daysToExpiry !== undefined ? (selectedDocument.daysToExpiry < 0 ? `${Math.abs(selectedDocument.daysToExpiry)} overdue` : `${selectedDocument.daysToExpiry} days`) : "N/A"}</div><div className="text-sm text-muted-foreground">Expiry</div></CardContent></Card>
                         <Card><CardContent className="p-4 text-center"><div className="text-2xl font-bold text-green-600">{selectedDocument.renewalCost ? `${selectedDocument.renewalCost} ${selectedDocument.currency}` : "N/A"}</div><div className="text-sm text-muted-foreground">Renewal</div></CardContent></Card>
@@ -1151,18 +1151,18 @@ const filteredDocuments = useMemo(() => {
                ) : (
                  // EDIT MODE FORM
                  <form className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1"><Label>Document Name *</Label><Input name="documentName" value={editFormData.documentName} onChange={handleFormChange} required /></div>
                         <div className="space-y-1"><Label>Document Number *</Label><Input name="documentNumber" value={editFormData.documentNumber} onChange={handleFormChange} required /></div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1"><Label>Issue Date *</Label><Input type="date" name="issueDate" value={editFormData.issueDate} onChange={handleFormChange} required /></div>
                         <div className="space-y-1"><Label>Expiry Date *</Label><Input type="date" name="expiryDate" value={editFormData.expiryDate} onChange={handleFormChange} required /></div>
                     </div>
                     <div className="space-y-1"><Label>Issuing Authority *</Label><Input name="issuingAuthority" value={editFormData.issuingAuthority} onChange={handleFormChange} required /></div>
                     <div className="space-y-4 border-t pt-4">
                         <h4 className="font-medium mb-2">Renewal Information</h4>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                              <div className="space-y-1"><Label>Renewal Cost</Label><Input type="number" name="renewalCost" value={editFormData.renewalCost} onChange={handleFormChange} placeholder="e.g. 2500" /></div>
                              <div className="space-y-1"><Label>Currency</Label><Input name="currency" value={editFormData.currency} onChange={handleFormChange} placeholder="e.g. USD" /></div>
                              <div className="space-y-1"><Label>Vendor</Label><Input name="vendor" value={editFormData.vendor} onChange={handleFormChange} placeholder="e.g. ABC Insurance" /></div>
@@ -1209,7 +1209,7 @@ const filteredDocuments = useMemo(() => {
     </DialogHeader>
 
     <form onSubmit={handleUploadSubmit} className="space-y-4 py-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label>Vehicle</Label>
           {/* CHANGE: name="vehicle" -> name="vehicle_id" */}
@@ -1269,7 +1269,7 @@ const filteredDocuments = useMemo(() => {
         <Input name="document_number" placeholder="Enter number" />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label>Issue Date</Label>
           {/* CHANGE: name="issueDate" -> name="issue_date" */}

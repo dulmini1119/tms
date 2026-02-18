@@ -250,7 +250,37 @@ export class GPSLogsService {
     });
 
     if (logs.length === 0) {
-      throw new AppError(ERROR_CODES.NOT_FOUND, 'No route data found for this trip', HTTP_STATUS.NOT_FOUND);
+      const assignment = await prisma.trip_assignments.findUnique({
+        where: { id: tripAssignmentId },
+        select: {
+          trip_request_id: true,
+          assigned_at: true,
+          started_at: true,
+          completed_at: true,
+          vehicles: { select: { registration_number: true } },
+          trip_requests: { select: { request_number: true } },
+        },
+      });
+
+      if (!assignment) {
+        throw new AppError(ERROR_CODES.NOT_FOUND, 'Trip assignment not found', HTTP_STATUS.NOT_FOUND);
+      }
+
+      const start = assignment.started_at || assignment.assigned_at || new Date();
+      const end = assignment.completed_at || start;
+
+      return {
+        tripId: tripAssignmentId,
+        requestNumber: assignment.trip_requests?.request_number || null,
+        vehicleNumber: assignment.vehicles?.registration_number || null,
+        startTime: start,
+        endTime: end,
+        distance: 0,
+        durationMinutes: 0,
+        avgSpeed: 0,
+        maxSpeed: 0,
+        routePoints: [],
+      };
     }
 
     let totalDistance = 0;

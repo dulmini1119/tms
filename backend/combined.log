@@ -2906,3 +2906,19 @@
 {"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-18T10:54:48.919Z"}
 {"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-18T10:54:48.920Z"}
 {"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-18T10:54:48.920Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-18T10:57:04.808Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-18T10:57:04.816Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-18T10:57:04.817Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-18T10:57:04.817Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-18T10:57:04.817Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-18T10:57:04.817Z"}
+{"error":"No route data found for this trip","ip":"::1","level":"error","message":"Error occurred:","method":"GET","path":"/gps-logs/replay/7ea164fb-12b8-4e56-85a6-928cbd889ad4","service":"tms-backend","stack":"Error: No route data found for this trip\n    at GPSLogsService.getTripReplayData (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\gpslogs\\gpslogs.service.ts:253:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async getTripReplay (C:\\Users\\admin\\Desktop\\new\\tms\\backend\\src\\modules\\gpslogs\\gpslogs.controller.ts:49:42)","timestamp":"2026-02-18T10:59:18.447Z"}
+{"level":"info","message":"Audit log created: Read on gps-logs by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T10:59:18.475Z"}
+{"level":"info","message":"Database connected successfully","service":"tms-backend","timestamp":"2026-02-18T11:00:08.353Z"}
+{"level":"info","message":"Server is running on port 3001","service":"tms-backend","timestamp":"2026-02-18T11:00:08.360Z"}
+{"level":"info","message":"Environment: development","service":"tms-backend","timestamp":"2026-02-18T11:00:08.361Z"}
+{"level":"info","message":"Health check: http://localhost:3001/health","service":"tms-backend","timestamp":"2026-02-18T11:00:08.361Z"}
+{"level":"info","message":"API base URL: http://localhost:3001","service":"tms-backend","timestamp":"2026-02-18T11:00:08.361Z"}
+{"level":"info","message":"Socket.IO ready at path /socket.io","service":"tms-backend","timestamp":"2026-02-18T11:00:08.362Z"}
+{"level":"info","message":"Audit log created: Create on system by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T11:02:49.674Z"}
+{"level":"info","message":"Audit log created: Update on bee6f1e7-eb84-4a7b-b182-96aba45d1427 by superadmin@lkcompany.com","service":"tms-backend","timestamp":"2026-02-18T11:05:44.909Z"}

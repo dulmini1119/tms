@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState, useCallback } from "react";
 import {
@@ -64,7 +64,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
-// ── TYPES ────────────────────────────────────────────────────────
+// â”€â”€ TYPES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type UserBasic = {
   first_name: string;
@@ -122,6 +122,7 @@ interface TripLogDb {
   driver_behavior_rating: number | null;
   vehicle_condition_rating: number | null;
   comments: string | null;
+  distance_source?: string | null;
   trip_assignments: {
     id: string;
     drivers: DriverBasic | null;
@@ -173,7 +174,7 @@ const buildRecentMonths = (count = 12) => {
   return months;
 };
 
-// ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
+// â”€â”€ MAIN COMPONENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function TripLogs() {
   const [tripLogs, setTripLogs] = useState<TripLogDb[]>([]);
@@ -203,7 +204,7 @@ export default function TripLogs() {
     totalDistance: 0,
   });
 
-  // ── EFFECTS ──────────────────────────────────────────────────────────────
+  // â”€â”€ EFFECTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -288,7 +289,7 @@ export default function TripLogs() {
     fetchLogs();
   }, [fetchLogs]);
 
-  // ── HELPERS ──────────────────────────────────────────────────────────────
+  // â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "N/A";
@@ -338,7 +339,7 @@ export default function TripLogs() {
     }
   };
 
-  // ── HANDLERS ─────────────────────────────────────────────────────────────
+  // â”€â”€ HANDLERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleViewDetails = (log: TripLogDb) => {
     setSelectedLog(log);
@@ -388,7 +389,7 @@ export default function TripLogs() {
     });
   };
 
-  // ── RENDER ───────────────────────────────────────────────────────────────
+  // â”€â”€ RENDER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   return (
     <div className="space-y-4">
@@ -564,7 +565,7 @@ export default function TripLogs() {
                             {log.to_location}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            {formatDuration(log.total_duration)} • {log.actual_distance} km
+                            {formatDuration(log.total_duration)} | {log.actual_distance ?? 0} km{log.distance_source ? ` (${log.distance_source})` : ""}
                           </div>
                         </TableCell>
 
@@ -617,7 +618,7 @@ export default function TripLogs() {
                       </div>
                       <div className="flex items-center">
                         <MapPin className="h-4 w-4 mr-1" />
-                        {log.from_location} → {log.to_location}
+                        {log.from_location} â†’ {log.to_location}
                       </div>
                     </div>
                     <div className="flex justify-end mt-3">
@@ -720,6 +721,10 @@ export default function TripLogs() {
                       <span>{selectedLog.actual_distance || 0} km</span>
                     </div>
                     <div className="flex justify-between">
+                      <span className="text-muted-foreground">Distance Source:</span>
+                      <span>{selectedLog.distance_source || "N/A"}</span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-muted-foreground">Duration:</span>
                       <span>{formatDuration(selectedLog.total_duration)}</span>
                     </div>
@@ -817,27 +822,27 @@ export default function TripLogs() {
                       <div key={cost.id || idx} className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm bg-background p-3 rounded border">
                         <div>
                            <span className="block text-xs text-muted-foreground">Base Fare</span>
-                           <span className="font-medium">₹{cost.base_fare || 0}</span>
+                           <span className="font-medium">â‚¹{cost.base_fare || 0}</span>
                         </div>
                         <div>
                            <span className="block text-xs text-muted-foreground">Distance</span>
-                           <span className="font-medium">₹{cost.distance_charges || 0}</span>
+                           <span className="font-medium">â‚¹{cost.distance_charges || 0}</span>
                         </div>
                         <div>
                            <span className="block text-xs text-muted-foreground">Fuel</span>
-                           <span className="font-medium flex items-center"><Fuel className="h-3 w-3 mr-1" /> ₹{cost.fuel_cost || 0}</span>
+                           <span className="font-medium flex items-center"><Fuel className="h-3 w-3 mr-1" /> â‚¹{cost.fuel_cost || 0}</span>
                         </div>
                          <div>
                            <span className="block text-xs text-muted-foreground">Tolls</span>
-                           <span className="font-medium flex items-center"><CreditCard className="h-3 w-3 mr-1" /> ₹{cost.toll_charges || 0}</span>
+                           <span className="font-medium flex items-center"><CreditCard className="h-3 w-3 mr-1" /> â‚¹{cost.toll_charges || 0}</span>
                         </div>
                         <div>
                            <span className="block text-xs text-muted-foreground">Parking</span>
-                           <span className="font-medium">₹{cost.parking_charges || 0}</span>
+                           <span className="font-medium">â‚¹{cost.parking_charges || 0}</span>
                         </div>
                         <div className="col-span-2 md:col-span-3 border-t mt-1 pt-2 flex justify-between items-center">
                            <span className="text-xs text-muted-foreground">Total</span>
-                           <span className="font-bold text-lg">₹{cost.total_cost || 0}</span>
+                           <span className="font-bold text-lg">â‚¹{cost.total_cost || 0}</span>
                         </div>
                       </div>
                     ))}
@@ -845,7 +850,7 @@ export default function TripLogs() {
                 ) : (
                   <div className="text-sm text-muted-foreground text-center py-2">
                     Detailed breakdown not available. <br />
-                    <span className="font-medium">Total Log Cost: ₹{selectedLog.totalCost || "0"}</span>
+                    <span className="font-medium">Total Log Cost: â‚¹{selectedLog.totalCost || "0"}</span>
                   </div>
                 )}
               </div>
@@ -862,3 +867,5 @@ export default function TripLogs() {
     </div>
   );
 }
+
+
